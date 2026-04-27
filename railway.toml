@@ -1,0 +1,7 @@
+[build]
+builder = "DOCKERFILE"
+
+[deploy]
+startCommand = "/bin/sh /app/scripts/start_railway.sh"
+healthcheckPath = "/health"
+healthcheckTimeout = 300

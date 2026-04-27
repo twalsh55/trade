@@ -1,0 +1,15 @@
+.git
+.gitignore
+.coverage
+.env
+.pytest_cache
+.venv
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+build/
+dist/
+tests/
+.vscode
+.codex
