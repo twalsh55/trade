@@ -15,6 +15,7 @@ from src.adapters.notifications.telegram_notifier import TelegramNotificationErr
 from src.adapters.market_data.yfinance_provider import YFinanceMarketDataAdapter
 from src.application.use_cases import BuildCrashDashboardUseCase
 from src.domain.models import CAUTION_CUTOFF, DEFAULT_UNIVERSE, RISK_OFF_CUTOFF, DashboardConfig
+from src.domain.services import compute_buyer_participation_series, compute_new_high_ratio_series
 
 REFRESH_INTERVAL_SECONDS = 300
 LAST_ALERT_SIGNATURE_KEY = "last_telegram_alert_signature"
@@ -35,6 +36,36 @@ def build_price_chart(close: pd.DataFrame, benchmark: str) -> go.Figure:
     fig.add_trace(go.Scatter(x=ma50.index, y=ma50, name="50D MA", line={"dash": "dot"}))
     fig.add_trace(go.Scatter(x=ma200.index, y=ma200, name="200D MA", line={"dash": "dash"}))
     fig.update_layout(height=420, margin={"l": 12, "r": 12, "t": 24, "b": 12}, legend={"orientation": "h"})
+    return fig
+
+
+def build_buyer_participation_chart(close: pd.DataFrame) -> go.Figure:
+    buyer_participation = compute_buyer_participation_series(close).rolling(20).mean()
+    new_high_ratio = compute_new_high_ratio_series(close)
+
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(
+            x=buyer_participation.index,
+            y=buyer_participation,
+            name="Buyer Participation (20D)",
+            line={"width": 2, "color": "#d97706"},
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=new_high_ratio.index,
+            y=new_high_ratio,
+            name="New High Ratio (252D)",
+            line={"width": 2, "dash": "dash", "color": "#2563eb"},
+        )
+    )
+    fig.update_layout(
+        height=320,
+        margin={"l": 12, "r": 12, "t": 24, "b": 12},
+        legend={"orientation": "h"},
+        yaxis={"range": [0, 1], "tickformat": ".0%"},
+    )
     return fig
 
 
@@ -181,6 +212,75 @@ def maybe_send_startup_telegram_message(benchmark: str, refreshed_at: datetime) 
     st.session_state[TELEGRAM_STATUS_KEY] = "startup message sent"
 
 
+def build_action_condition_rows(result: object) -> pd.DataFrame:
+    score = float(getattr(result, "risk_score", 0.0))
+    metrics = getattr(result, "metrics", {})
+    rows: list[dict[str, str]] = []
+
+    if score >= RISK_OFF_CUTOFF:
+        rows.append(
+            {
+                "Suggestion": "De-risk aggressively",
+                "Conditions": "Crash risk score >= 70, showing elevated trend, drawdown, volatility, or breadth stress.",
+            }
+        )
+    elif score >= CAUTION_CUTOFF:
+        rows.append(
+            {
+                "Suggestion": "Partial de-risk",
+                "Conditions": "Crash risk score between 50 and 70, so the market is fragile but not fully risk-off.",
+            }
+        )
+    else:
+        rows.append(
+            {
+                "Suggestion": "Maintain strategic risk",
+                "Conditions": "Crash risk score below 50, so broad stress is still contained.",
+            }
+        )
+
+    dip_zone = -0.20 < float(metrics.get("drawdown_252", 0.0)) < -0.05
+    oversold = float(metrics.get("rsi14", 100.0)) < 35
+    trend_reclaim = float(metrics.get("price", 0.0)) > float(metrics.get("ma50", float("inf")))
+    vix_cooling = "vix" in metrics and "vix_sma20" in metrics and float(metrics["vix"]) < float(metrics["vix_sma20"])
+
+    if dip_zone and oversold and (trend_reclaim or vix_cooling):
+        rows.append(
+            {
+                "Suggestion": "Buy-the-dip staging",
+                "Conditions": "Drawdown is between -20% and -5%, RSI is below 35, and either trend is reclaiming or VIX is cooling.",
+            }
+        )
+    elif dip_zone and oversold:
+        rows.append(
+            {
+                "Suggestion": "Watchlist dip",
+                "Conditions": "Drawdown is between -20% and -5% and RSI is below 35, but trend reclaim or VIX cooling is still missing.",
+            }
+        )
+
+    if float(metrics.get("yield_curve_spread", 0.0)) < 0:
+        rows.append(
+            {
+                "Suggestion": "Yield curve caution",
+                "Conditions": "Yield curve spread is negative, so the term structure is inverted.",
+            }
+        )
+
+    buyer_exhaustion = float(metrics.get("buyer_exhaustion", 0.0))
+    buyer_participation = float(metrics.get("buyer_participation_20d", 1.0))
+    new_high_ratio = float(metrics.get("new_high_ratio_252", 1.0))
+    if buyer_exhaustion >= 70 or (buyer_participation < 0.45 and new_high_ratio < 0.25):
+        rows.append(
+            {
+                "Suggestion": "No more buyers",
+                "Conditions": "Buyer participation is weak and few names are near 252-day highs, so rallies may be running out of sponsorship.",
+            }
+        )
+
+    return pd.DataFrame(rows)
+
+
 def maybe_send_telegram_alert(result: object, benchmark: str, refreshed_at: datetime) -> None:
     if not should_send_telegram_alert(result):
         return
@@ -276,6 +376,11 @@ def render() -> None:
     for action in result.actions:
         st.write(f"- {action}")
 
+    condition_table = build_action_condition_rows(result)
+    if not condition_table.empty:
+        st.subheader("Why These Suggestions Appear")
+        st.dataframe(condition_table, hide_index=True, width="stretch")
+
     left, right = st.columns([2, 1])
     with left:
         st.subheader(f"{benchmark} Trend & Price")
@@ -288,6 +393,9 @@ def render() -> None:
             .reset_index(drop=True)
         )
         st.dataframe(component_df, hide_index=True, width="stretch")
+
+    st.subheader("Buyer Participation")
+    st.plotly_chart(build_buyer_participation_chart(result.close_data), width="stretch")
 
     st.subheader("Indicators with Percentiles")
     indicator_table = result.indicator_percentiles.copy()

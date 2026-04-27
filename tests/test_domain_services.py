@@ -12,6 +12,9 @@ from src.domain.services import (
     normalize_yield_series,
     recommend_actions,
     summarize_series_percentiles,
+    tradable_columns,
+    compute_buyer_participation_series,
+    compute_new_high_ratio_series,
 )
 
 
@@ -41,6 +44,14 @@ def test_clamp_and_normalize_yield_series() -> None:
     normalized = normalize_yield_series(series)
 
     assert normalized.tolist() == [1.5, 2.2, 4.5]
+
+
+def test_tradable_columns_and_empty_participation_helpers() -> None:
+    close = pd.DataFrame({"^VIX": [10.0, 11.0], "^TNX": [4.0, 5.0]})
+
+    assert tradable_columns(close) == []
+    assert compute_buyer_participation_series(close).empty
+    assert compute_new_high_ratio_series(close).empty
 
 
 def test_compute_rsi_and_series_percentiles_helpers() -> None:
@@ -81,6 +92,10 @@ def test_compute_metrics_indicator_percentiles_and_risk_score_cover_optional_inp
     assert metrics["short_yield"] == 5.8
     assert metrics["long_yield"] == 3.1
     assert metrics["yield_curve_spread"] == -2.6999999999999997
+    assert metrics["buyer_participation_20d"] > 0
+    assert metrics["new_high_ratio_252"] > 0
+    assert metrics["benchmark_20d_return"] > 0
+    assert metrics["buyer_exhaustion"] >= 0
 
     indicator_percentiles = compute_indicator_percentiles(close, "SPY", "^VIX", "HYG", "^IRX", "^TNX")
     assert set(indicator_percentiles["Indicator"]) == {
@@ -90,6 +105,8 @@ def test_compute_metrics_indicator_percentiles_and_risk_score_cover_optional_inp
         "20D Vol (Ann.)",
         "252D Drawdown",
         "Breadth >200D",
+        "Buyer Participation (20D)",
+        "New High Ratio (252D)",
         "VIX",
         "Risk Proxy / 50D MA",
         "Short Yield",
@@ -100,6 +117,7 @@ def test_compute_metrics_indicator_percentiles_and_risk_score_cover_optional_inp
     score, components = compute_risk_score(metrics)
     assert score > 0
     assert components["Yield curve stress"] == 80.0
+    assert "Buyer exhaustion" in components
     assert "VIX stress" in components
     assert "Credit/risk stress" in components
 
@@ -144,3 +162,18 @@ def test_recommend_actions_cover_all_regimes_and_dip_paths() -> None:
     )
     assert constructive_regime == "Constructive (Low Crash Stress)"
     assert len(constructive_actions) == 2
+
+    buyer_exhaustion_regime, buyer_exhaustion_actions = recommend_actions(
+        30.0,
+        {
+            "drawdown_252": -0.02,
+            "rsi14": 55.0,
+            "price": 110.0,
+            "ma50": 100.0,
+            "buyer_exhaustion": 80.0,
+            "buyer_participation_20d": 0.30,
+            "new_high_ratio_252": 0.10,
+        },
+    )
+    assert buyer_exhaustion_regime == "Constructive (Low Crash Stress)"
+    assert any("No more buyers" in action for action in buyer_exhaustion_actions)

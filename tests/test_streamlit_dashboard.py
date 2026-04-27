@@ -145,6 +145,24 @@ def test_build_price_chart_builds_expected_traces() -> None:
     assert figure.data[2].name == "200D MA"
 
 
+def test_build_buyer_participation_chart_builds_expected_traces() -> None:
+    dates = pd.bdate_range("2022-01-01", periods=320)
+    close = pd.DataFrame(
+        {
+            "SPY": np.linspace(100.0, 150.0, len(dates)),
+            "QQQ": np.linspace(120.0, 140.0, len(dates)),
+            "^VIX": np.linspace(16.0, 28.0, len(dates)),
+        },
+        index=dates,
+    )
+
+    figure = dashboard.build_buyer_participation_chart(close)
+
+    assert len(figure.data) == 2
+    assert figure.data[0].name == "Buyer Participation (20D)"
+    assert figure.data[1].name == "New High Ratio (252D)"
+
+
 def test_run_dashboard_builds_config_and_executes_use_case(monkeypatch) -> None:
     dashboard.run_dashboard.clear()
     captured: dict[str, object] = {}
@@ -244,6 +262,85 @@ def test_telegram_alert_helpers(monkeypatch) -> None:
     assert "Refreshed: 2024-05-06 14:30:00 CEST" in message
     startup_message = dashboard.build_startup_message("SPY", refreshed_at)
     assert startup_message == "Market Crash Monitor started for SPY\nStartup time: 2024-05-06 14:30:00 CEST"
+
+
+def test_build_action_condition_rows_covers_regimes_and_signals() -> None:
+    low_result = make_result(False, False)
+    low_result = DashboardResult(
+        close_data=low_result.close_data,
+        metrics={"drawdown_252": -0.03, "rsi14": 50.0, "price": 130.0, "ma50": 120.0},
+        indicator_percentiles=low_result.indicator_percentiles,
+        risk_score=45.0,
+        risk_components=low_result.risk_components,
+        regime=low_result.regime,
+        actions=low_result.actions,
+    )
+    low_rows = dashboard.build_action_condition_rows(low_result)
+    assert list(low_rows["Suggestion"]) == ["Maintain strategic risk"]
+
+    caution_result = make_result(False, False)
+    caution_result = DashboardResult(
+        close_data=caution_result.close_data,
+        metrics={
+            "drawdown_252": -0.12,
+            "rsi14": 32.0,
+            "price": 99.0,
+            "ma50": 120.0,
+            "yield_curve_spread": -0.1,
+        },
+        indicator_percentiles=caution_result.indicator_percentiles,
+        risk_score=60.0,
+        risk_components=caution_result.risk_components,
+        regime=caution_result.regime,
+        actions=caution_result.actions,
+    )
+    caution_rows = dashboard.build_action_condition_rows(caution_result)
+    assert list(caution_rows["Suggestion"]) == ["Partial de-risk", "Watchlist dip", "Yield curve caution"]
+
+    high_result = make_result(True, False)
+    high_result = DashboardResult(
+        close_data=high_result.close_data,
+        metrics={
+            "drawdown_252": -0.12,
+            "rsi14": 32.0,
+            "price": 125.0,
+            "ma50": 120.0,
+            "vix": 20.0,
+            "vix_sma20": 25.0,
+            "yield_curve_spread": -0.1,
+        },
+        indicator_percentiles=high_result.indicator_percentiles,
+        risk_score=75.0,
+        risk_components=high_result.risk_components,
+        regime=high_result.regime,
+        actions=high_result.actions,
+    )
+    high_rows = dashboard.build_action_condition_rows(high_result)
+    assert list(high_rows["Suggestion"]) == ["De-risk aggressively", "Buy-the-dip staging", "Yield curve caution"]
+
+
+def test_build_action_condition_rows_includes_no_more_buyers_signal() -> None:
+    result = make_result(False, False)
+    result = DashboardResult(
+        close_data=result.close_data,
+        metrics={
+            "drawdown_252": -0.02,
+            "rsi14": 50.0,
+            "price": 110.0,
+            "ma50": 100.0,
+            "buyer_exhaustion": 80.0,
+            "buyer_participation_20d": 0.30,
+            "new_high_ratio_252": 0.10,
+        },
+        indicator_percentiles=result.indicator_percentiles,
+        risk_score=30.0,
+        risk_components=result.risk_components,
+        regime=result.regime,
+        actions=result.actions,
+    )
+
+    rows = dashboard.build_action_condition_rows(result)
+    assert list(rows["Suggestion"]) == ["Maintain strategic risk", "No more buyers"]
 
 
 def test_get_secret_returns_none_when_secrets_are_unavailable(monkeypatch) -> None:
@@ -538,9 +635,11 @@ def test_render_success_path_with_yield_curve(monkeypatch) -> None:
     assert any("**Regime:** :red[" in message for message in fake_st.markdowns)
     assert any("**Yield Curve:** :red[Inverted]" == message for message in fake_st.markdowns)
     assert fake_st.writes == ["- First action", "- Second action"]
-    assert fake_st.plot_calls == 1
-    assert len(fake_st.dataframes) == 2
-    assert fake_st.dataframes[1].iloc[0]["Current"] == 130.1234
+    assert fake_st.plot_calls == 2
+    assert len(fake_st.dataframes) == 3
+    assert list(fake_st.dataframes[0]["Suggestion"]) == ["De-risk aggressively", "Yield curve caution"]
+    assert list(fake_st.dataframes[1]["Component"]) == ["Trend stress", "Breadth stress"]
+    assert fake_st.dataframes[2].iloc[0]["Current"] == 130.1234
     assert fake_st.captions[-1] == "Last refreshed: 2024-05-06 14:30:00 CEST"
 
 
@@ -608,10 +707,12 @@ def test_render_force_refresh_updates_tables_and_error_path(monkeypatch) -> None
     top_metrics = fake_st.columns_created[0]
     assert ("Yield Spread (L-S)", "N/A") in top_metrics[4].metrics
     assert any("**Regime:** :green[" in message for message in fake_st.markdowns)
-    assert fake_st.dataframes[1].empty
-    assert not fake_st.dataframes[3].empty
-    assert fake_st.dataframes[3].iloc[0]["Current"] == 131.9876
-    assert fake_st.dataframes[2].iloc[0]["Score"] == 20.0
+    assert list(fake_st.dataframes[0]["Suggestion"]) == ["Maintain strategic risk"]
+    assert fake_st.dataframes[2].empty
+    assert list(fake_st.dataframes[3]["Suggestion"]) == ["Maintain strategic risk"]
+    assert fake_st.dataframes[4].iloc[0]["Score"] == 20.0
+    assert fake_st.dataframes[5].iloc[0]["Current"] == 131.9876
+    assert fake_st.plot_calls == 4
     assert cleared == ["cleared"]
     refresh_captions = [caption for caption in fake_st.captions if caption.startswith("Last refreshed:")]
     assert refresh_captions == [

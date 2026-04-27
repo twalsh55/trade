@@ -25,6 +25,29 @@ def normalize_yield_series(series: pd.Series) -> pd.Series:
     return series.where(series <= 20, series / 10)
 
 
+def tradable_columns(close: pd.DataFrame) -> list[str]:
+    return [column for column in close.columns if not str(column).startswith("^")]
+
+
+def compute_buyer_participation_series(close: pd.DataFrame) -> pd.Series:
+    columns = tradable_columns(close)
+    if not columns:
+        return pd.Series(dtype=float)
+
+    daily_returns = close[columns].pct_change()
+    return (daily_returns > 0).mean(axis=1)
+
+
+def compute_new_high_ratio_series(close: pd.DataFrame, lookback: int = 252, tolerance: float = 0.03) -> pd.Series:
+    columns = tradable_columns(close)
+    if not columns:
+        return pd.Series(dtype=float)
+
+    rolling_high = close[columns].rolling(lookback).max()
+    near_high = close[columns] >= rolling_high * (1 - tolerance)
+    return near_high.mean(axis=1)
+
+
 def compute_metrics(
     close: pd.DataFrame,
     benchmark: str,
@@ -46,6 +69,9 @@ def compute_metrics(
 
     breadth = (close / close.rolling(200).mean()) > 1
     breadth_ratio = breadth.iloc[-1].mean() if not breadth.empty else np.nan
+    buyer_participation_20d = compute_buyer_participation_series(close).rolling(20).mean()
+    new_high_ratio_252 = compute_new_high_ratio_series(close)
+    benchmark_20d_return = float(bench.pct_change(20).iloc[-1]) if len(bench) > 20 else np.nan
 
     metrics = {
         "price": float(bench.iloc[-1]),
@@ -57,11 +83,29 @@ def compute_metrics(
         "breadth_ratio": float(breadth_ratio),
     }
 
+    if not buyer_participation_20d.empty and not np.isnan(buyer_participation_20d.iloc[-1]):
+        metrics["buyer_participation_20d"] = float(buyer_participation_20d.iloc[-1])
+
+    if not new_high_ratio_252.empty and not np.isnan(new_high_ratio_252.iloc[-1]):
+        metrics["new_high_ratio_252"] = float(new_high_ratio_252.iloc[-1])
+
+    if not np.isnan(benchmark_20d_return):
+        metrics["benchmark_20d_return"] = benchmark_20d_return
+
     if vix_symbol in close:
         vix = close[vix_symbol].dropna()
         if len(vix) > 20:
             metrics["vix"] = float(vix.iloc[-1])
             metrics["vix_sma20"] = float(vix.rolling(20).mean().iloc[-1])
+
+    if "buyer_participation_20d" in metrics and "new_high_ratio_252" in metrics and "benchmark_20d_return" in metrics:
+        metrics["buyer_exhaustion"] = clamp(
+            (0.55 - metrics["buyer_participation_20d"]) * 180
+            + (0.20 - metrics["new_high_ratio_252"]) * 120
+            + (0.00 - metrics["benchmark_20d_return"]) * 100,
+            0,
+            100,
+        )
 
     if risk_proxy in close:
         proxy = close[risk_proxy].dropna()
@@ -109,6 +153,8 @@ def compute_indicator_percentiles(
     vol20 = bench.pct_change().rolling(20).std() * np.sqrt(252)
     rsi14 = compute_rsi(bench, 14)
     breadth_ratio_series = ((close / close.rolling(200).mean()) > 1).mean(axis=1)
+    buyer_participation_series = compute_buyer_participation_series(close).rolling(20).mean()
+    new_high_ratio_series = compute_new_high_ratio_series(close)
 
     rows: list[dict[str, float | str]] = []
     series_map: list[tuple[str, pd.Series]] = [
@@ -119,6 +165,8 @@ def compute_indicator_percentiles(
         ("20D Vol (Ann.)", vol20),
         ("252D Drawdown", dd_252),
         ("Breadth >200D", breadth_ratio_series),
+        ("Buyer Participation (20D)", buyer_participation_series),
+        ("New High Ratio (252D)", new_high_ratio_series),
     ]
 
     if vix_symbol in close:
@@ -166,6 +214,9 @@ def compute_risk_score(metrics: dict[str, float]) -> tuple[float, dict[str, floa
     if "yield_curve_spread" in metrics:
         components["Yield curve stress"] = 80.0 if metrics["yield_curve_spread"] < 0 else 0.0
 
+    if "buyer_exhaustion" in metrics:
+        components["Buyer exhaustion"] = clamp(metrics["buyer_exhaustion"], 0, 100)
+
     weights = {
         "Trend stress": 0.23,
         "Drawdown stress": 0.18,
@@ -175,6 +226,7 @@ def compute_risk_score(metrics: dict[str, float]) -> tuple[float, dict[str, floa
         "VIX stress": 0.10,
         "Credit/risk stress": 0.07,
         "Yield curve stress": 0.08,
+        "Buyer exhaustion": 0.09,
     }
 
     total_weight = sum(weights[key] for key in components)
@@ -187,6 +239,9 @@ def recommend_actions(score: float, metrics: dict[str, float]) -> tuple[str, lis
     oversold = metrics["rsi14"] < 35
     trend_reclaim = metrics["price"] > metrics["ma50"]
     vix_cooling = "vix" in metrics and "vix_sma20" in metrics and metrics["vix"] < metrics["vix_sma20"]
+    buyer_exhaustion = float(metrics.get("buyer_exhaustion", 0.0))
+    buyer_participation = float(metrics.get("buyer_participation_20d", 1.0))
+    new_high_ratio = float(metrics.get("new_high_ratio_252", 1.0))
 
     if score >= RISK_OFF_CUTOFF:
         regime = "Risk-Off (High Crash Risk)"
@@ -218,5 +273,10 @@ def recommend_actions(score: float, metrics: dict[str, float]) -> tuple[str, lis
 
     if "yield_curve_spread" in metrics and metrics["yield_curve_spread"] < 0:
         actions.append("Yield curve inverted: keep risk budgets tighter and emphasize defensive/quality exposure.")
+
+    if buyer_exhaustion >= 70 or (buyer_participation < 0.45 and new_high_ratio < 0.25):
+        actions.append(
+            "No more buyers: participation is thinning and fewer names are near highs, so avoid chasing strength."
+        )
 
     return regime, actions
