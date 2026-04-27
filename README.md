@@ -22,9 +22,9 @@ railway up
 
 Container behavior:
 - installs dependencies with `uv sync --frozen`
-- starts Streamlit behind Nginx
-- serves `GET /health` for Railway healthchecks
-- binds the proxy to `0.0.0.0:$PORT` so Railway can route traffic correctly
+- starts Streamlit directly on `0.0.0.0:$PORT`
+- serves `GET /_stcore/health` for Railway healthchecks
+- disables CORS/XSRF protections for proxy compatibility
 
 Set these Railway environment variables if you want Telegram alerts:
 - `TELEGRAM_BOT_TOKEN`

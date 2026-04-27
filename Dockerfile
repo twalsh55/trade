@@ -10,10 +10,7 @@ WORKDIR /app
 
 COPY pyproject.toml uv.lock ./
 
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends nginx gettext-base ca-certificates \
-    && rm -rf /var/lib/apt/lists/* \
-    && pip install --no-cache-dir uv \
+RUN pip install --no-cache-dir uv \
     && uv sync --frozen
 
 COPY . .
