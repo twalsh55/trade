@@ -11,6 +11,29 @@ uv sync
 uv run streamlit run main.py
 ```
 
+## Telegram Alerts
+
+Create a local `.env` file or export these before running if you want Telegram messages when the dashboard produces an actionable alert:
+
+```bash
+TELEGRAM_BOT_TOKEN=your_bot_token
+TELEGRAM_CHAT_ID=your_chat_id
+```
+
+Alerts are sent once per distinct signal and will re-send only when the regime/actions change.
+
+To discover your `TELEGRAM_CHAT_ID` after messaging the bot:
+
+```bash
+uv run python scripts/get_telegram_chat_id.py
+```
+
+To test whether your bot token and chat ID can send successfully:
+
+```bash
+uv run python scripts/test_telegram_send.py
+```
+
 ## Ports and Adapters Structure
 
 ```text

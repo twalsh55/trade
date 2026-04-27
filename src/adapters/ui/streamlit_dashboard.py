@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from datetime import date, datetime, timedelta
 
 import pandas as pd
@@ -7,11 +8,14 @@ import plotly.graph_objects as go
 import streamlit as st
 import streamlit.components.v1 as components
 
+from src.adapters.notifications.telegram_notifier import TelegramNotificationError, TelegramNotifier
 from src.adapters.market_data.yfinance_provider import YFinanceMarketDataAdapter
 from src.application.use_cases import BuildCrashDashboardUseCase
 from src.domain.models import CAUTION_CUTOFF, DEFAULT_UNIVERSE, RISK_OFF_CUTOFF, DashboardConfig
 
 REFRESH_INTERVAL_SECONDS = 300
+LAST_ALERT_SIGNATURE_KEY = "last_telegram_alert_signature"
+STARTUP_MESSAGE_SENT_KEY = "startup_telegram_message_sent"
 
 
 def build_price_chart(close: pd.DataFrame, benchmark: str) -> go.Figure:
@@ -75,6 +79,86 @@ def clear_dashboard_cache() -> None:
         clear()
 
 
+def get_secret(name: str) -> str | None:
+    value = os.getenv(name)
+    if value:
+        return value
+
+    secrets = getattr(st, "secrets", None)
+    if secrets is None:
+        return None
+
+    secret_value = secrets.get(name)
+    return str(secret_value) if secret_value else None
+
+
+def should_send_telegram_alert(result: object) -> bool:
+    actions = getattr(result, "actions", [])
+    score = getattr(result, "risk_score", 0.0)
+    return score >= CAUTION_CUTOFF or any(
+        keyword in action
+        for action in actions
+        for keyword in ("Buy-the-dip signal", "Watchlist dip", "Yield curve inverted")
+    )
+
+
+def build_alert_signature(result: object, benchmark: str) -> str:
+    actions = tuple(getattr(result, "actions", []))
+    regime = getattr(result, "regime", "")
+    score = round(float(getattr(result, "risk_score", 0.0)), 1)
+    return repr((benchmark, regime, score, actions))
+
+
+def build_telegram_alert_message(result: object, benchmark: str, refreshed_at: datetime) -> str:
+    actions = "\n".join(f"- {action}" for action in getattr(result, "actions", []))
+    return (
+        f"Market Crash Monitor alert for {benchmark}\n"
+        f"Regime: {getattr(result, 'regime', 'Unknown')}\n"
+        f"Risk score: {float(getattr(result, 'risk_score', 0.0)):.1f}/100\n"
+        f"Refreshed: {format_refresh_timestamp(refreshed_at)}\n"
+        f"Actions:\n{actions}"
+    )
+
+
+def build_startup_message(benchmark: str, refreshed_at: datetime) -> str:
+    return (
+        f"Market Crash Monitor started for {benchmark}\n"
+        f"Startup time: {format_refresh_timestamp(refreshed_at)}"
+    )
+
+
+def maybe_send_startup_telegram_message(benchmark: str, refreshed_at: datetime) -> None:
+    if st.session_state.get(STARTUP_MESSAGE_SENT_KEY):
+        return
+
+    bot_token = get_secret("TELEGRAM_BOT_TOKEN")
+    chat_id = get_secret("TELEGRAM_CHAT_ID")
+    if not bot_token or not chat_id:
+        return
+
+    notifier = TelegramNotifier(bot_token=bot_token, chat_id=chat_id)
+    notifier.send_message(build_startup_message(benchmark, refreshed_at))
+    st.session_state[STARTUP_MESSAGE_SENT_KEY] = "sent"
+
+
+def maybe_send_telegram_alert(result: object, benchmark: str, refreshed_at: datetime) -> None:
+    if not should_send_telegram_alert(result):
+        return
+
+    bot_token = get_secret("TELEGRAM_BOT_TOKEN")
+    chat_id = get_secret("TELEGRAM_CHAT_ID")
+    if not bot_token or not chat_id:
+        return
+
+    signature = build_alert_signature(result, benchmark)
+    if st.session_state.get(LAST_ALERT_SIGNATURE_KEY) == signature:
+        return
+
+    notifier = TelegramNotifier(bot_token=bot_token, chat_id=chat_id)
+    notifier.send_message(build_telegram_alert_message(result, benchmark, refreshed_at))
+    st.session_state[LAST_ALERT_SIGNATURE_KEY] = signature
+
+
 def render() -> None:
     st.set_page_config(page_title="Crash Monitor Dashboard", layout="wide")
     schedule_refresh()
@@ -116,6 +200,12 @@ def render() -> None:
     except ValueError as exc:
         st.error(str(exc))
         return
+
+    try:
+        maybe_send_startup_telegram_message(benchmark, refreshed_at)
+        maybe_send_telegram_alert(result, benchmark, refreshed_at)
+    except TelegramNotificationError as exc:
+        st.warning(str(exc))
 
     st.caption(f"Last refreshed: {format_refresh_timestamp(refreshed_at)}")
 

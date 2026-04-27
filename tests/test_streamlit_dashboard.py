@@ -41,6 +41,8 @@ class FakeStreamlit:
         self._text_values = iter(text_values)
         self._slider_value = slider_value
         self._button_values = iter(button_values or [])
+        self.session_state: dict[str, str] = {}
+        self.secrets: dict[str, str] = {}
         self.columns_created: list[list[FakeColumn]] = []
         self.errors: list[str] = []
         self.markdowns: list[str] = []
@@ -49,6 +51,7 @@ class FakeStreamlit:
         self.writes: list[str] = []
         self.dataframes: list[pd.DataFrame] = []
         self.plot_calls = 0
+        self.warnings: list[str] = []
 
     def set_page_config(self, **kwargs) -> None:  # type: ignore[no-untyped-def]
         self.page_config = kwargs
@@ -74,6 +77,9 @@ class FakeStreamlit:
 
     def error(self, message: str) -> None:
         self.errors.append(message)
+
+    def warning(self, message: str) -> None:
+        self.warnings.append(message)
 
     def markdown(self, message: str) -> None:
         self.markdowns.append(message)
@@ -191,6 +197,135 @@ def test_schedule_refresh_and_format_refresh_timestamp(monkeypatch) -> None:
     assert "300000" in captured["html"]
     assert captured["height"] == 0
     assert dashboard.format_refresh_timestamp(datetime(2024, 5, 6, 12, 30, tzinfo=timezone.utc)) == "2024-05-06 12:30:00 UTC"
+
+
+def test_telegram_alert_helpers(monkeypatch) -> None:
+    fake_st = FakeStreamlit([], slider_value=1)
+    monkeypatch.setattr(dashboard, "st", fake_st)
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "bot-token")
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "chat-id")
+
+    result = make_result(True, False)
+    refreshed_at = datetime(2024, 5, 6, 12, 30, tzinfo=timezone.utc)
+
+    assert dashboard.get_secret("TELEGRAM_BOT_TOKEN") == "bot-token"
+    assert dashboard.should_send_telegram_alert(result) is True
+    assert "Risk-Off" in dashboard.build_alert_signature(result, "SPY")
+    message = dashboard.build_telegram_alert_message(result, "SPY", refreshed_at)
+    assert "Market Crash Monitor alert for SPY" in message
+    assert "Refreshed: 2024-05-06 12:30:00 UTC" in message
+    startup_message = dashboard.build_startup_message("SPY", refreshed_at)
+    assert startup_message == "Market Crash Monitor started for SPY\nStartup time: 2024-05-06 12:30:00 UTC"
+
+
+def test_get_secret_returns_none_when_secrets_are_unavailable(monkeypatch) -> None:
+    class StreamlitWithoutSecrets:
+        session_state: dict[str, str] = {}
+
+    monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
+    monkeypatch.setattr(dashboard, "st", StreamlitWithoutSecrets())
+
+    assert dashboard.get_secret("TELEGRAM_BOT_TOKEN") is None
+
+
+def test_get_secret_reads_from_streamlit_secrets(monkeypatch) -> None:
+    fake_st = FakeStreamlit([], slider_value=1)
+    fake_st.secrets = {"TELEGRAM_BOT_TOKEN": "secret-token"}
+    monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
+    monkeypatch.setattr(dashboard, "st", fake_st)
+
+    assert dashboard.get_secret("TELEGRAM_BOT_TOKEN") == "secret-token"
+
+
+def test_maybe_send_telegram_alert_deduplicates_and_respects_threshold(monkeypatch) -> None:
+    fake_st = FakeStreamlit([], slider_value=1)
+    fake_st.secrets = {"TELEGRAM_BOT_TOKEN": "secret-token", "TELEGRAM_CHAT_ID": "secret-chat"}
+    monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
+    monkeypatch.delenv("TELEGRAM_CHAT_ID", raising=False)
+    monkeypatch.setattr(dashboard, "st", fake_st)
+
+    sent_messages: list[tuple[str, str, str]] = []
+
+    class FakeNotifier:
+        def __init__(self, bot_token: str, chat_id: str) -> None:
+            self.bot_token = bot_token
+            self.chat_id = chat_id
+
+        def send_message(self, text: str) -> None:
+            sent_messages.append((self.bot_token, self.chat_id, text))
+
+    monkeypatch.setattr(dashboard, "TelegramNotifier", FakeNotifier)
+    refreshed_at = datetime(2024, 5, 6, 12, 30, tzinfo=timezone.utc)
+    actionable = make_result(True, False)
+    constructive = make_result(False, False)
+
+    dashboard.maybe_send_telegram_alert(actionable, "SPY", refreshed_at)
+    dashboard.maybe_send_telegram_alert(actionable, "SPY", refreshed_at)
+    dashboard.maybe_send_telegram_alert(constructive, "SPY", refreshed_at)
+
+    assert len(sent_messages) == 1
+    assert sent_messages[0][0] == "secret-token"
+    assert sent_messages[0][1] == "secret-chat"
+    assert "Risk-Off" in sent_messages[0][2]
+    assert fake_st.session_state[dashboard.LAST_ALERT_SIGNATURE_KEY] == dashboard.build_alert_signature(actionable, "SPY")
+
+
+def test_maybe_send_startup_telegram_message_sends_once_per_session(monkeypatch) -> None:
+    fake_st = FakeStreamlit([], slider_value=1)
+    fake_st.secrets = {"TELEGRAM_BOT_TOKEN": "secret-token", "TELEGRAM_CHAT_ID": "secret-chat"}
+    monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
+    monkeypatch.delenv("TELEGRAM_CHAT_ID", raising=False)
+    monkeypatch.setattr(dashboard, "st", fake_st)
+
+    sent_messages: list[tuple[str, str, str]] = []
+
+    class FakeNotifier:
+        def __init__(self, bot_token: str, chat_id: str) -> None:
+            self.bot_token = bot_token
+            self.chat_id = chat_id
+
+        def send_message(self, text: str) -> None:
+            sent_messages.append((self.bot_token, self.chat_id, text))
+
+    monkeypatch.setattr(dashboard, "TelegramNotifier", FakeNotifier)
+    refreshed_at = datetime(2024, 5, 6, 12, 30, tzinfo=timezone.utc)
+
+    dashboard.maybe_send_startup_telegram_message("SPY", refreshed_at)
+    dashboard.maybe_send_startup_telegram_message("SPY", refreshed_at)
+
+    assert sent_messages == [
+        ("secret-token", "secret-chat", "Market Crash Monitor started for SPY\nStartup time: 2024-05-06 12:30:00 UTC")
+    ]
+    assert fake_st.session_state[dashboard.STARTUP_MESSAGE_SENT_KEY] == "sent"
+
+
+def test_maybe_send_telegram_alert_skips_without_credentials_and_warning_on_failure(monkeypatch) -> None:
+    fake_st = FakeStreamlit(["SPY, QQQ", "spy", "^vix", "hyg", "^irx", "^tnx"], slider_value=4)
+    monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
+    monkeypatch.delenv("TELEGRAM_CHAT_ID", raising=False)
+    monkeypatch.setattr(dashboard, "st", fake_st)
+    monkeypatch.setattr(dashboard, "schedule_refresh", lambda: None)
+    refreshed_at = datetime(2024, 5, 6, 12, 30, tzinfo=timezone.utc)
+    result = make_result(True, False)
+
+    dashboard.maybe_send_telegram_alert(result, "SPY", refreshed_at)
+    assert dashboard.LAST_ALERT_SIGNATURE_KEY not in fake_st.session_state
+    dashboard.maybe_send_startup_telegram_message("SPY", refreshed_at)
+    assert dashboard.STARTUP_MESSAGE_SENT_KEY not in fake_st.session_state
+
+    fake_st.secrets = {"TELEGRAM_BOT_TOKEN": "secret-token", "TELEGRAM_CHAT_ID": "secret-chat"}
+
+    def raise_telegram_error(result: object, benchmark: str, refreshed_at: datetime) -> None:
+        raise dashboard.TelegramNotificationError("Unable to send Telegram notification.")
+
+    monkeypatch.setattr(dashboard, "maybe_send_startup_telegram_message", lambda benchmark, refreshed_at: None)
+    monkeypatch.setattr(dashboard, "maybe_send_telegram_alert", raise_telegram_error)
+    monkeypatch.setattr(dashboard, "run_dashboard", lambda *args: (result, refreshed_at))
+    monkeypatch.setattr(dashboard, "build_price_chart", lambda close, benchmark: {"benchmark": benchmark})
+
+    dashboard.render()
+
+    assert fake_st.warnings == ["Unable to send Telegram notification."]
 
 
 def test_clear_dashboard_cache_calls_clear_when_available() -> None:
