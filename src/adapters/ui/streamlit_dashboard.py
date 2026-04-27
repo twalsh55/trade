@@ -8,6 +8,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 import streamlit.components.v1 as components
+from streamlit.errors import StreamlitSecretNotFoundError
 
 from src.adapters.notifications.telegram_notifier import TelegramNotificationError, TelegramNotifier
 from src.adapters.market_data.yfinance_provider import YFinanceMarketDataAdapter
@@ -93,11 +94,15 @@ def get_secret(name: str) -> str | None:
     if value:
         return value
 
-    secrets = getattr(st, "secrets", None)
-    if secrets is None:
+    try:
+        secrets = getattr(st, "secrets", None)
+        if secrets is None:
+            return None
+
+        secret_value = secrets.get(name)
+    except StreamlitSecretNotFoundError:
         return None
 
-    secret_value = secrets.get(name)
     return str(secret_value) if secret_value else None
 
 

@@ -256,6 +256,21 @@ def test_get_secret_returns_none_when_secrets_are_unavailable(monkeypatch) -> No
     assert dashboard.get_secret("TELEGRAM_BOT_TOKEN") is None
 
 
+def test_get_secret_returns_none_when_streamlit_secrets_file_is_missing(monkeypatch) -> None:
+    class SecretsThatRaise:
+        def get(self, name: str):  # type: ignore[no-untyped-def]
+            raise dashboard.StreamlitSecretNotFoundError("missing")
+
+    class StreamlitWithRaisingSecrets:
+        session_state: dict[str, str] = {}
+        secrets = SecretsThatRaise()
+
+    monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
+    monkeypatch.setattr(dashboard, "st", StreamlitWithRaisingSecrets())
+
+    assert dashboard.get_secret("TELEGRAM_BOT_TOKEN") is None
+
+
 def test_get_secret_reads_from_streamlit_secrets(monkeypatch) -> None:
     fake_st = FakeStreamlit([], slider_value=1)
     fake_st.secrets = {"TELEGRAM_BOT_TOKEN": "secret-token"}
