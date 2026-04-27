@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timezone
+import logging
 
 import numpy as np
 import pandas as pd
@@ -182,6 +183,33 @@ def test_run_dashboard_builds_config_and_executes_use_case(monkeypatch) -> None:
     assert result == ("done", fake_now)
 
 
+def test_run_dashboard_logs_refresh_window(monkeypatch, caplog) -> None:
+    dashboard.run_dashboard.clear()
+
+    class CapturingUseCase:
+        def __init__(self, market_data) -> None:  # type: ignore[no-untyped-def]
+            self.market_data = market_data
+
+        def execute(self, config):  # type: ignore[no-untyped-def]
+            return "done"
+
+    monkeypatch.setattr(dashboard, "YFinanceMarketDataAdapter", FakeAdapter)
+    monkeypatch.setattr(dashboard, "BuildCrashDashboardUseCase", CapturingUseCase)
+    with caplog.at_level(logging.INFO):
+        dashboard.run_dashboard(
+            ("SPY", "QQQ"),
+            "SPY",
+            "^VIX",
+            "HYG",
+            "^IRX",
+            "^TNX",
+            date(2024, 1, 1),
+            date(2024, 12, 31),
+        )
+
+    assert any("Refreshing dashboard data" in record.message for record in caplog.records)
+
+
 def test_schedule_refresh_and_format_refresh_timestamp(monkeypatch) -> None:
     captured: dict[str, object] = {}
 
@@ -270,6 +298,30 @@ def test_maybe_send_telegram_alert_deduplicates_and_respects_threshold(monkeypat
     assert fake_st.session_state[dashboard.LAST_ALERT_SIGNATURE_KEY] == dashboard.build_alert_signature(actionable, "SPY")
 
 
+def test_maybe_send_telegram_alert_logs(monkeypatch, caplog) -> None:
+    fake_st = FakeStreamlit([], slider_value=1)
+    fake_st.secrets = {"TELEGRAM_BOT_TOKEN": "secret-token", "TELEGRAM_CHAT_ID": "secret-chat"}
+    monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
+    monkeypatch.delenv("TELEGRAM_CHAT_ID", raising=False)
+    monkeypatch.setattr(dashboard, "st", fake_st)
+
+    class FakeNotifier:
+        def __init__(self, bot_token: str, chat_id: str) -> None:
+            pass
+
+        def send_message(self, text: str) -> None:
+            return None
+
+    monkeypatch.setattr(dashboard, "TelegramNotifier", FakeNotifier)
+    refreshed_at = datetime(2024, 5, 6, 12, 30, tzinfo=timezone.utc)
+    actionable = make_result(True, False)
+
+    with caplog.at_level(logging.INFO):
+        dashboard.maybe_send_telegram_alert(actionable, "SPY", refreshed_at)
+
+    assert any("Sending Telegram alert" in record.message for record in caplog.records)
+
+
 def test_maybe_send_startup_telegram_message_sends_once_per_session(monkeypatch) -> None:
     fake_st = FakeStreamlit([], slider_value=1)
     fake_st.secrets = {"TELEGRAM_BOT_TOKEN": "secret-token", "TELEGRAM_CHAT_ID": "secret-chat"}
@@ -297,6 +349,29 @@ def test_maybe_send_startup_telegram_message_sends_once_per_session(monkeypatch)
         ("secret-token", "secret-chat", "Market Crash Monitor started for SPY\nStartup time: 2024-05-06 12:30:00 UTC")
     ]
     assert fake_st.session_state[dashboard.STARTUP_MESSAGE_SENT_KEY] == "sent"
+
+
+def test_maybe_send_startup_telegram_message_logs(monkeypatch, caplog) -> None:
+    fake_st = FakeStreamlit([], slider_value=1)
+    fake_st.secrets = {"TELEGRAM_BOT_TOKEN": "secret-token", "TELEGRAM_CHAT_ID": "secret-chat"}
+    monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
+    monkeypatch.delenv("TELEGRAM_CHAT_ID", raising=False)
+    monkeypatch.setattr(dashboard, "st", fake_st)
+
+    class FakeNotifier:
+        def __init__(self, bot_token: str, chat_id: str) -> None:
+            pass
+
+        def send_message(self, text: str) -> None:
+            return None
+
+    monkeypatch.setattr(dashboard, "TelegramNotifier", FakeNotifier)
+    refreshed_at = datetime(2024, 5, 6, 12, 30, tzinfo=timezone.utc)
+
+    with caplog.at_level(logging.INFO):
+        dashboard.maybe_send_startup_telegram_message("SPY", refreshed_at)
+
+    assert any("Sending Telegram startup message" in record.message for record in caplog.records)
 
 
 def test_maybe_send_telegram_alert_skips_without_credentials_and_warning_on_failure(monkeypatch) -> None:

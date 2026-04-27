@@ -11,6 +11,25 @@ uv sync
 uv run streamlit run main.py
 ```
 
+## Deploy on Railway
+
+This repo includes a `Dockerfile` and `railway.toml` for Railway deployment.
+
+Railway setup:
+```bash
+railway up
+```
+
+Container behavior:
+- installs dependencies with `uv sync --frozen`
+- starts Streamlit behind Nginx
+- serves `GET /health` for Railway healthchecks
+- binds the proxy to `0.0.0.0:$PORT` so Railway can route traffic correctly
+
+Set these Railway environment variables if you want Telegram alerts:
+- `TELEGRAM_BOT_TOKEN`
+- `TELEGRAM_CHAT_ID`
+
 ## Telegram Alerts
 
 Create a local `.env` file or export these before running if you want Telegram messages when the dashboard produces an actionable alert:

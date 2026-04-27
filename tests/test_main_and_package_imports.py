@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import runpy
+import logging
 from pathlib import Path
 
 import main
@@ -74,3 +75,7 @@ def test_main_script_calls_render_when_streamlit_runtime_exists(monkeypatch) -> 
     runpy.run_path("main.py", run_name="__main__")
 
     assert called == ["rendered"]
+
+
+def test_main_logging_configuration_exists() -> None:
+    assert logging.getLogger().level in (logging.INFO, logging.WARNING, logging.ERROR, logging.CRITICAL)

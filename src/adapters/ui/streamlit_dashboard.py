@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import logging
 from datetime import date, datetime, timedelta
 
 import pandas as pd
@@ -16,6 +17,8 @@ from src.domain.models import CAUTION_CUTOFF, DEFAULT_UNIVERSE, RISK_OFF_CUTOFF,
 REFRESH_INTERVAL_SECONDS = 300
 LAST_ALERT_SIGNATURE_KEY = "last_telegram_alert_signature"
 STARTUP_MESSAGE_SENT_KEY = "startup_telegram_message_sent"
+
+logger = logging.getLogger(__name__)
 
 
 def build_price_chart(close: pd.DataFrame, benchmark: str) -> go.Figure:
@@ -53,6 +56,11 @@ def run_dashboard(
         end_date=end_date,
     )
     use_case = BuildCrashDashboardUseCase(market_data=YFinanceMarketDataAdapter())
+    logger.info(
+        "Refreshing dashboard data for %s through %s",
+        start_date.isoformat(),
+        end_date.isoformat(),
+    )
     return use_case.execute(config), datetime.now().astimezone()
 
 
@@ -76,6 +84,7 @@ def format_refresh_timestamp(refreshed_at: datetime) -> str:
 def clear_dashboard_cache() -> None:
     clear = getattr(run_dashboard, "clear", None)
     if clear is not None:
+        logger.info("Clearing cached dashboard data")
         clear()
 
 
@@ -137,6 +146,7 @@ def maybe_send_startup_telegram_message(benchmark: str, refreshed_at: datetime) 
         return
 
     notifier = TelegramNotifier(bot_token=bot_token, chat_id=chat_id)
+    logger.info("Sending Telegram startup message for %s", benchmark)
     notifier.send_message(build_startup_message(benchmark, refreshed_at))
     st.session_state[STARTUP_MESSAGE_SENT_KEY] = "sent"
 
@@ -155,6 +165,7 @@ def maybe_send_telegram_alert(result: object, benchmark: str, refreshed_at: date
         return
 
     notifier = TelegramNotifier(bot_token=bot_token, chat_id=chat_id)
+    logger.info("Sending Telegram alert for %s with signature %s", benchmark, signature)
     notifier.send_message(build_telegram_alert_message(result, benchmark, refreshed_at))
     st.session_state[LAST_ALERT_SIGNATURE_KEY] = signature
 
@@ -162,6 +173,7 @@ def maybe_send_telegram_alert(result: object, benchmark: str, refreshed_at: date
 def render() -> None:
     st.set_page_config(page_title="Crash Monitor Dashboard", layout="wide")
     schedule_refresh()
+    logger.info("Rendering dashboard UI")
     st.title("Market Crash Monitor")
     st.caption(
         "Tracks stress indicators and provides systematic de-risk / dip-buy cues. "
