@@ -1,26 +1,13 @@
 import os
 import logging
-from pathlib import Path
 
 import streamlit as st
+
+from src.config.env import load_env_file
 
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s - %(message)s")
 logger = logging.getLogger(__name__)
-
-
-def load_env_file(path: str = ".env") -> None:
-    env_path = Path(path)
-    if not env_path.exists():
-        return
-
-    for raw_line in env_path.read_text(encoding="utf-8").splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-
-        key, value = line.split("=", 1)
-        os.environ.setdefault(key.strip(), value.strip().strip("\"'"))
 
 
 if __name__ == "__main__":

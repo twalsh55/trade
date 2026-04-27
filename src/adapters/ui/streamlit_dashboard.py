@@ -247,7 +247,6 @@ def render() -> None:
         return
 
     try:
-        maybe_send_startup_telegram_message(benchmark, refreshed_at)
         maybe_send_telegram_alert(result, benchmark, refreshed_at)
     except TelegramNotificationError as exc:
         st.warning(str(exc))

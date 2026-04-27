@@ -3,6 +3,9 @@ set -eu
 
 export PORT="${PORT:-8501}"
 
+echo "Sending Telegram startup notification if configured"
+.venv/bin/python scripts/send_telegram_startup.py || true
+
 .venv/bin/streamlit run main.py \
   --server.address 0.0.0.0 \
   --server.port "${PORT}" \
