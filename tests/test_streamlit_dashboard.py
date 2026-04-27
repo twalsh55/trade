@@ -224,7 +224,7 @@ def test_schedule_refresh_and_format_refresh_timestamp(monkeypatch) -> None:
 
     assert captured["interval"] == 300000
     assert captured["key"] == "market_crash_monitor_refresh"
-    assert dashboard.format_refresh_timestamp(datetime(2024, 5, 6, 12, 30, tzinfo=timezone.utc)) == "2024-05-06 12:30:00 UTC"
+    assert dashboard.format_refresh_timestamp(datetime(2024, 5, 6, 12, 30, tzinfo=timezone.utc)) == "2024-05-06 14:30:00 CEST"
 
 
 def test_telegram_alert_helpers(monkeypatch) -> None:
@@ -241,9 +241,9 @@ def test_telegram_alert_helpers(monkeypatch) -> None:
     assert "Risk-Off" in dashboard.build_alert_signature(result, "SPY")
     message = dashboard.build_telegram_alert_message(result, "SPY", refreshed_at)
     assert "Market Crash Monitor alert for SPY" in message
-    assert "Refreshed: 2024-05-06 12:30:00 UTC" in message
+    assert "Refreshed: 2024-05-06 14:30:00 CEST" in message
     startup_message = dashboard.build_startup_message("SPY", refreshed_at)
-    assert startup_message == "Market Crash Monitor started for SPY\nStartup time: 2024-05-06 12:30:00 UTC"
+    assert startup_message == "Market Crash Monitor started for SPY\nStartup time: 2024-05-06 14:30:00 CEST"
 
 
 def test_get_secret_returns_none_when_secrets_are_unavailable(monkeypatch) -> None:
@@ -419,7 +419,7 @@ def test_maybe_send_startup_telegram_message_sends_once_per_session(monkeypatch)
     dashboard.maybe_send_startup_telegram_message("SPY", refreshed_at)
 
     assert sent_messages == [
-        ("secret-token", "secret-chat", "Market Crash Monitor started for SPY\nStartup time: 2024-05-06 12:30:00 UTC")
+        ("secret-token", "secret-chat", "Market Crash Monitor started for SPY\nStartup time: 2024-05-06 14:30:00 CEST")
     ]
     assert fake_st.session_state[dashboard.STARTUP_MESSAGE_SENT_KEY] == "sent"
     assert fake_st.session_state[dashboard.TELEGRAM_STATUS_KEY] == "startup message sent"
@@ -541,7 +541,7 @@ def test_render_success_path_with_yield_curve(monkeypatch) -> None:
     assert fake_st.plot_calls == 1
     assert len(fake_st.dataframes) == 2
     assert fake_st.dataframes[1].iloc[0]["Current"] == 130.1234
-    assert fake_st.captions[-1] == "Last refreshed: 2024-05-06 12:30:00 UTC"
+    assert fake_st.captions[-1] == "Last refreshed: 2024-05-06 14:30:00 CEST"
 
 
 def test_render_force_refresh_updates_tables_and_error_path(monkeypatch) -> None:
@@ -615,7 +615,7 @@ def test_render_force_refresh_updates_tables_and_error_path(monkeypatch) -> None
     assert cleared == ["cleared"]
     refresh_captions = [caption for caption in fake_st.captions if caption.startswith("Last refreshed:")]
     assert refresh_captions == [
-        "Last refreshed: 2024-05-06 12:30:00 UTC",
-        "Last refreshed: 2024-05-06 12:35:00 UTC",
+        "Last refreshed: 2024-05-06 14:30:00 CEST",
+        "Last refreshed: 2024-05-06 14:35:00 CEST",
     ]
     assert fake_st.errors == ["bad symbols"]

@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import logging
 from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -19,6 +20,7 @@ REFRESH_INTERVAL_SECONDS = 300
 LAST_ALERT_SIGNATURE_KEY = "last_telegram_alert_signature"
 STARTUP_MESSAGE_SENT_KEY = "startup_telegram_message_sent"
 TELEGRAM_STATUS_KEY = "telegram_status_message"
+DISPLAY_TIMEZONE = ZoneInfo(os.getenv("APP_TIMEZONE", "Europe/Rome"))
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +73,7 @@ def schedule_refresh(interval_seconds: int = REFRESH_INTERVAL_SECONDS) -> None:
 
 
 def format_refresh_timestamp(refreshed_at: datetime) -> str:
-    return refreshed_at.strftime("%Y-%m-%d %H:%M:%S %Z")
+    return refreshed_at.astimezone(DISPLAY_TIMEZONE).strftime("%Y-%m-%d %H:%M:%S %Z")
 
 
 def clear_dashboard_cache() -> None:
