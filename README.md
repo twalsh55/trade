@@ -14,7 +14,7 @@ uv run streamlit run main.py
 ## Ports and Adapters Structure
 
 ```text
-trade/
+src/
   domain/
     models.py       # entities, policies, thresholds
     services.py     # pure business logic for metrics/scoring/actions

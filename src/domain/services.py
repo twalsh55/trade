@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from trade.domain.models import CAUTION_CUTOFF, RISK_OFF_CUTOFF
+from src.domain.models import CAUTION_CUTOFF, RISK_OFF_CUTOFF
 
 
 def clamp(value: float, low: float, high: float) -> float:

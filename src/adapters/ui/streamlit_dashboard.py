@@ -6,9 +6,9 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from trade.adapters.market_data.yfinance_provider import YFinanceMarketDataAdapter
-from trade.application.use_cases import BuildCrashDashboardUseCase
-from trade.domain.models import CAUTION_CUTOFF, DEFAULT_UNIVERSE, RISK_OFF_CUTOFF, DashboardConfig
+from src.adapters.market_data.yfinance_provider import YFinanceMarketDataAdapter
+from src.application.use_cases import BuildCrashDashboardUseCase
+from src.domain.models import CAUTION_CUTOFF, DEFAULT_UNIVERSE, RISK_OFF_CUTOFF, DashboardConfig
 
 
 def build_price_chart(close: pd.DataFrame, benchmark: str) -> go.Figure:

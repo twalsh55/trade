@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from trade.application.ports import MarketDataPort
-from trade.domain.models import DashboardConfig, DashboardResult
-from trade.domain.services import (
+from src.application.ports import MarketDataPort
+from src.domain.models import DashboardConfig, DashboardResult
+from src.domain.services import (
     compute_indicator_percentiles,
     compute_metrics,
     compute_risk_score,
