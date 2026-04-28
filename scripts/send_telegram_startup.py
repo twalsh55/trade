@@ -11,7 +11,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from src.adapters.notifications.telegram_notifier import TelegramNotificationError, TelegramNotifier
 from src.adapters.notifications.telegram_setup import get_env_secret
-from env_utils import load_env_file
+from src.env_utils import load_env_file
 
 
 def build_startup_message(refreshed_at: datetime) -> str:

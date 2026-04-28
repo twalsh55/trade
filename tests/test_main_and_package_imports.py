@@ -3,6 +3,8 @@ from __future__ import annotations
 import os
 import runpy
 import logging
+import sys
+import types
 from pathlib import Path
 
 import main
@@ -70,7 +72,8 @@ def test_main_script_prints_cli_hint_when_not_in_streamlit(monkeypatch, capsys) 
 def test_main_script_calls_render_when_streamlit_runtime_exists(monkeypatch) -> None:
     called: list[str] = []
     monkeypatch.setattr("streamlit.runtime.exists", lambda: True)
-    monkeypatch.setattr("src.adapters.ui.streamlit_dashboard.render", lambda: called.append("rendered"))
+    stub_module = types.SimpleNamespace(render=lambda: called.append("rendered"))
+    monkeypatch.setitem(sys.modules, "src.adapters.ui.streamlit_dashboard", stub_module)
 
     runpy.run_path("main.py", run_name="__main__")
 

@@ -14,7 +14,7 @@ from src.adapters.notifications.telegram_setup import (
     format_chat_id_report,
     get_env_secret,
 )
-from env_utils import load_env_file
+from src.env_utils import load_env_file
 
 
 def main() -> int:
