@@ -11,6 +11,37 @@ uv sync
 uv run streamlit run main.py
 ```
 
+## Authentication
+
+The app now authenticates users through an auth-provider adapter and stores its own internal user records in Postgres.
+
+Required environment variables:
+
+```bash
+CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
+DATABASE_URL=postgresql://user:password@host:5432/dbname
+```
+
+Optional Clerk variables:
+
+```bash
+CLERK_SECRET_KEY=your_clerk_secret_key
+CLERK_FRONTEND_API_URL=https://your-instance.clerk.accounts.dev
+CLERK_JWKS_URL=https://your-instance.clerk.accounts.dev/.well-known/jwks.json
+CLERK_ISSUER=https://your-instance.clerk.accounts.dev
+CLERK_AUTHORIZED_PARTIES=https://your-app.example.com,http://localhost:8501
+CLERK_SIGN_IN_URL=https://your-account-portal-domain/sign-in
+CLERK_SIGN_UP_URL=https://your-account-portal-domain/sign-up
+APP_BASE_URL=http://localhost:8501
+```
+
+Notes:
+- The dashboard uses Clerk's signed session token and validates it with JWKS.
+- The app keeps its own `app_user` table in Postgres with an internal UUID primary key.
+- Clerk is isolated behind an application auth port so a future migration can swap adapters without rewriting the dashboard or domain logic.
+- For hosted Account Portal links, use the exact URLs shown in Clerk Dashboard > Account Portal > Pages instead of trying to derive them from the publishable key.
+- Hosted sign-in and sign-up links should redirect back to `APP_BASE_URL`, so set that to your real local or deployed app URL.
+
 ## Deploy on Railway
 
 This repo includes a `Dockerfile` and `railway.toml` for Railway deployment.
@@ -58,14 +89,20 @@ uv run python scripts/test_telegram_send.py
 ```text
 src/
   domain/
+    auth.py         # provider-agnostic identity and internal user models
     models.py       # entities, policies, thresholds
     services.py     # pure business logic for metrics/scoring/actions
   application/
     ports.py        # interfaces used by use-cases
+    auth.py         # authentication use-case
     use_cases.py    # orchestration of the dashboard workflow
   adapters/
+    auth/
+      clerk_auth.py             # Clerk JWT verification + profile lookup adapter
     market_data/
       yfinance_provider.py   # outbound adapter for market data
+    persistence/
+      postgres_user_repository.py # Postgres user persistence adapter
     ui/
       streamlit_dashboard.py # inbound adapter (Streamlit)
 main.py              # composition root / entrypoint

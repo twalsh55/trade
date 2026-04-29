@@ -1,12 +1,14 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime, timezone
 import logging
+from uuid import UUID
 
 import numpy as np
 import pandas as pd
 
 from src.adapters.ui import streamlit_dashboard as dashboard
+from src.domain.auth import User
 from src.domain.models import DashboardResult
 
 
@@ -43,6 +45,7 @@ class FakeStreamlit:
         self._slider_value = slider_value
         self._button_values = iter(button_values or [])
         self.session_state: dict[str, str] = {}
+        self.query_params: dict[str, str] = {}
         self.secrets: dict[str, str] = {}
         self.columns_created: list[list[FakeColumn]] = []
         self.errors: list[str] = []
@@ -104,6 +107,30 @@ class FakeStreamlit:
 
     def dataframe(self, frame: pd.DataFrame, hide_index: bool, width: str) -> None:
         self.dataframes.append(frame.copy())
+
+
+def make_user() -> User:
+    now = datetime(2024, 5, 6, 12, 30, tzinfo=UTC)
+    return User(
+        id=UUID("11111111-1111-1111-1111-111111111111"),
+        auth_provider="clerk",
+        auth_issuer="https://example.clerk.accounts.dev",
+        auth_subject="user_123",
+        email="user@example.com",
+        given_name="Ada",
+        family_name="Lovelace",
+        display_name="Ada Lovelace",
+        created_at=now,
+        updated_at=now,
+        last_login_at=now,
+    )
+
+
+def stub_authenticated_user(monkeypatch, user: User | None = None) -> User:
+    current_user = user or make_user()
+    monkeypatch.setattr(dashboard, "get_current_user", lambda: current_user)
+    monkeypatch.setattr(dashboard, "render_account_widget", lambda: None)
+    return current_user
 
 
 def make_result(include_yield_spread: bool, empty_indicator_table: bool) -> DashboardResult:
@@ -550,6 +577,7 @@ def test_maybe_send_telegram_alert_skips_without_credentials_and_warning_on_fail
     monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
     monkeypatch.delenv("TELEGRAM_CHAT_ID", raising=False)
     monkeypatch.setattr(dashboard, "st", fake_st)
+    stub_authenticated_user(monkeypatch)
     monkeypatch.setattr(dashboard, "schedule_refresh", lambda: None)
     refreshed_at = datetime(2024, 5, 6, 12, 30, tzinfo=timezone.utc)
     result = make_result(True, False)
@@ -578,6 +606,7 @@ def test_render_shows_telegram_status(monkeypatch) -> None:
     fake_st = FakeStreamlit(["SPY", "SPY", "^VIX", "HYG", "^IRX", "^TNX"], slider_value=4)
     fake_st.secrets = {"TELEGRAM_BOT_TOKEN": "secret-token", "TELEGRAM_CHAT_ID": "secret-chat"}
     monkeypatch.setattr(dashboard, "st", fake_st)
+    stub_authenticated_user(monkeypatch)
     monkeypatch.setattr(dashboard, "schedule_refresh", lambda: None)
     monkeypatch.setattr(dashboard, "maybe_send_startup_telegram_message", lambda benchmark, refreshed_at: None)
     monkeypatch.setattr(dashboard, "maybe_send_telegram_alert", lambda result, benchmark, refreshed_at: None)
@@ -623,6 +652,7 @@ def test_clear_dashboard_cache_ignores_missing_clear() -> None:
 def test_render_success_path_with_yield_curve(monkeypatch) -> None:
     fake_st = FakeStreamlit(["SPY, QQQ", "spy", "^vix", "hyg", "^irx", "^tnx"], slider_value=4)
     monkeypatch.setattr(dashboard, "st", fake_st)
+    stub_authenticated_user(monkeypatch)
     monkeypatch.setattr(dashboard, "schedule_refresh", lambda: None)
     refreshed_at = datetime(2024, 5, 6, 12, 30, tzinfo=timezone.utc)
     monkeypatch.setattr(dashboard, "run_dashboard", lambda *args: (make_result(True, False), refreshed_at))
@@ -666,9 +696,10 @@ def test_render_force_refresh_updates_tables_and_error_path(monkeypatch) -> None
             "^TNX",
         ],
         slider_value=1,
-        button_values=[True, False],
+        button_values=[False, True, False, False, False, False],
     )
     monkeypatch.setattr(dashboard, "st", fake_st)
+    stub_authenticated_user(monkeypatch)
     monkeypatch.setattr(dashboard, "schedule_refresh", lambda: None)
 
     cleared: list[str] = []
@@ -720,3 +751,158 @@ def test_render_force_refresh_updates_tables_and_error_path(monkeypatch) -> None
         "Last refreshed: 2024-05-06 14:35:00 CEST",
     ]
     assert fake_st.errors == ["bad symbols"]
+
+
+def test_derive_clerk_frontend_api_host_decodes_publishable_key() -> None:
+    publishable_key = "pk_test_ZXhhbXBsZS5jbGVyay5hY2NvdW50cy5kZXYk"
+
+    assert dashboard.derive_clerk_frontend_api_host(publishable_key) == "example.clerk.accounts.dev"
+
+
+def test_get_app_base_url_prefers_env_and_falls_back(monkeypatch) -> None:
+    monkeypatch.setenv("APP_BASE_URL", "https://app.example.com")
+    assert dashboard.get_app_base_url() == "https://app.example.com"
+
+    monkeypatch.delenv("APP_BASE_URL", raising=False)
+    monkeypatch.setenv("PUBLIC_APP_URL", "https://public.example.com")
+    assert dashboard.get_app_base_url() == "https://public.example.com"
+
+    monkeypatch.delenv("PUBLIC_APP_URL", raising=False)
+    assert dashboard.get_app_base_url() == "http://localhost:8501"
+
+
+def test_get_configured_clerk_page_url_supports_absolute_relative_and_missing(monkeypatch) -> None:
+    monkeypatch.delenv("CLERK_SIGN_IN_URL", raising=False)
+    monkeypatch.delenv("CLERK_SIGN_UP_URL", raising=False)
+    assert dashboard.get_configured_clerk_page_url("sign-in") is None
+
+    monkeypatch.setenv("CLERK_SIGN_IN_URL", "https://accounts.example.com/sign-in")
+    assert (
+        dashboard.get_configured_clerk_page_url("sign-in")
+        == "https://accounts.example.com/sign-in?redirect_url=http%3A%2F%2Flocalhost%3A8501"
+    )
+
+    monkeypatch.setenv("APP_BASE_URL", "https://app.example.com")
+    monkeypatch.setenv("CLERK_SIGN_UP_URL", "/sign-up")
+    assert (
+        dashboard.get_configured_clerk_page_url("sign-up")
+        == "https://app.example.com/sign-up?redirect_url=https%3A%2F%2Fapp.example.com"
+    )
+
+
+def test_with_redirect_url_preserves_existing_redirect(monkeypatch) -> None:
+    monkeypatch.setenv("APP_BASE_URL", "https://app.example.com")
+
+    assert (
+        dashboard.with_redirect_url(
+            "https://accounts.example.com/sign-in?redirect_url=https%3A%2F%2Falready.example.com",
+            dashboard.get_app_base_url(),
+        )
+        == "https://accounts.example.com/sign-in?redirect_url=https%3A%2F%2Falready.example.com"
+    )
+
+
+def test_query_param_helpers_support_dict_like_streamlit(monkeypatch) -> None:
+    fake_st = FakeStreamlit([], slider_value=1)
+    fake_st.query_params = {dashboard.CLERK_SESSION_TOKEN_PARAM: "token-123"}
+    monkeypatch.setattr(dashboard, "st", fake_st)
+
+    assert dashboard.get_query_param(dashboard.CLERK_SESSION_TOKEN_PARAM) == "token-123"
+    dashboard.clear_query_param(dashboard.CLERK_SESSION_TOKEN_PARAM)
+    assert dashboard.get_query_param(dashboard.CLERK_SESSION_TOKEN_PARAM) is None
+
+    fake_st.query_params = {dashboard.CLERK_SESSION_TOKEN_PARAM: ["token-456"]}
+    assert dashboard.get_query_param(dashboard.CLERK_SESSION_TOKEN_PARAM) == "token-456"
+
+
+def test_render_shows_login_screen_when_logged_out(monkeypatch) -> None:
+    fake_st = FakeStreamlit([], slider_value=4)
+    monkeypatch.setattr(dashboard, "st", fake_st)
+    monkeypatch.setattr(dashboard, "schedule_refresh", lambda: None)
+    monkeypatch.setattr(dashboard, "get_current_user", lambda: None)
+    monkeypatch.setattr(dashboard, "authenticate_session_token", lambda token: None)
+
+    auth_gate_calls: list[str] = []
+    monkeypatch.setattr(dashboard, "render_auth_gate", lambda: auth_gate_calls.append("shown"))
+
+    run_calls: list[tuple[object, ...]] = []
+    monkeypatch.setattr(dashboard, "run_dashboard", lambda *args: run_calls.append(args))
+
+    dashboard.render()
+
+    assert auth_gate_calls == ["shown"]
+    assert run_calls == []
+
+
+def test_render_uses_auth_gate_token_to_enter_dashboard(monkeypatch) -> None:
+    fake_st = FakeStreamlit(
+        ["SPY, QQQ", "spy", "^vix", "hyg", "^irx", "^tnx"],
+        slider_value=4,
+        button_values=[False],
+    )
+    monkeypatch.setattr(dashboard, "st", fake_st)
+    monkeypatch.setattr(dashboard, "schedule_refresh", lambda: None)
+    monkeypatch.setattr(dashboard, "get_current_user", lambda: None)
+    monkeypatch.setattr(dashboard, "render_auth_gate", lambda: "token-123")
+    monkeypatch.setattr(dashboard, "authenticate_session_token", lambda token: make_user() if token == "token-123" else None)
+    monkeypatch.setattr(dashboard, "render_account_widget", lambda: None)
+
+    captured: dict[str, object] = {}
+    refreshed_at = datetime(2024, 5, 6, 12, 30, tzinfo=timezone.utc)
+
+    def fake_run_dashboard(*args):  # type: ignore[no-untyped-def]
+        captured["args"] = args
+        return make_result(False, False), refreshed_at
+
+    monkeypatch.setattr(dashboard, "run_dashboard", fake_run_dashboard)
+    monkeypatch.setattr(dashboard, "build_price_chart", lambda close, benchmark: {"benchmark": benchmark})
+
+    dashboard.render()
+
+    assert captured["args"][0] == ("SPY", "QQQ")
+
+
+def test_render_authenticated_user_enters_configurable_dashboard(monkeypatch) -> None:
+    fake_st = FakeStreamlit(
+        ["SPY, QQQ", "spy", "^vix", "hyg", "^irx", "^tnx"],
+        slider_value=4,
+        button_values=[False],
+    )
+    monkeypatch.setattr(dashboard, "st", fake_st)
+    monkeypatch.setattr(dashboard, "schedule_refresh", lambda: None)
+    stub_authenticated_user(monkeypatch)
+
+    captured: dict[str, object] = {}
+    refreshed_at = datetime(2024, 5, 6, 12, 30, tzinfo=timezone.utc)
+
+    def fake_run_dashboard(*args):  # type: ignore[no-untyped-def]
+        captured["args"] = args
+        return make_result(False, False), refreshed_at
+
+    monkeypatch.setattr(dashboard, "run_dashboard", fake_run_dashboard)
+    monkeypatch.setattr(dashboard, "build_price_chart", lambda close, benchmark: {"benchmark": benchmark})
+
+    dashboard.render()
+
+    assert captured["args"][0] == ("SPY", "QQQ")
+    assert captured["args"][1] == "SPY"
+    assert any("Signed in as: `Ada Lovelace`" in message for message in fake_st.markdowns)
+    assert "user@example.com" in fake_st.captions
+
+
+def test_render_uses_auth_gate_when_session_is_invalid(monkeypatch) -> None:
+    fake_st = FakeStreamlit([], slider_value=4)
+    monkeypatch.setattr(dashboard, "st", fake_st)
+    monkeypatch.setattr(dashboard, "schedule_refresh", lambda: None)
+    monkeypatch.setattr(dashboard, "get_current_user", lambda: None)
+
+    auth_gate_calls: list[str] = []
+    monkeypatch.setattr(dashboard, "render_auth_gate", lambda: auth_gate_calls.append("shown"))
+
+    run_calls: list[tuple[object, ...]] = []
+    monkeypatch.setattr(dashboard, "run_dashboard", lambda *args: run_calls.append(args))
+
+    dashboard.render()
+
+    assert auth_gate_calls == ["shown"]
+    assert run_calls == []
