@@ -1,0 +1,1 @@
+"""Social lead-source adapters."""

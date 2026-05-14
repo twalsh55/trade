@@ -1,0 +1,148 @@
+from __future__ import annotations
+
+from collections.abc import Callable
+from dataclasses import dataclass
+from datetime import UTC, datetime
+
+from src.application.ports import EmailDeliveryPort, ProspectDraftingPort, SocialLeadSourcePort
+from src.domain.prospecting import ProspectMatch, SocialPost, score_social_post
+
+DEFAULT_PROSPECT_SEARCH_TERMS = (
+    "looking for stock market crash app",
+    "portfolio risk dashboard",
+    "market crash alert tool",
+)
+
+DEFAULT_APP_SUMMARY = (
+    "Brivoly is a SaaS app for tracking market crash risk with a dashboard, risk signals, "
+    "and alerts for investors who want to monitor portfolio conditions."
+)
+
+
+@dataclass(frozen=True, slots=True)
+class DraftedProspectEmail:
+    post: SocialPost
+    matched_query: str
+    score: int
+    reasons: tuple[str, ...]
+    suggested_reply: str
+
+
+@dataclass(frozen=True, slots=True)
+class ProspectingDigest:
+    generated_at: datetime
+    scanned_post_count: int
+    shortlisted_count: int
+    shortlisted_posts: tuple[DraftedProspectEmail, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class DailyProspectingConfig:
+    recipient_email: str
+    app_summary: str = DEFAULT_APP_SUMMARY
+    app_url: str | None = None
+    search_terms: tuple[str, ...] = DEFAULT_PROSPECT_SEARCH_TERMS
+    per_term_limit: int = 8
+    max_matches: int = 3
+
+
+class RunDailyProspectingUseCase:
+    def __init__(
+        self,
+        lead_source: SocialLeadSourcePort,
+        drafter: ProspectDraftingPort,
+        email_delivery: EmailDeliveryPort,
+        now: Callable[[], datetime] = lambda: datetime.now(tz=UTC),
+    ) -> None:
+        self.lead_source = lead_source
+        self.drafter = drafter
+        self.email_delivery = email_delivery
+        self.now = now
+
+    def execute(self, config: DailyProspectingConfig) -> ProspectingDigest:
+        seen_ids: set[str] = set()
+        matches: list[ProspectMatch] = []
+        scanned_count = 0
+
+        for search_term in config.search_terms:
+            posts = self.lead_source.search_recent_posts(search_term, config.per_term_limit)
+            scanned_count += len(posts)
+            for post in posts:
+                unique_key = f"{post.source}:{post.external_id}"
+                if unique_key in seen_ids:
+                    continue
+                seen_ids.add(unique_key)
+                match = score_social_post(post, search_term)
+                if match is not None:
+                    matches.append(match)
+
+        ranked = tuple(
+            sorted(
+                matches,
+                key=lambda item: (item.score, item.post.created_at),
+                reverse=True,
+            )[: config.max_matches]
+        )
+        drafted_replies = self.drafter.draft_promotional_replies(config.app_summary, ranked, config.app_url)
+        drafted_matches = tuple(
+            DraftedProspectEmail(
+                post=match.post,
+                matched_query=match.matched_query,
+                score=match.score,
+                reasons=match.reasons,
+                suggested_reply=drafted_replies[index],
+            )
+            for index, match in enumerate(ranked)
+        )
+        digest = ProspectingDigest(
+            generated_at=self.now(),
+            scanned_post_count=scanned_count,
+            shortlisted_count=len(drafted_matches),
+            shortlisted_posts=drafted_matches,
+        )
+        self.email_delivery.send_email(
+            recipient=config.recipient_email,
+            subject=f"Daily prospecting digest for {digest.generated_at.date().isoformat()}",
+            text_body=format_digest_email(config, digest),
+        )
+        return digest
+
+
+def format_digest_email(config: DailyProspectingConfig, digest: ProspectingDigest) -> str:
+    lines = [
+        f"Daily prospecting digest generated at {digest.generated_at.isoformat()}",
+        f"Recipient: {config.recipient_email}",
+        f"Scanned posts: {digest.scanned_post_count}",
+        f"Shortlisted posts: {digest.shortlisted_count}",
+        "",
+    ]
+
+    if not digest.shortlisted_posts:
+        lines.append("No strong social posts were found today.")
+        return "\n".join(lines)
+
+    if config.app_url:
+        lines.extend([f"App URL for drafting context: {config.app_url}", ""])
+
+    for index, item in enumerate(digest.shortlisted_posts, start=1):
+        excerpt = item.post.body.strip().replace("\n", " ")
+        if len(excerpt) > 280:
+            excerpt = f"{excerpt[:277]}..."
+        lines.extend(
+            [
+                f"{index}. Reddit post",
+                f"Title: {item.post.title}",
+                f"Author: {item.post.author}",
+                f"Posted at: {item.post.created_at.isoformat()}",
+                f"URL: {item.post.permalink}",
+                f"Matched query: {item.matched_query}",
+                f"Score: {item.score}",
+                f"Reasons: {', '.join(item.reasons)}",
+                f"Body excerpt: {excerpt or '(no body text)'}",
+                "Suggested promo reply:",
+                item.suggested_reply,
+                "",
+            ]
+        )
+
+    return "\n".join(lines).rstrip()

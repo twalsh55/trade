@@ -8,7 +8,7 @@ from typing import Callable
 from uuid import UUID
 from uuid import uuid4
 
-from fastapi import Cookie, FastAPI, Header, HTTPException, Query, Request, status
+from fastapi import BackgroundTasks, Cookie, FastAPI, Header, HTTPException, Query, Request, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
@@ -27,7 +27,11 @@ from src.adapters.auth.runtime import (
     get_configured_clerk_page_url,
 )
 from src.adapters.market_data.yfinance_provider import YFinanceMarketDataAdapter
+from src.adapters.notifications.smtp_email_notifier import EmailNotificationError
+from src.adapters.notifications.telegram_notifier import TelegramNotificationError, TelegramNotifier
 from src.adapters.persistence.runtime import build_personalization_repository
+from src.adapters.prospecting.runtime import collect_prospecting_config_errors, run_prospecting_job
+from src.adapters.social.reddit_lead_source import RedditLeadSourceError
 from src.application.account import (
     AlertHistoryEntry,
     GetUserDashboardSettingsUseCase,
@@ -314,6 +318,40 @@ def create_app(dependencies: ApiDependencies | None = None) -> FastAPI:
         snapshot = build_dashboard_snapshot_dto(config=config, result=result, refreshed_at=deps.now())
         return dto_to_dict(snapshot)
 
+    @app.post("/api/telegram/webhook")
+    def telegram_webhook(
+        payload: dict[str, object],
+        background_tasks: BackgroundTasks,
+        telegram_secret: str | None = Header(default=None, alias="X-Telegram-Bot-Api-Secret-Token"),
+    ) -> dict[str, object]:
+        _validate_telegram_webhook_secret(telegram_secret)
+        command = _extract_telegram_command(payload)
+        if command is None:
+            return {"ok": True, "handled": False}
+
+        configured_chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip()
+        if not configured_chat_id:
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Telegram chat ID is not configured.")
+        if command.chat_id != configured_chat_id:
+            return {"ok": True, "handled": False}
+
+        notifier = _build_telegram_notifier()
+        if command.text == "/prospect":
+            notifier.send_message("Starting the daily prospecting run now. I will send a follow-up when it finishes.")
+            background_tasks.add_task(_run_prospecting_from_telegram, notifier)
+            return {"ok": True, "handled": True, "command": command.text}
+        if command.text == "/prospect status":
+            notifier.send_message(_build_prospecting_status_message())
+            return {"ok": True, "handled": True, "command": command.text}
+        if command.text == "/help":
+            notifier.send_message(
+                "Supported commands:\n"
+                "/prospect - run the prospecting agent\n"
+                "/prospect status - show whether the prospecting agent is configured"
+            )
+            return {"ok": True, "handled": True, "command": command.text}
+        return {"ok": True, "handled": False}
+
     return app
 
 
@@ -362,6 +400,67 @@ def _build_default_dashboard_settings(user_id: UUID) -> UserDashboardSettings:
         user_id,
         telegram_enabled=bool(os.environ.get("TELEGRAM_BOT_TOKEN")) and bool(os.environ.get("TELEGRAM_CHAT_ID")),
     )
+
+
+@dataclass(frozen=True)
+class _TelegramCommand:
+    chat_id: str
+    text: str
+
+
+def _extract_telegram_command(payload: dict[str, object]) -> _TelegramCommand | None:
+    message = payload.get("message")
+    if not isinstance(message, dict):
+        return None
+
+    text = message.get("text")
+    chat = message.get("chat")
+    if not isinstance(text, str) or not isinstance(chat, dict):
+        return None
+
+    chat_id = chat.get("id")
+    if chat_id is None:
+        return None
+
+    normalized_text = text.strip().split("@", 1)[0]
+    return _TelegramCommand(chat_id=str(chat_id), text=normalized_text)
+
+
+def _validate_telegram_webhook_secret(provided_secret: str | None) -> None:
+    expected_secret = os.getenv("TELEGRAM_WEBHOOK_SECRET", "").strip()
+    if expected_secret and provided_secret != expected_secret:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Telegram webhook secret.")
+
+
+def _build_telegram_notifier() -> TelegramNotifier:
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+    chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip()
+    if not bot_token or not chat_id:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Telegram bot is not configured.")
+    return TelegramNotifier(bot_token=bot_token, chat_id=chat_id)
+
+
+def _build_prospecting_status_message() -> str:
+    errors = collect_prospecting_config_errors()
+    openai_enabled = bool(os.getenv("OPENAI_API_KEY", "").strip())
+    if errors:
+        return "Prospecting agent is not ready:\n- " + "\n- ".join(errors)
+    model_line = "OpenAI drafting enabled." if openai_enabled else "OpenAI drafting disabled; template replies will be used."
+    return f"Prospecting agent is ready.\n{model_line}"
+
+
+def _run_prospecting_from_telegram(notifier: TelegramNotifier) -> None:
+    try:
+        digest = run_prospecting_job()
+        notifier.send_message(
+            f"Prospecting finished. Scanned {digest.scanned_post_count} posts, shortlisted "
+            f"{digest.shortlisted_count}, and emailed the digest."
+        )
+    except (EmailNotificationError, RedditLeadSourceError, TelegramNotificationError, ValueError, RuntimeError) as exc:
+        try:
+            notifier.send_message(f"Prospecting run failed: {exc}")
+        except TelegramNotificationError:
+            return
 
 
 class _DisabledBillingPort:

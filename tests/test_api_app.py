@@ -8,7 +8,16 @@ import pandas as pd
 from fastapi.testclient import TestClient
 import pytest
 
-from src.adapters.api.app import ApiDependencies, _DisabledBillingPort, _normalize_universe, create_app
+from src.adapters.api.app import (
+    ApiDependencies,
+    _DisabledBillingPort,
+    _TelegramCommand,
+    _build_prospecting_status_message,
+    _extract_telegram_command,
+    _normalize_universe,
+    _run_prospecting_from_telegram,
+    create_app,
+)
 from src.adapters.auth.clerk_auth import AuthenticationError
 from src.adapters.persistence.in_memory_personalization_repository import InMemoryPersonalizationRepository
 from src.application.account import (
@@ -251,6 +260,167 @@ def test_billing_overview_route_returns_disabled_status_when_stripe_is_unconfigu
         "checkout_available": False,
         "portal_available": False,
     }
+
+
+def test_extract_telegram_command_parses_supported_message_shapes() -> None:
+    assert _extract_telegram_command({}) is None
+    assert _extract_telegram_command({"message": "bad"}) is None
+    assert _extract_telegram_command({"message": {"text": 1, "chat": {}}}) is None
+    assert _extract_telegram_command({"message": {"text": "/prospect", "chat": "bad"}}) is None
+    assert _extract_telegram_command({"message": {"text": "/prospect", "chat": {"id": None}}}) is None
+    assert _extract_telegram_command({"message": {"text": "/prospect@mybot", "chat": {"id": 123}}}) == _TelegramCommand(
+        chat_id="123",
+        text="/prospect",
+    )
+
+
+def test_build_prospecting_status_message_reports_errors_and_modes(monkeypatch) -> None:
+    monkeypatch.setattr("src.adapters.api.app.collect_prospecting_config_errors", lambda: ["Missing SMTP_HOST"])
+    assert _build_prospecting_status_message() == "Prospecting agent is not ready:\n- Missing SMTP_HOST"
+
+    monkeypatch.setattr("src.adapters.api.app.collect_prospecting_config_errors", lambda: [])
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    assert _build_prospecting_status_message() == "Prospecting agent is ready.\nOpenAI drafting disabled; template replies will be used."
+
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    assert _build_prospecting_status_message() == "Prospecting agent is ready.\nOpenAI drafting enabled."
+
+
+def test_run_prospecting_from_telegram_sends_success_and_failure_updates(monkeypatch) -> None:
+    sent: list[str] = []
+
+    class FakeNotifier:
+        def send_message(self, text: str) -> None:
+            sent.append(text)
+
+    monkeypatch.setattr(
+        "src.adapters.api.app.run_prospecting_job",
+        lambda: type("Digest", (), {"scanned_post_count": 7, "shortlisted_count": 2})(),
+    )
+    _run_prospecting_from_telegram(FakeNotifier())  # type: ignore[arg-type]
+    assert sent[-1] == "Prospecting finished. Scanned 7 posts, shortlisted 2, and emailed the digest."
+
+    monkeypatch.setattr("src.adapters.api.app.run_prospecting_job", lambda: (_ for _ in ()).throw(ValueError("broken")))
+    _run_prospecting_from_telegram(FakeNotifier())  # type: ignore[arg-type]
+    assert sent[-1] == "Prospecting run failed: broken"
+
+    class FailingNotifier:
+        calls = 0
+
+        def send_message(self, text: str) -> None:
+            self.calls += 1
+            raise __import__("src.adapters.notifications.telegram_notifier", fromlist=["TelegramNotificationError"]).TelegramNotificationError(
+                "down"
+            )
+
+    monkeypatch.setattr("src.adapters.api.app.run_prospecting_job", lambda: (_ for _ in ()).throw(ValueError("broken")))
+    _run_prospecting_from_telegram(FailingNotifier())  # type: ignore[arg-type]
+
+
+def test_telegram_webhook_handles_commands_and_guards(monkeypatch) -> None:
+    client = make_client(user=make_user())
+    sent: list[str] = []
+    tasks: list[str] = []
+
+    class FakeNotifier:
+        def __init__(self, bot_token: str, chat_id: str) -> None:
+            self.bot_token = bot_token
+            self.chat_id = chat_id
+
+        def send_message(self, text: str) -> None:
+            sent.append(text)
+
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "bot")
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "123")
+    monkeypatch.setenv("TELEGRAM_WEBHOOK_SECRET", "secret")
+    monkeypatch.setattr("src.adapters.api.app.TelegramNotifier", FakeNotifier)
+    monkeypatch.setattr("src.adapters.api.app._run_prospecting_from_telegram", lambda notifier: tasks.append("ran"))
+    monkeypatch.setattr("src.adapters.api.app.collect_prospecting_config_errors", lambda: [])
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    response = client.post("/api/telegram/webhook", headers={"X-Telegram-Bot-Api-Secret-Token": "secret"}, json={})
+    assert response.json() == {"ok": True, "handled": False}
+
+    response = client.post(
+        "/api/telegram/webhook",
+        headers={"X-Telegram-Bot-Api-Secret-Token": "wrong"},
+        json={"message": {"text": "/prospect", "chat": {"id": 123}}},
+    )
+    assert response.status_code == 401
+
+    response = client.post(
+        "/api/telegram/webhook",
+        headers={"X-Telegram-Bot-Api-Secret-Token": "secret"},
+        json={"message": {"text": "/prospect", "chat": {"id": 999}}},
+    )
+    assert response.json() == {"ok": True, "handled": False}
+
+    response = client.post(
+        "/api/telegram/webhook",
+        headers={"X-Telegram-Bot-Api-Secret-Token": "secret"},
+        json={"message": {"text": "/prospect", "chat": {"id": 123}}},
+    )
+    assert response.json() == {"ok": True, "handled": True, "command": "/prospect"}
+    assert sent[-1] == "Starting the daily prospecting run now. I will send a follow-up when it finishes."
+    assert tasks == ["ran"]
+
+    response = client.post(
+        "/api/telegram/webhook",
+        headers={"X-Telegram-Bot-Api-Secret-Token": "secret"},
+        json={"message": {"text": "/prospect status", "chat": {"id": 123}}},
+    )
+    assert response.json() == {"ok": True, "handled": True, "command": "/prospect status"}
+    assert sent[-1] == "Prospecting agent is ready.\nOpenAI drafting disabled; template replies will be used."
+
+    response = client.post(
+        "/api/telegram/webhook",
+        headers={"X-Telegram-Bot-Api-Secret-Token": "secret"},
+        json={"message": {"text": "/help", "chat": {"id": 123}}},
+    )
+    assert response.json() == {"ok": True, "handled": True, "command": "/help"}
+    assert "Supported commands:" in sent[-1]
+
+    response = client.post(
+        "/api/telegram/webhook",
+        headers={"X-Telegram-Bot-Api-Secret-Token": "secret"},
+        json={"message": {"text": "/unknown", "chat": {"id": 123}}},
+    )
+    assert response.json() == {"ok": True, "handled": False}
+
+
+def test_telegram_webhook_requires_configuration(monkeypatch) -> None:
+    client = make_client(user=make_user())
+    monkeypatch.delenv("TELEGRAM_CHAT_ID", raising=False)
+    response = client.post("/api/telegram/webhook", json={"message": {"text": "/prospect", "chat": {"id": 123}}})
+    assert response.status_code == 503
+
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "123")
+    monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
+    response = client.post("/api/telegram/webhook", json={"message": {"text": "/prospect", "chat": {"id": 123}}})
+    assert response.status_code == 503
+
+
+def test_telegram_webhook_status_can_report_errors(monkeypatch) -> None:
+    client = make_client(user=make_user())
+    sent: list[str] = []
+
+    class FakeNotifier:
+        def __init__(self, bot_token: str, chat_id: str) -> None:
+            self.bot_token = bot_token
+            self.chat_id = chat_id
+
+        def send_message(self, text: str) -> None:
+            sent.append(text)
+
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "bot")
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "123")
+    monkeypatch.setattr("src.adapters.api.app.TelegramNotifier", FakeNotifier)
+    monkeypatch.setattr("src.adapters.api.app.collect_prospecting_config_errors", lambda: ["Missing SMTP_HOST"])
+
+    response = client.post("/api/telegram/webhook", json={"message": {"text": "/prospect status", "chat": {"id": 123}}})
+
+    assert response.json() == {"ok": True, "handled": True, "command": "/prospect status"}
+    assert sent[-1] == "Prospecting agent is not ready:\n- Missing SMTP_HOST"
 
 
 def test_billing_routes_round_trip_overview_checkout_and_portal_urls() -> None:

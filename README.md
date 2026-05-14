@@ -180,6 +180,7 @@ Optional startup and alert notifications use:
 ```bash
 TELEGRAM_BOT_TOKEN=your_bot_token
 TELEGRAM_CHAT_ID=your_chat_id
+TELEGRAM_WEBHOOK_SECRET=shared_secret_for_webhook_optional
 ```
 
 Utilities:
@@ -188,6 +189,68 @@ Utilities:
 uv run python scripts/get_telegram_chat_id.py
 uv run python scripts/test_telegram_send.py
 ```
+
+Telegram-triggered prospecting:
+
+- expose `POST /api/telegram/webhook`
+- set `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, and optionally `TELEGRAM_WEBHOOK_SECRET`
+- point your Telegram bot webhook at your API, for example `https://api.brivoly.com/api/telegram/webhook`
+- supported bot commands from the allowed chat:
+  - `/prospect`
+  - `/prospect status`
+  - `/help`
+
+## Daily Prospecting Agent
+
+There is now a low-cost daily prospecting job for testing outreach ideas without posting publicly.
+
+What it does:
+
+- searches Reddit for recent posts that look relevant to the app
+- scores posts with local heuristics first to avoid unnecessary model usage
+- uses OpenAI only for a tiny drafting step when `OPENAI_API_KEY` is configured
+- sends a plain-text email digest to `tom.mg.walsh@gmail.com` by default
+- never posts to Reddit or any other social network
+
+Required email settings:
+
+```bash
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_USERNAME=your_username
+SMTP_PASSWORD=your_password
+SMTP_FROM_EMAIL=alerts@your-domain.com
+SMTP_USE_TLS=true
+```
+
+Optional AI settings:
+
+```bash
+OPENAI_API_KEY=sk-...
+PROSPECT_OPENAI_MODEL=gpt-5-nano
+PROSPECT_OPENAI_MAX_OUTPUT_TOKENS=500
+```
+
+Run it manually:
+
+```bash
+uv run python scripts/run_daily_prospecting.py
+```
+
+Useful prospecting settings:
+
+```bash
+PROSPECT_EMAIL_RECIPIENT=tom.mg.walsh@gmail.com
+PROSPECT_REDDIT_SEARCH_TERMS=looking for stock market crash app,portfolio risk dashboard,market crash alert tool
+PROSPECT_REDDIT_LIMIT_PER_TERM=8
+PROSPECT_MAX_MATCHES=3
+```
+
+Scheduling:
+
+- run `uv run python scripts/run_daily_prospecting.py` once per day from a scheduler
+- on Railway, the cleanest setup is a separate scheduled worker service or cron-style job using the same repo and env vars
+- the main API service should stay focused on serving FastAPI traffic
 
 ## Structure
 

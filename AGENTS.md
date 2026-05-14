@@ -14,7 +14,9 @@
 - Database: PostgreSQL via `psycopg`
 - Authentication: Clerk JWT auth with internal Postgres-backed user records
 - Billing: Stripe Checkout + Billing Portal
-- Notifications: Telegram bot integration
+- Notifications: Telegram bot integration and SMTP email delivery
+- AI drafting: OpenAI API for optional low-cost prospecting reply generation
+- Social lead sourcing: Reddit read-only search for daily prospecting workflows
 - Testing: `pytest` with `pytest-cov`
 - Containerization: Docker
 - Deployment target: Railway for the API, Vercel for the web frontend

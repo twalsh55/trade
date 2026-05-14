@@ -27,6 +27,9 @@ def test_build_runtime_report_defaults_to_degraded_without_auth_config(monkeypat
     monkeypatch.delenv("TRADE_API_BASE_URL", raising=False)
     monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
     monkeypatch.delenv("TELEGRAM_CHAT_ID", raising=False)
+    monkeypatch.delenv("SMTP_HOST", raising=False)
+    monkeypatch.delenv("SMTP_USERNAME", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
 
     report = build_runtime_report()
 
@@ -41,6 +44,8 @@ def test_build_runtime_report_defaults_to_degraded_without_auth_config(monkeypat
     }
     assert checks["frontend_api_base_url"] == {"configured": False, "valid": None}
     assert checks["telegram"] == {"configured": False}
+    assert checks["smtp_email"] == {"configured": False}
+    assert checks["openai"] == {"configured": False}
 
 
 def test_build_runtime_report_marks_configured_runtime_as_ok(monkeypatch) -> None:
@@ -51,6 +56,9 @@ def test_build_runtime_report_marks_configured_runtime_as_ok(monkeypatch) -> Non
     monkeypatch.setenv("TRADE_API_BASE_URL", "https://api.trade.example.com")
     monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "bot")
     monkeypatch.setenv("TELEGRAM_CHAT_ID", "chat")
+    monkeypatch.setenv("SMTP_HOST", "smtp.example.com")
+    monkeypatch.setenv("SMTP_USERNAME", "mailer")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
 
     report = build_runtime_report()
 
@@ -65,3 +73,5 @@ def test_build_runtime_report_marks_configured_runtime_as_ok(monkeypatch) -> Non
     }
     assert checks["frontend_api_base_url"] == {"configured": True, "valid": True}
     assert checks["telegram"] == {"configured": True}
+    assert checks["smtp_email"] == {"configured": True}
+    assert checks["openai"] == {"configured": True}

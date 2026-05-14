@@ -7,9 +7,12 @@ import src
 import src.adapters
 import src.adapters.api
 import src.adapters.auth
+import src.adapters.llm
 import src.adapters.market_data
 import src.adapters.notifications
 import src.adapters.persistence
+import src.adapters.prospecting
+import src.adapters.social
 import src.application
 import src.domain
 from src.env_utils import load_env_file
@@ -20,9 +23,12 @@ def test_package_modules_import() -> None:
     assert src.adapters.__doc__ == "Adapters layer: external systems and delivery adapters."
     assert src.adapters.api.__doc__ == "API adapters."
     assert src.adapters.auth.__doc__ == "Authentication adapters."
+    assert src.adapters.llm.__doc__ == "LLM-backed drafting adapters."
     assert src.adapters.market_data.__doc__ == "Market data adapters."
     assert src.adapters.notifications.__doc__ == "Notification adapters."
     assert src.adapters.persistence.__doc__ == "Persistence adapters."
+    assert src.adapters.prospecting.__doc__ == "Prospecting runtime adapters."
+    assert src.adapters.social.__doc__ == "Social lead-source adapters."
     assert src.application.__doc__ == "Application layer: use-cases and ports."
     assert src.domain.__doc__ == "Domain layer: pure market-risk rules and models."
 

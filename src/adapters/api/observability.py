@@ -40,6 +40,9 @@ def build_runtime_report() -> dict[str, object]:
     trade_api_base_url = os.getenv("TRADE_API_BASE_URL", "").strip()
     telegram_bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
     telegram_chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip()
+    smtp_host = os.getenv("SMTP_HOST", "").strip()
+    smtp_username = os.getenv("SMTP_USERNAME", "").strip()
+    openai_api_key = os.getenv("OPENAI_API_KEY", "").strip()
 
     auth_configured = bool(database_url) and bool(publishable_key)
     app_base_url_valid = is_absolute_http_url(app_base_url)
@@ -66,6 +69,12 @@ def build_runtime_report() -> dict[str, object]:
             },
             "telegram": {
                 "configured": bool(telegram_bot_token) and bool(telegram_chat_id),
+            },
+            "smtp_email": {
+                "configured": bool(smtp_host) and bool(smtp_username),
+            },
+            "openai": {
+                "configured": bool(openai_api_key),
             },
         },
     }

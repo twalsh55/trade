@@ -7,6 +7,7 @@ from uuid import UUID
 import pandas as pd
 
 from src.domain.auth import ExternalIdentity, User
+from src.domain.prospecting import ProspectMatch, SocialPost
 
 if TYPE_CHECKING:
     from src.application.account import AlertHistoryEntry, UserDashboardSettings
@@ -53,3 +54,23 @@ class BillingPort(Protocol):
 
     def create_portal_session(self, user: User, return_url: str | None = None) -> str:
         """Create a Stripe Billing Portal session URL for the authenticated user."""
+
+
+class SocialLeadSourcePort(Protocol):
+    def search_recent_posts(self, search_term: str, limit: int) -> list[SocialPost]:
+        """Return recent social posts for a search term."""
+
+
+class ProspectDraftingPort(Protocol):
+    def draft_promotional_replies(
+        self,
+        app_summary: str,
+        matches: tuple[ProspectMatch, ...],
+        app_url: str | None = None,
+    ) -> list[str]:
+        """Return a suggested non-posted reply for each shortlisted match."""
+
+
+class EmailDeliveryPort(Protocol):
+    def send_email(self, recipient: str, subject: str, text_body: str) -> None:
+        """Send a plain-text email."""
