@@ -6,6 +6,8 @@ from src.adapters.llm.openai_prospect_drafter import OpenAIProspectDrafter, Temp
 from src.adapters.notifications.smtp_email_notifier import SMTPEmailNotifier
 from src.adapters.notifications.telegram_digest_notifier import TelegramDigestNotifier
 from src.adapters.notifications.telegram_notifier import TelegramNotifier
+from src.adapters.social.composite_lead_source import CompositeLeadSource
+from src.adapters.social.hacker_news_lead_source import HackerNewsLeadSource
 from src.adapters.social.reddit_lead_source import RedditLeadSource
 from src.application.prospecting import (
     DEFAULT_APP_SUMMARY,
@@ -67,8 +69,13 @@ def build_drafter_from_env() -> OpenAIProspectDrafter | TemplateProspectDrafter:
     )
 
 
-def build_lead_source_from_env() -> RedditLeadSource:
-    return RedditLeadSource(user_agent=os.getenv("PROSPECT_REDDIT_USER_AGENT", "trade-prospecting-bot/0.1"))
+def build_lead_source_from_env() -> CompositeLeadSource:
+    return CompositeLeadSource(
+        sources=(
+            RedditLeadSource(user_agent=os.getenv("PROSPECT_REDDIT_USER_AGENT", "trade-prospecting-bot/0.1")),
+            HackerNewsLeadSource(),
+        )
+    )
 
 
 def build_telegram_digest_notifier_from_env() -> TelegramDigestNotifier:

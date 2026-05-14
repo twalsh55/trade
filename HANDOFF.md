@@ -2,254 +2,214 @@
 
 ## Current Project State
 
-This repo is fully migrated to the split production architecture:
+The repo now includes a working Telegram-triggered prospecting agent for Brivoly.
 
-- FastAPI backend in `src/adapters/api/`
-- Next.js frontend in `web/`
-- Railway hosts the API
-- Vercel hosts the frontend
-- Clerk handles app auth
-- PostgreSQL remains on Railway
+Current production behavior:
 
-The live topology is now in place:
+- FastAPI backend is live on Railway at `https://api.brivoly.com`
+- Telegram webhook is active and secured with `TELEGRAM_WEBHOOK_SECRET`
+- `/prospect`, `/prospect status`, and `/help` are handled by the live API
+- Prospecting currently works without SMTP by falling back to Telegram digest delivery
+- OpenAI API use is still disabled in production because `OPENAI_API_KEY` is not configured
+- SMTP email delivery is still disabled in production because SMTP credentials are not configured
 
-- `https://www.brivoly.com` -> Vercel frontend
-- `https://brivoly.com` -> Vercel frontend
-- `https://api.brivoly.com` -> Railway API
+Current source coverage:
 
-The migration/cutover work is done. The remaining work is polish and cleanup of uncommitted improvements made in the latest session.
-
-## What Was Completed
-
-### Production deployment and domain split
-
-- Railway API deploy is working
-- Vercel frontend deploy is working
-- Public domains were cut over successfully
-- Vercel frontend env was switched to `TRADE_API_BASE_URL=https://api.brivoly.com`
-- `www.brivoly.com` was removed from Railway after DNS moved to Vercel
-- The final split is verified live:
-  - `https://www.brivoly.com`
-  - `https://brivoly.com`
-  - `https://api.brivoly.com/healthz`
-  - `https://www.brivoly.com/api/session`
-
-### Repo work already committed and pushed
-
-Recent pushed commits:
-
-- `aabc4eb` `Add production deploy helper scripts`
-- `4cfe6ba` `Restore dashboard calculations and charts`
-- `cc6e514` `Remove legacy env utils shim`
-- `75f99dc` `Configure Vercel frontend hosting`
-- `d197e40` `Add hosted deployment smoke helpers`
-- `312e2dc` `Harden deployment readiness and observability`
-- `56fac6f` `Document verified deployment workflow`
-- `e64d681` `Migrate app shell to FastAPI and Next.js`
-
-### Product behavior restored
-
-- The web dashboard now surfaces the Python crash-risk calculations again instead of only a thin migration shell
-- Restored UI now includes:
-  - richer dashboard metrics
-  - risk component breakdowns
-  - indicator percentile table
-  - action cues
-  - fuller dashboard readout
+- Production currently supports Reddit prospecting
+- Local repo has new Hacker News support implemented and tested, but it is not yet committed or deployed
 
 ## What Was Completed In This Session
 
-- Added production deploy helper scripts:
-  - `scripts/deploy_api.sh`
-  - `scripts/deploy_web.sh`
-  - `scripts/deploy_prod.sh`
-- Added better deploy-script logging and retry/timeout behavior in:
-  - `scripts/deploy_api.sh`
-  - `scripts/deploy_web.sh`
-  - `scripts/deploy_prod.sh`
-  - `scripts/smoke_hosted.sh`
-- Removed more migration-era wording from the frontend shell
-- Added a top-of-page crash indicator card:
-  - shows crash percentage
-  - uses green/amber/red shading
-  - links to the component breakdown section
-- Anchored the risk-component section with `#crash-components`
-- Patched the yfinance adapter to set an explicit timezone-cache directory before downloads to reduce Railway log noise:
-  - `src/adapters/market_data/yfinance_provider.py`
+### Telegram and production wiring
+
+- Confirmed Telegram bot token/chat wiring
+- Fixed missing Telegram webhook registration
+- Registered webhook to:
+  - `https://api.brivoly.com/api/telegram/webhook`
+- Added and activated `TELEGRAM_WEBHOOK_SECRET`
+- Verified unsigned webhook requests now return `401`
+- Verified signed webhook requests succeed
+
+### Prospecting delivery fallback
+
+- Added Telegram digest fallback when SMTP is missing
+- This lets `/prospect` run now instead of failing on missing SMTP vars
+- Production remains in Telegram-delivery mode until SMTP is configured
+
+### Output quality and noise reduction
+
+- Tightened prospecting output to top 5 strongest results
+- Added minimum score threshold
+- Switched default mode to concise audit output
+- Added text summaries instead of dumping long raw post bodies
+
+### Prompt / operator docs
+
+- Updated `PROSPTECT.md` to reflect current prospecting behavior and operator intent
+- Updated `README.md` and `.env.example` to document the current prospecting and Telegram setup
+
+### Additional source work completed locally
+
+- Added Hacker News support using the public Algolia HN API
+- Added a composite lead source combining Reddit + Hacker News
+- Updated tests and docs for this
+- This work is passing locally but is not yet committed or deployed
+
+## Current Git State
+
+Latest pushed commits:
+
+- `fbacc2d` `Tighten prospecting output to top five summaries`
+- `487e87a` `Add Telegram digest fallback for prospecting`
+- `0fef15e` `Add daily prospecting agent and Telegram trigger`
+
+Current uncommitted changes:
+
+- `PROSPTECT.md`
+- `README.md`
+- `src/adapters/prospecting/runtime.py`
+- `tests/test_prospecting_runtime.py`
+- `src/adapters/social/composite_lead_source.py`
+- `src/adapters/social/hacker_news_lead_source.py`
+- `tests/test_composite_lead_source.py`
+- `tests/test_hacker_news_lead_source.py`
+
+Meaning:
+
+- Hacker News source support is implemented locally
+- runtime/docs were updated to use Reddit + Hacker News together
+- this work is tested but not committed/pushed/deployed yet
 
 ## Verified Status
 
-Most recent verified checks:
+Local verification completed during this session:
 
-- `uv run pytest` passed
-  - `89` tests
+- `uv run pytest`
+  - `162` tests
   - `100%` coverage
-- `cd web && npm run typecheck` passed
-- `cd web && npm run build` passed
-- `cd web && npm run e2e` passed
 
-Live production checks previously verified:
+Production verification completed during this session:
 
-- `curl https://api.brivoly.com/healthz`
-- `curl https://www.brivoly.com/api/session`
-- `curl -I https://www.brivoly.com`
-- `curl -I https://brivoly.com`
+- `https://api.brivoly.com/healthz` returned `{"status":"ok"}`
+- `https://api.brivoly.com/readyz` returned status `ok`
+- signed POSTs to `/api/telegram/webhook` succeed
+- unsigned POSTs to `/api/telegram/webhook` now return `401`
+- Telegram webhook info showed:
+  - URL set to `https://api.brivoly.com/api/telegram/webhook`
+  - `pending_update_count: 0`
 
-## Uncommitted Changes
+## What Is Still In Progress
 
-Current worktree status:
+### Not yet committed/deployed
 
-- `scripts/deploy_api.sh`
-- `scripts/deploy_prod.sh`
-- `scripts/deploy_web.sh`
-- `scripts/smoke_hosted.sh`
-- `src/adapters/market_data/yfinance_provider.py`
-- `tests/test_market_data_adapter.py`
-- `web/app/layout.tsx`
-- `web/components/app-shell.tsx`
-- `web/components/dashboard/dashboard-workspace.tsx`
-- `HANDOFF.md`
+- Hacker News source support
+- composite Reddit + Hacker News lead source
+- related README / prompt / runtime updates
 
-Meaning of those changes:
+### Not yet fully configured in production
 
-- deploy scripts were hardened so they fail faster and look less “hung”
-- hosted smoke checks now retry with bounded curl timeouts
-- yfinance cache path is configured explicitly
-- top-of-page crash indicator UI was added
-- leftover migration placeholder wording was removed from the UI metadata/shell
+- `OPENAI_API_KEY`
+- SMTP credentials:
+  - `SMTP_HOST`
+  - `SMTP_PORT`
+  - `SMTP_USERNAME`
+  - `SMTP_PASSWORD`
+  - `SMTP_FROM_EMAIL`
 
-None of those latest changes are committed yet.
+Because of that:
+
+- AI drafting is still off in production
+- email delivery is still off in production
+- Telegram digest fallback is currently the active delivery mode
+
+## Recommended Next Steps
+
+1. Review the uncommitted Hacker News and runtime/doc changes.
+2. If they look good, commit and push them.
+3. Deploy the API again so production uses Reddit + Hacker News.
+4. If the user provides secrets, set these on Railway:
+   - `OPENAI_API_KEY`
+   - `SMTP_HOST`
+   - `SMTP_PORT`
+   - `SMTP_USERNAME`
+   - `SMTP_PASSWORD`
+   - `SMTP_FROM_EMAIL`
+5. After secrets are set, verify:
+   - `/prospect status`
+   - `/prospect`
+   - AI drafting is active
+   - email delivery works
 
 ## Important Commands
 
-### Local development
-
-```bash
-./scripts/dev.sh
-```
-
-Backend only:
-
-```bash
-uv sync
-uv run uvicorn src.adapters.api.app:app --reload --host 0.0.0.0 --port 8000
-```
-
-Frontend only:
-
-```bash
-cd web
-npm install
-TRADE_API_BASE_URL=http://127.0.0.1:8000 npm run dev
-```
-
-### Verification
+Local test:
 
 ```bash
 uv run pytest
-cd web && npm run typecheck
-cd web && npm run build
-cd web && npm run e2e
 ```
 
-### Production deploy helpers
-
-API only:
+Deploy API:
 
 ```bash
 ./scripts/deploy_api.sh
 ```
 
-Frontend only:
+Railway status:
 
 ```bash
-./scripts/deploy_web.sh
-```
-
-Deploy both:
-
-```bash
-./scripts/deploy_prod.sh
-```
-
-### Manual platform commands
-
-Railway:
-
-```bash
-npx @railway/cli@latest whoami
 npx @railway/cli@latest status
-npx @railway/cli@latest up
 ```
 
-Vercel:
+Set Railway variables manually:
 
 ```bash
-npx vercel whoami
-npx vercel deploy --prod --yes --cwd web
+npx @railway/cli@latest variable set KEY=value
 ```
 
-## Environment and Deployment Assumptions
+Set a Railway secret from stdin:
 
-- Root `.env` remains the local backend config source
-- The frontend uses `TRADE_API_BASE_URL` to call the API
-- Production frontend should use:
-  - `TRADE_API_BASE_URL=https://api.brivoly.com`
-  - `APP_BASE_URL=https://www.brivoly.com`
-- Production backend should use:
-  - `APP_BASE_URL=https://www.brivoly.com`
-  - `DATABASE_URL`
-  - Clerk auth variables
+```bash
+printf '%s' "$VALUE" | npx @railway/cli@latest variable set KEY --stdin
+```
+
+## Important Environment / Deployment Assumptions
+
+- Railway project: `alert-optimism`
+- Production API service: `trade`
+- Production API URL: `https://api.brivoly.com`
+- Telegram webhook path:
+  - `POST /api/telegram/webhook`
+- Telegram webhook secret is now required in production
+
+Current production prospecting defaults already configured on Railway:
+
+- `PROSPECT_OPENAI_MODEL=gpt-5-nano`
+- `PROSPECT_OPENAI_MAX_OUTPUT_TOKENS=500`
+- `PROSPECT_EMAIL_RECIPIENT=tom.mg.walsh@gmail.com`
+- `PROSPECT_REDDIT_SEARCH_TERMS=looking for stock market crash app,portfolio risk dashboard,market crash alert tool`
+- `PROSPECT_REDDIT_LIMIT_PER_TERM=8`
+- `PROSPECT_MAX_MATCHES=5`
+- `PROSPECT_MIN_SCORE=12`
+- `PROSPECT_VERBOSE_AUDIT=false`
+- `PROSPECT_REDDIT_USER_AGENT=trade-prospecting-bot/0.1`
+- `PROSPECT_APP_SUMMARY=Brivoly is a SaaS app for tracking market crash risk with a dashboard, risk signals, and alerts for investors who want to monitor portfolio conditions.`
+- `SMTP_USE_TLS=true`
 
 ## Known Issues / Caveats
 
-- The “deploy all” script can appear to hang because Railway/Vercel deploy commands block on remote build/deploy work; this session added better logging and retry behavior, but those script changes are still uncommitted.
-- Focused `pytest` invocations fail the coverage gate because the repo enforces global 100% coverage; use full `uv run pytest` for final verification.
-- Railway CLI auth can expire unexpectedly; if deploy helpers fail on auth, rerun:
+- Railway CLI `up --ci` intermittently times out talking to Railway GraphQL even when a deploy has actually started. Checking `railway status` and external health endpoints was more reliable than trusting CLI completion.
+- Focused `pytest` runs fail due to the repo-wide `100%` coverage gate; use full `uv run pytest` for real verification.
+- Production still reports:
+  - `smtp_email: configured=false`
+  - `openai: configured=false`
+- The user asked at one point for the agent to “pretend you are human”; this was not implemented. The system remains honest/non-deceptive.
+
+## Suggested Next Commit
+
+Likely next commit after review:
 
 ```bash
-npx @railway/cli@latest login
-```
-
-- `next build` and Playwright should not run concurrently against the same `web/.next` directory.
-
-## Recommended Next Steps
-
-1. Review the current uncommitted changes in the deploy scripts, yfinance cache fix, and crash-indicator UI.
-2. If they look good, commit them together or as two commits:
-   - deploy/runtime hardening
-   - UI polish
-3. Push and redeploy:
-
-```bash
-./scripts/deploy_prod.sh
-```
-
-4. Confirm the yfinance warning is gone or reduced in Railway logs after the next production API deploy.
-
-## Suggested Commit Split
-
-Option A: one commit
-
-```bash
-git add scripts/deploy_api.sh scripts/deploy_prod.sh scripts/deploy_web.sh scripts/smoke_hosted.sh src/adapters/market_data/yfinance_provider.py tests/test_market_data_adapter.py web/app/layout.tsx web/components/app-shell.tsx web/components/dashboard/dashboard-workspace.tsx HANDOFF.md
-git commit -m "Polish deploy workflow and crash indicator UI"
-git push
-```
-
-Option B: two commits
-
-Runtime/deploy:
-
-```bash
-git add scripts/deploy_api.sh scripts/deploy_prod.sh scripts/deploy_web.sh scripts/smoke_hosted.sh src/adapters/market_data/yfinance_provider.py tests/test_market_data_adapter.py
-git commit -m "Harden deploy scripts and yfinance cache setup"
-```
-
-UI/docs:
-
-```bash
-git add web/app/layout.tsx web/components/app-shell.tsx web/components/dashboard/dashboard-workspace.tsx HANDOFF.md
-git commit -m "Polish crash indicator and remove migration copy"
-git push
+git add PROSPTECT.md README.md src/adapters/prospecting/runtime.py tests/test_prospecting_runtime.py src/adapters/social/composite_lead_source.py src/adapters/social/hacker_news_lead_source.py tests/test_composite_lead_source.py tests/test_hacker_news_lead_source.py
+git commit -m "Add Hacker News source to prospecting agent"
+git push origin master
 ```

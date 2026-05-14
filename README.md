@@ -206,12 +206,12 @@ There is now a low-cost daily prospecting job for testing outreach ideas without
 
 What it does:
 
-- searches Reddit for recent posts that look relevant to the app
+- searches Reddit and Hacker News for recent posts that look relevant to the app
 - scores posts with local heuristics first to avoid unnecessary model usage
 - uses OpenAI only for a tiny drafting step when `OPENAI_API_KEY` is configured
 - sends a plain-text email digest to `tom.mg.walsh@gmail.com` by default
 - falls back to Telegram digest delivery when SMTP is not configured but Telegram is
-- never posts to Reddit or any other social network
+- never posts to Reddit, Hacker News, or any other social network
 
 Required email settings:
 

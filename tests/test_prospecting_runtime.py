@@ -70,7 +70,9 @@ def test_build_drafter_from_env_uses_openai_when_api_key_present(monkeypatch) ->
 def test_build_lead_source_from_env_uses_custom_user_agent(monkeypatch) -> None:
     monkeypatch.setenv("PROSPECT_REDDIT_USER_AGENT", "custom-agent")
     source = build_lead_source_from_env()
-    assert source.user_agent == "custom-agent"
+    assert source.__class__.__name__ == "CompositeLeadSource"
+    assert source.sources[0].user_agent == "custom-agent"
+    assert source.sources[1].__class__.__name__ == "HackerNewsLeadSource"
 
 
 def test_build_telegram_digest_notifier_from_env_requires_telegram(monkeypatch) -> None:
