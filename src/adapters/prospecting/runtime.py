@@ -3,12 +3,14 @@ from __future__ import annotations
 import os
 
 from src.adapters.llm.openai_prospect_drafter import OpenAIProspectDrafter, TemplateProspectDrafter
+from src.adapters.notifications.composite_email_notifier import CompositeEmailNotifier
 from src.adapters.notifications.smtp_email_notifier import SMTPEmailNotifier
 from src.adapters.notifications.telegram_digest_notifier import TelegramDigestNotifier
 from src.adapters.notifications.telegram_notifier import TelegramNotifier
 from src.adapters.social.composite_lead_source import CompositeLeadSource
 from src.adapters.social.hacker_news_lead_source import HackerNewsLeadSource
 from src.adapters.social.reddit_lead_source import RedditLeadSource
+from src.application.ports import EmailDeliveryPort
 from src.application.prospecting import (
     DEFAULT_APP_SUMMARY,
     DEFAULT_PROSPECT_SEARCH_TERMS,
@@ -52,10 +54,17 @@ def build_email_notifier_from_env() -> SMTPEmailNotifier:
     )
 
 
-def build_digest_delivery_from_env() -> SMTPEmailNotifier | TelegramDigestNotifier:
+def build_digest_delivery_from_env() -> EmailDeliveryPort:
+    notifiers: list[EmailDeliveryPort] = []
     if has_configured_smtp_delivery():
-        return build_email_notifier_from_env()
-    return build_telegram_digest_notifier_from_env()
+        notifiers.append(build_email_notifier_from_env())
+    if has_configured_telegram_delivery():
+        notifiers.append(build_telegram_digest_notifier_from_env())
+    if not notifiers:
+        raise ValueError("Missing SMTP delivery settings and Telegram delivery fallback is unavailable.")
+    if len(notifiers) == 1:
+        return notifiers[0]
+    return CompositeEmailNotifier(tuple(notifiers))
 
 
 def build_drafter_from_env() -> OpenAIProspectDrafter | TemplateProspectDrafter:

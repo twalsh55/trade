@@ -85,18 +85,47 @@ def test_build_telegram_digest_notifier_from_env_requires_telegram(monkeypatch) 
         raise AssertionError("Expected ValueError")
 
 
-def test_build_digest_delivery_from_env_prefers_smtp_but_falls_back_to_telegram(monkeypatch) -> None:
+def test_build_digest_delivery_from_env_uses_telegram_when_only_telegram_is_configured(monkeypatch) -> None:
     monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "bot")
     monkeypatch.setenv("TELEGRAM_CHAT_ID", "chat")
     fallback = build_digest_delivery_from_env()
     assert fallback.__class__.__name__ == "TelegramDigestNotifier"
 
+
+def test_build_digest_delivery_from_env_uses_smtp_when_only_smtp_is_configured(monkeypatch) -> None:
+    monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
+    monkeypatch.delenv("TELEGRAM_CHAT_ID", raising=False)
     monkeypatch.setenv("SMTP_HOST", "smtp.example.com")
     monkeypatch.setenv("SMTP_USERNAME", "mailer")
     monkeypatch.setenv("SMTP_PASSWORD", "secret")
     monkeypatch.setenv("SMTP_FROM_EMAIL", "alerts@example.com")
     smtp = build_digest_delivery_from_env()
     assert smtp.__class__.__name__ == "SMTPEmailNotifier"
+
+
+def test_build_digest_delivery_from_env_uses_both_channels_when_both_are_configured(monkeypatch) -> None:
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "bot")
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "chat")
+    monkeypatch.setenv("SMTP_HOST", "smtp.example.com")
+    monkeypatch.setenv("SMTP_USERNAME", "mailer")
+    monkeypatch.setenv("SMTP_PASSWORD", "secret")
+    monkeypatch.setenv("SMTP_FROM_EMAIL", "alerts@example.com")
+
+    delivery = build_digest_delivery_from_env()
+
+    assert delivery.__class__.__name__ == "CompositeEmailNotifier"
+
+
+def test_build_digest_delivery_from_env_requires_at_least_one_channel(monkeypatch) -> None:
+    for name in ("SMTP_HOST", "SMTP_USERNAME", "SMTP_PASSWORD", "SMTP_FROM_EMAIL", "TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID"):
+        monkeypatch.delenv(name, raising=False)
+
+    try:
+        build_digest_delivery_from_env()
+    except ValueError as exc:
+        assert str(exc) == "Missing SMTP delivery settings and Telegram delivery fallback is unavailable."
+    else:
+        raise AssertionError("Expected ValueError")
 
 
 def test_collect_prospecting_config_errors_reports_missing_and_invalid_fields(monkeypatch) -> None:
