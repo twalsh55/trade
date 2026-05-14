@@ -320,6 +320,39 @@ def test_healthcheck_and_settings_bootstrap_work(monkeypatch) -> None:
     assert settings_response.json()["clerk_publishable_key"] is None
 
 
+def test_healthcheck_and_readiness_include_request_ids(monkeypatch) -> None:
+    monkeypatch.setenv("APP_BASE_URL", "https://trade.example.com")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@db.example.com:5432/trade")
+    monkeypatch.setenv("CLERK_PUBLISHABLE_KEY", "pk_test_value")
+    client = make_client(user=make_user())
+
+    response = client.get("/healthz", headers={"X-Request-ID": "req-123"})
+    assert response.status_code == 200
+    assert response.headers["X-Request-ID"] == "req-123"
+
+    generated = client.get("/healthz")
+    assert generated.status_code == 200
+    assert generated.headers["X-Request-ID"]
+
+    readiness = client.get("/readyz")
+    assert readiness.status_code == 200
+    assert readiness.headers["X-Request-ID"]
+    assert readiness.json()["status"] == "ok"
+    assert readiness.json()["checks"]["auth"]["configured"] is True
+
+
+def test_readiness_reports_degraded_runtime_without_auth_config(monkeypatch) -> None:
+    monkeypatch.setenv("DATABASE_URL", "")
+    monkeypatch.setenv("CLERK_PUBLISHABLE_KEY", "")
+    client = make_client(user=make_user())
+
+    response = client.get("/readyz")
+
+    assert response.status_code == 503
+    assert response.json()["status"] == "degraded"
+    assert response.json()["checks"]["auth"]["configured"] is False
+
+
 def test_settings_bootstrap_includes_clerk_host_when_configured(monkeypatch) -> None:
     monkeypatch.setenv("CLERK_PUBLISHABLE_KEY", "pk_test_ZXhhbXBsZS5jbGVyay5hY2NvdW50cy5kZXYk")
     monkeypatch.setenv("CLERK_SIGN_IN_URL", "https://accounts.example.com/sign-in")

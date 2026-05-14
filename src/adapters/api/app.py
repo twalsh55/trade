@@ -3,12 +3,20 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
+from time import perf_counter
 from typing import Callable
 from uuid import UUID
+from uuid import uuid4
 
-from fastapi import Cookie, FastAPI, Header, HTTPException, Query, status
+from fastapi import Cookie, FastAPI, Header, HTTPException, Query, Request, status
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
+from src.adapters.api.observability import (
+    REQUEST_ID_HEADER,
+    build_runtime_report,
+    configure_api_logger,
+)
 from src.adapters.auth.clerk_auth import AuthenticationError
 from src.adapters.auth.runtime import (
     CLERK_SESSION_COOKIE,
@@ -71,6 +79,7 @@ class UserDashboardSettingsPayload(BaseModel):
 
 def create_app(dependencies: ApiDependencies | None = None) -> FastAPI:
     load_env_file()
+    logger = configure_api_logger()
     deps = dependencies or ApiDependencies(
         auth_use_case_factory=build_authenticate_user_use_case,
         market_data_factory=YFinanceMarketDataAdapter,
@@ -79,9 +88,31 @@ def create_app(dependencies: ApiDependencies | None = None) -> FastAPI:
     )
     app = FastAPI(title="Trade API", version="0.1.0")
 
+    @app.middleware("http")
+    async def add_request_context(request: Request, call_next):  # type: ignore[no-untyped-def]
+        request_id = request.headers.get(REQUEST_ID_HEADER) or str(uuid4())
+        started_at = perf_counter()
+        response = await call_next(request)
+        duration_ms = (perf_counter() - started_at) * 1000
+        response.headers[REQUEST_ID_HEADER] = request_id
+        logger.info(
+            "request method=%s path=%s status=%s duration_ms=%.2f request_id=%s",
+            request.method,
+            request.url.path,
+            response.status_code,
+            duration_ms,
+            request_id,
+        )
+        return response
+
     @app.get("/healthz")
     def healthcheck() -> dict[str, str]:
         return {"status": "ok"}
+
+    @app.get("/readyz")
+    def readiness() -> JSONResponse:
+        report = build_runtime_report()
+        return JSONResponse(report, status_code=status.HTTP_200_OK if report["status"] == "ok" else status.HTTP_503_SERVICE_UNAVAILABLE)
 
     @app.get("/api/settings/bootstrap")
     def settings_bootstrap() -> dict[str, object]:

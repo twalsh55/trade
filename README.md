@@ -85,8 +85,10 @@ Container behavior:
 
 - installs Python dependencies with `uv sync --frozen`
 - sends the optional Telegram startup notification
-- starts `uvicorn` on `0.0.0.0:$PORT`
+- starts `uvicorn` on `0.0.0.0:$PORT` with proxy headers enabled
 - exposes `GET /healthz` for Railway health checks
+- exposes `GET /readyz` for config/readiness inspection
+- emits an `X-Request-ID` header on API responses for request tracing
 
 Recommended production topology:
 
@@ -128,7 +130,9 @@ curl http://127.0.0.1:18000/healthz
 Notes:
 
 - `curl` returned `{"status":"ok"}` from the containerized API.
+- `curl http://127.0.0.1:18000/readyz` returned `{"status":"ok", ...}` with production-like env values.
 - Avoid running `npm run build` and `npm run e2e` against the same `web/.next` directory in parallel; Next can fail with transient build errors in that case.
+- `npm run typecheck` now self-generates Next route types, so it works from a clean checkout.
 
 ## Telegram
 

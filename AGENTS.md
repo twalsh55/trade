@@ -67,6 +67,7 @@ Python remains the source of truth for domain logic and application use-cases. T
 The backend exposes these routes from `src/adapters/api/app.py`:
 
 - `GET /healthz`
+- `GET /readyz`
 - `GET /api/settings/bootstrap`
 - `GET /api/session`
 - `GET /api/dashboard`
@@ -79,6 +80,7 @@ Notes:
 - `account/settings` and `alerts/history` use a Postgres-backed personalization adapter when `DATABASE_URL` is configured.
 - The in-memory personalization adapter remains available as a fallback for local or isolated test contexts.
 - The Next.js app supports sign-in bootstrap, dashboard rendering, interactive dashboard filters, editable settings, refreshable alert history, and richer chart rendering on top of the Python API contracts.
+- API responses include `X-Request-ID` for request tracing.
 
 ## Execution Checklist
 
@@ -111,8 +113,9 @@ Notes:
   - `cd web && npm run typecheck`
   - `cd web && npm run build`
   - `cd web && npm run e2e`
-  - `docker build -t trade-api-deploycheck .`
-  - `docker run ... trade-api-deploycheck` returning `GET /healthz -> {"status":"ok"}`
+- `docker build -t trade-api-deploycheck .`
+- `docker run ... trade-api-deploycheck` returning `GET /healthz -> {"status":"ok"}`
+- `uv run pytest` now includes a real `uvicorn` smoke test for `/healthz`, `/readyz`, and bootstrap routes
 
 ## Directory Direction
 

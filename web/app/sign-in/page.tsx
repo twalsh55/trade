@@ -3,6 +3,7 @@ import Link from "next/link";
 import { BrandLockup } from "@/components/brand-lockup";
 import { ClerkAuthBridge } from "@/components/auth/clerk-auth-bridge";
 import { getSettingsBootstrap } from "@/lib/api";
+import { sanitizeRedirectTo } from "@/lib/auth";
 
 type SignInPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -11,7 +12,7 @@ type SignInPageProps = {
 export default async function SignInPage({ searchParams }: SignInPageProps) {
   const resolvedSearchParams = (await searchParams) ?? {};
   const redirectValue = resolvedSearchParams.redirectTo;
-  const redirectTo = Array.isArray(redirectValue) ? redirectValue[0] : redirectValue || "/";
+  const redirectTo = sanitizeRedirectTo(Array.isArray(redirectValue) ? redirectValue[0] : redirectValue);
   const bootstrap = await getSettingsBootstrap().catch(() => null);
 
   return (

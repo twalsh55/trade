@@ -41,6 +41,10 @@ The frontend supports:
 - Added Playwright end-to-end coverage for session bootstrap, dashboard refresh, settings save, and alert refresh
 - Verified the split deployment path locally, including the Railway Docker image and Next standalone build
 - Added `.dockerignore` to keep the Railway build context focused on deployable files
+- Added API request tracing with `X-Request-ID` and a `/readyz` endpoint for config/readiness inspection
+- Added a real process-level smoke test that launches `uvicorn` and verifies `/healthz`, `/readyz`, bootstrap, and session behavior
+- Hardened the sign-in redirect flow to reject unsafe external `redirectTo` values
+- Updated frontend typechecking so it self-generates Next route types from a clean checkout
 
 ## Verified Status
 
@@ -56,6 +60,7 @@ Last verified successfully:
   - `docker build -t trade-api-deploycheck .`
   - `docker run ... trade-api-deploycheck`
   - `GET /healthz` returned `{"status":"ok"}`
+  - `GET /readyz` returned `{"status":"ok", ...}` with production-like env wiring
 
 ## Important Run Commands
 
@@ -117,7 +122,6 @@ Recommended production topology:
 
 ## Known Risks / Caveats
 
-- The Playwright suite currently uses a mock backend for deterministic browser coverage rather than the live FastAPI app.
 - `next build` and the Playwright suite should not be run against the same `web/.next` directory in parallel; doing so can produce transient Next build errors.
 - Production deployment still depends on correct per-service environment configuration in Railway and Vercel.
 
@@ -125,11 +129,11 @@ Recommended production topology:
 
 Remaining high-value items:
 
-- Add a thin real-stack smoke test layer that exercises the live FastAPI app in addition to the mocked Playwright suite
-- Continue hardening environment setup and observability for separate frontend/backend production services
+- Configure the actual Railway and Vercel services with the verified environment values
+- Add any external monitoring, alerting, or log shipping needed beyond the in-app request tracing
 
 ## Recommended Next Steps
 
 1. Configure the real Railway and Vercel services using the verified split deployment settings and environment variables.
-2. Add a thin smoke test against the live FastAPI app to complement the mocked Playwright suite.
-3. Add structured logging and auth-boundary observability for production readiness.
+2. Add platform-level monitoring or log shipping on top of the in-app `X-Request-ID` tracing.
+3. Smoke-test the hosted services after the first real deployment using `/healthz`, `/readyz`, and the sign-in flow.
