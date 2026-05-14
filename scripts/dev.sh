@@ -6,7 +6,7 @@ API_HOST="${API_HOST:-127.0.0.1}"
 API_PORT="${API_PORT:-8000}"
 WEB_HOST="${WEB_HOST:-127.0.0.1}"
 WEB_PORT="${WEB_PORT:-3000}"
-TRADE_API_BASE_URL="${TRADE_API_BASE_URL:-http://${API_HOST}:${API_PORT}}"
+BRIVOLY_API_BASE_URL="${BRIVOLY_API_BASE_URL:-${TRADE_API_BASE_URL:-http://${API_HOST}:${API_PORT}}}"
 
 cd "${ROOT_DIR}"
 
@@ -63,7 +63,7 @@ api_pid="$!"
 echo "Starting Next.js frontend on http://${WEB_HOST}:${WEB_PORT}"
 (
   cd web
-  TRADE_API_BASE_URL="${TRADE_API_BASE_URL}" npm run dev -- --hostname "${WEB_HOST}" --port "${WEB_PORT}"
+  BRIVOLY_API_BASE_URL="${BRIVOLY_API_BASE_URL}" TRADE_API_BASE_URL="${BRIVOLY_API_BASE_URL}" npm run dev -- --hostname "${WEB_HOST}" --port "${WEB_PORT}"
 ) &
 web_pid="$!"
 

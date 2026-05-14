@@ -32,7 +32,7 @@ export function AppShell({ data }: AppShellProps) {
       <aside className="hidden w-72 shrink-0 rounded-[2rem] border bg-slate-950 p-6 text-slate-50 shadow-[0_24px_80px_-40px_rgba(15,23,42,0.7)] lg:block">
         <div className="space-y-3">
           <BrandLockup size="lg" priority />
-          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-cyan-300">Trade Control</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-cyan-300">Brivoly Control</p>
           <h1 className="text-3xl font-semibold tracking-tight">Crash Monitor</h1>
           <p className="text-sm leading-6 text-slate-300">
             Monitor market stress, participation, and crash-risk cues while Python remains the calculation engine.

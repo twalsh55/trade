@@ -4,7 +4,7 @@ import logging
 import os
 from urllib.parse import urlsplit
 
-API_LOGGER_NAME = "trade.api"
+API_LOGGER_NAME = "brivoly.api"
 REQUEST_ID_HEADER = "X-Request-ID"
 
 
@@ -37,7 +37,7 @@ def build_runtime_report() -> dict[str, object]:
     database_url = os.getenv("DATABASE_URL", "").strip()
     publishable_key = os.getenv("CLERK_PUBLISHABLE_KEY", "").strip()
     secret_key = os.getenv("CLERK_SECRET_KEY", "").strip()
-    trade_api_base_url = os.getenv("TRADE_API_BASE_URL", "").strip()
+    frontend_api_base_url = os.getenv("BRIVOLY_API_BASE_URL", "").strip() or os.getenv("TRADE_API_BASE_URL", "").strip()
     telegram_bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
     telegram_chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip()
     smtp_host = os.getenv("SMTP_HOST", "").strip()
@@ -46,7 +46,7 @@ def build_runtime_report() -> dict[str, object]:
 
     auth_configured = bool(database_url) and bool(publishable_key)
     app_base_url_valid = is_absolute_http_url(app_base_url)
-    trade_api_base_url_valid = is_absolute_http_url(trade_api_base_url) if trade_api_base_url else None
+    frontend_api_base_url_valid = is_absolute_http_url(frontend_api_base_url) if frontend_api_base_url else None
 
     return {
         "status": "ok" if app_base_url_valid and auth_configured else "degraded",
@@ -64,8 +64,8 @@ def build_runtime_report() -> dict[str, object]:
                 "configured": auth_configured,
             },
             "frontend_api_base_url": {
-                "configured": bool(trade_api_base_url),
-                "valid": trade_api_base_url_valid,
+                "configured": bool(frontend_api_base_url),
+                "valid": frontend_api_base_url_valid,
             },
             "telegram": {
                 "configured": bool(telegram_bot_token) and bool(telegram_chat_id),

@@ -20,7 +20,7 @@ declare global {
       mountSignIn(target: Element): void;
     };
     __internal_ClerkUICtor?: unknown;
-    __tradeClerkLoadPromise?: Promise<unknown>;
+    __brivolyClerkLoadPromise?: Promise<unknown>;
   }
 }
 
@@ -32,7 +32,7 @@ export function ClerkAuthBridge({ publishableKey, host, redirectTo }: ClerkAuthB
     let cancelled = false;
 
     async function loadScript(src: string, attributes: Record<string, string> = {}) {
-      const existing = document.querySelector<HTMLScriptElement>(`script[data-trade-src="${src}"]`);
+      const existing = document.querySelector<HTMLScriptElement>(`script[data-brivoly-src="${src}"]`);
       if (existing) {
         if (existing.dataset.loaded === "true") {
           return;
@@ -48,7 +48,7 @@ export function ClerkAuthBridge({ publishableKey, host, redirectTo }: ClerkAuthB
         const script = document.createElement("script");
         script.src = src;
         script.async = true;
-        script.dataset.tradeSrc = src;
+        script.dataset.brivolySrc = src;
         Object.entries(attributes).forEach(([key, value]) => script.setAttribute(key, value));
         script.addEventListener(
           "load",
@@ -64,8 +64,8 @@ export function ClerkAuthBridge({ publishableKey, host, redirectTo }: ClerkAuthB
     }
 
     async function ensureClerk() {
-      if (!window.__tradeClerkLoadPromise) {
-        window.__tradeClerkLoadPromise = (async () => {
+      if (!window.__brivolyClerkLoadPromise) {
+        window.__brivolyClerkLoadPromise = (async () => {
           await loadScript(`https://${host}/npm/@clerk/clerk-js@6/dist/clerk.browser.js`, {
             crossorigin: "anonymous",
             "data-clerk-publishable-key": publishableKey,
@@ -78,7 +78,7 @@ export function ClerkAuthBridge({ publishableKey, host, redirectTo }: ClerkAuthB
           });
         })();
       }
-      await window.__tradeClerkLoadPromise;
+      await window.__brivolyClerkLoadPromise;
       return window.Clerk;
     }
 
@@ -144,7 +144,7 @@ export function ClerkAuthBridge({ publishableKey, host, redirectTo }: ClerkAuthB
       <div className="inline-flex items-center rounded-full border bg-slate-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
         Clerk session bootstrap
       </div>
-      <h2 className="mt-4 text-3xl font-semibold tracking-tight text-slate-950">Sign in to Trade</h2>
+      <h2 className="mt-4 text-3xl font-semibold tracking-tight text-slate-950">Sign in to Brivoly</h2>
       <p className="mt-3 max-w-xl text-sm leading-6 text-slate-600">
         Authentication happens through Clerk, then the session token is exchanged for an application cookie so the
         Next.js UI can talk to the Python API on every request.

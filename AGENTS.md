@@ -119,10 +119,10 @@ Notes:
   - `./scripts/deploy_api.sh`
   - `./scripts/deploy_web.sh`
   - `./scripts/deploy_prod.sh`
-- Required frontend deployment env: `TRADE_API_BASE_URL` pointing at the deployed Railway API origin.
+- Required frontend deployment env: `BRIVOLY_API_BASE_URL` pointing at the deployed Railway API origin.
 - Required shared/auth env depends on environment:
   - API service: `DATABASE_URL`, Clerk variables, `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID`, optional `STRIPE_PORTAL_CONFIGURATION_ID`, optional Telegram variables
-  - Frontend service: `TRADE_API_BASE_URL`, `APP_BASE_URL`, Clerk publishable/sign-in/sign-up values as needed by the sign-in bridge
+  - Frontend service: `BRIVOLY_API_BASE_URL`, `APP_BASE_URL`, Clerk publishable/sign-in/sign-up values as needed by the sign-in bridge
 - Local verification completed for the current split:
   - `uv run pytest`
   - `cd web && npm run typecheck`

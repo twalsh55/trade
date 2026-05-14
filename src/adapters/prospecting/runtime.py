@@ -81,7 +81,7 @@ def build_drafter_from_env() -> OpenAIProspectDrafter | TemplateProspectDrafter:
 def build_lead_source_from_env() -> CompositeLeadSource:
     return CompositeLeadSource(
         sources=(
-            RedditLeadSource(user_agent=os.getenv("PROSPECT_REDDIT_USER_AGENT", "trade-prospecting-bot/0.1")),
+            RedditLeadSource(user_agent=os.getenv("PROSPECT_REDDIT_USER_AGENT", "brivoly-prospecting-bot/0.1")),
             HackerNewsLeadSource(),
         )
     )

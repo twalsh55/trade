@@ -29,6 +29,7 @@ export default defineConfig({
       cwd: ".",
       env: {
         NEXT_TELEMETRY_DISABLED: "1",
+        BRIVOLY_API_BASE_URL: `http://127.0.0.1:${mockApiPort}`,
         TRADE_API_BASE_URL: `http://127.0.0.1:${mockApiPort}`,
       },
     },

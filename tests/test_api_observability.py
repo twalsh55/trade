@@ -24,6 +24,7 @@ def test_build_runtime_report_defaults_to_degraded_without_auth_config(monkeypat
     monkeypatch.delenv("DATABASE_URL", raising=False)
     monkeypatch.delenv("CLERK_PUBLISHABLE_KEY", raising=False)
     monkeypatch.delenv("CLERK_SECRET_KEY", raising=False)
+    monkeypatch.delenv("BRIVOLY_API_BASE_URL", raising=False)
     monkeypatch.delenv("TRADE_API_BASE_URL", raising=False)
     monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
     monkeypatch.delenv("TELEGRAM_CHAT_ID", raising=False)
@@ -49,11 +50,11 @@ def test_build_runtime_report_defaults_to_degraded_without_auth_config(monkeypat
 
 
 def test_build_runtime_report_marks_configured_runtime_as_ok(monkeypatch) -> None:
-    monkeypatch.setenv("APP_BASE_URL", "https://trade.example.com")
+    monkeypatch.setenv("APP_BASE_URL", "https://app.brivoly.example.com")
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@db.example.com:5432/trade")
     monkeypatch.setenv("CLERK_PUBLISHABLE_KEY", "pk_test_value")
     monkeypatch.setenv("CLERK_SECRET_KEY", "sk_test_value")
-    monkeypatch.setenv("TRADE_API_BASE_URL", "https://api.trade.example.com")
+    monkeypatch.setenv("BRIVOLY_API_BASE_URL", "https://api.brivoly.example.com")
     monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "bot")
     monkeypatch.setenv("TELEGRAM_CHAT_ID", "chat")
     monkeypatch.setenv("SMTP_HOST", "smtp.example.com")
@@ -64,7 +65,7 @@ def test_build_runtime_report_marks_configured_runtime_as_ok(monkeypatch) -> Non
 
     assert report["status"] == "ok"
     checks = report["checks"]
-    assert checks["app_base_url"] == {"value": "https://trade.example.com", "valid": True}
+    assert checks["app_base_url"] == {"value": "https://app.brivoly.example.com", "valid": True}
     assert checks["database"] == {"configured": True}
     assert checks["auth"] == {
         "publishable_key_configured": True,

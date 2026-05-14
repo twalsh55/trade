@@ -103,7 +103,7 @@ def create_app(dependencies: ApiDependencies | None = None) -> FastAPI:
         billing_port_factory=build_billing_adapter,
         now=lambda: datetime.now(tz=UTC),
     )
-    app = FastAPI(title="Trade API", version="0.1.0")
+    app = FastAPI(title="Brivoly API", version="0.1.0")
 
     @app.middleware("http")
     async def add_request_context(request: Request, call_next):  # type: ignore[no-untyped-def]

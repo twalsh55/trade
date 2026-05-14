@@ -36,8 +36,10 @@ export function DashboardWorkspace({ initialDashboard, settings, bootstrap }: Da
       void refreshDashboard(nextFilters);
     }
 
+    window.addEventListener("brivoly:settings-saved", handleSavedSettings as EventListener);
     window.addEventListener("trade:settings-saved", handleSavedSettings as EventListener);
     return () => {
+      window.removeEventListener("brivoly:settings-saved", handleSavedSettings as EventListener);
       window.removeEventListener("trade:settings-saved", handleSavedSettings as EventListener);
     };
   }, []);

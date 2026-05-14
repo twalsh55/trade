@@ -19,7 +19,7 @@ from src.env_utils import load_env_file
 
 
 def test_package_modules_import() -> None:
-    assert src.__doc__ == "Trade dashboard package."
+    assert src.__doc__ == "Brivoly dashboard package."
     assert src.adapters.__doc__ == "Adapters layer: external systems and delivery adapters."
     assert src.adapters.api.__doc__ == "API adapters."
     assert src.adapters.auth.__doc__ == "Authentication adapters."

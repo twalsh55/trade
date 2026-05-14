@@ -76,6 +76,7 @@ export function SettingsEditor({
 
     setForm(body as AccountSettings);
     setStatus("Settings saved. Refreshing dashboard snapshot...");
+    window.dispatchEvent(new CustomEvent("brivoly:settings-saved", { detail: body }));
     window.dispatchEvent(new CustomEvent("trade:settings-saved", { detail: body }));
     startTransition(() => {
       router.refresh();

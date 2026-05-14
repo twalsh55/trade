@@ -20,7 +20,7 @@ log "Checking Railway authentication and linked project"
 "${RAILWAY_CMD[@]}" whoami
 "${RAILWAY_CMD[@]}" status
 
-log "Deploying Trade API to Railway"
+log "Deploying Brivoly API to Railway"
 "${RAILWAY_CMD[@]}" up --ci
 
 log "Smoke testing deployed API at ${API_BASE_URL}"

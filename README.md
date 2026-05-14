@@ -1,6 +1,6 @@
-# Trade
+# Brivoly
 
-Trade is a split-stack market monitoring app:
+Brivoly is a split-stack market monitoring app:
 
 - Next.js frontend in `web/`
 - FastAPI backend in `src/adapters/api/`
@@ -35,7 +35,7 @@ Manual commands:
 uv sync
 uv run uvicorn src.adapters.api.app:app --reload --host 0.0.0.0 --port 8000
 cd web && npm install
-cd web && TRADE_API_BASE_URL=http://127.0.0.1:8000 npm run dev
+cd web && BRIVOLY_API_BASE_URL=http://127.0.0.1:8000 npm run dev
 ```
 
 Verification:
@@ -83,7 +83,7 @@ CLERK_AUTHORIZED_PARTIES=https://your-app.example.com,http://localhost:3000
 CLERK_SIGN_IN_URL=https://your-account-portal-domain/sign-in
 CLERK_SIGN_UP_URL=https://your-account-portal-domain/sign-up
 APP_BASE_URL=http://localhost:3000
-TRADE_API_BASE_URL=http://127.0.0.1:8000
+BRIVOLY_API_BASE_URL=http://127.0.0.1:8000
 ```
 
 Stripe billing variables for the API service:
@@ -149,7 +149,7 @@ Required service environment variables:
   - optional Telegram variables
   - `APP_BASE_URL` should point at the deployed frontend origin
 - Vercel frontend:
-  - `TRADE_API_BASE_URL` set to the deployed Railway API origin
+  - `BRIVOLY_API_BASE_URL` set to the deployed Railway API origin
   - `APP_BASE_URL` set to the deployed frontend origin
   - Clerk publishable/sign-in/sign-up variables used by the sign-in bridge
 

@@ -52,6 +52,7 @@ def test_live_uvicorn_process_serves_health_readiness_and_bootstrap() -> None:
             "APP_BASE_URL": "http://127.0.0.1:3000",
             "DATABASE_URL": "postgresql://user:pass@db.example.com:5432/trade",
             "CLERK_PUBLISHABLE_KEY": "pk_test_ZXhhbXBsZS5jbGVyay5hY2NvdW50cy5kZXYk",
+            "BRIVOLY_API_BASE_URL": f"http://127.0.0.1:{port}",
             "TRADE_API_BASE_URL": f"http://127.0.0.1:{port}",
             "TELEGRAM_BOT_TOKEN": "bot",
             "TELEGRAM_CHAT_ID": "chat",

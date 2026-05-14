@@ -86,6 +86,8 @@ def test_build_telegram_digest_notifier_from_env_requires_telegram(monkeypatch) 
 
 
 def test_build_digest_delivery_from_env_uses_telegram_when_only_telegram_is_configured(monkeypatch) -> None:
+    for name in ("SMTP_HOST", "SMTP_USERNAME", "SMTP_PASSWORD", "SMTP_FROM_EMAIL"):
+        monkeypatch.delenv(name, raising=False)
     monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "bot")
     monkeypatch.setenv("TELEGRAM_CHAT_ID", "chat")
     fallback = build_digest_delivery_from_env()

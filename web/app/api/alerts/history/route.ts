@@ -2,11 +2,12 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 import { getAlertHistory } from "@/lib/api";
-import { TRADE_SESSION_COOKIE } from "@/lib/auth";
+import { BRIVOLY_SESSION_COOKIE, LEGACY_TRADE_SESSION_COOKIE } from "@/lib/auth";
 
 export async function GET(request: Request) {
   const cookieStore = await cookies();
-  const sessionToken = cookieStore.get(TRADE_SESSION_COOKIE)?.value ?? null;
+  const sessionToken =
+    cookieStore.get(BRIVOLY_SESSION_COOKIE)?.value ?? cookieStore.get(LEGACY_TRADE_SESSION_COOKIE)?.value ?? null;
   if (!sessionToken) {
     return NextResponse.json({ error: "Authentication required." }, { status: 401 });
   }

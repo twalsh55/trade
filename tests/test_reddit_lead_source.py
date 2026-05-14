@@ -43,7 +43,7 @@ def test_reddit_lead_source_parses_posts(monkeypatch) -> None:
 
     assert captured["url"] == "https://www.reddit.com/search.json"
     assert captured["params"]["q"] == "market crash alert tool"
-    assert captured["headers"] == {"User-Agent": "trade-prospecting-bot/0.1"}
+    assert captured["headers"] == {"User-Agent": "brivoly-prospecting-bot/0.1"}
     assert captured["follow_redirects"] is True
     assert len(posts) == 1
     assert posts[0].permalink == "https://www.reddit.com/r/test/comments/abc/post"

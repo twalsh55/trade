@@ -1,1 +1,1 @@
-"""Trade dashboard package."""
+"""Brivoly dashboard package."""

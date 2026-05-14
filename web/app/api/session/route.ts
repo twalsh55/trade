@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 import { getSession } from "@/lib/api";
-import { TRADE_SESSION_COOKIE } from "@/lib/auth";
+import { BRIVOLY_SESSION_COOKIE, LEGACY_TRADE_SESSION_COOKIE } from "@/lib/auth";
 
 export async function POST(request: Request) {
   const payload = (await request.json().catch(() => null)) as { sessionToken?: string } | null;
@@ -18,7 +18,13 @@ export async function POST(request: Request) {
     }
 
     const response = NextResponse.json({ authenticated: true, user: session.user });
-    response.cookies.set(TRADE_SESSION_COOKIE, sessionToken, {
+    response.cookies.set(BRIVOLY_SESSION_COOKIE, sessionToken, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+    });
+    response.cookies.set(LEGACY_TRADE_SESSION_COOKIE, sessionToken, {
       httpOnly: true,
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
@@ -33,7 +39,14 @@ export async function POST(request: Request) {
 
 export async function DELETE() {
   const response = NextResponse.json({ authenticated: false });
-  response.cookies.set(TRADE_SESSION_COOKIE, "", {
+  response.cookies.set(BRIVOLY_SESSION_COOKIE, "", {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 0,
+  });
+  response.cookies.set(LEGACY_TRADE_SESSION_COOKIE, "", {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
@@ -45,7 +58,8 @@ export async function DELETE() {
 
 export async function GET() {
   const cookieStore = await cookies();
-  const sessionToken = cookieStore.get(TRADE_SESSION_COOKIE)?.value;
+  const sessionToken =
+    cookieStore.get(BRIVOLY_SESSION_COOKIE)?.value ?? cookieStore.get(LEGACY_TRADE_SESSION_COOKIE)?.value;
   if (!sessionToken) {
     return NextResponse.json({ authenticated: false, user: null });
   }

@@ -23,7 +23,7 @@ export function BrandLockup({
     <Link href={href} className="inline-flex rounded-[1.75rem]">
       <Image
         src="/logo.png"
-        alt="Trade logo"
+        alt="Brivoly logo"
         width={96}
         height={96}
         priority={priority}

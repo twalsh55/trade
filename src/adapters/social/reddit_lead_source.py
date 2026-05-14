@@ -14,7 +14,7 @@ class RedditLeadSourceError(RuntimeError):
 class RedditLeadSource:
     SEARCH_URL = "https://www.reddit.com/search.json"
 
-    def __init__(self, user_agent: str = "trade-prospecting-bot/0.1", timeout_seconds: float = 20.0) -> None:
+    def __init__(self, user_agent: str = "brivoly-prospecting-bot/0.1", timeout_seconds: float = 20.0) -> None:
         self.user_agent = user_agent
         self.timeout_seconds = timeout_seconds
 

@@ -2,12 +2,12 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 import { getAccountSettings, updateAccountSettings } from "@/lib/api";
-import { TRADE_SESSION_COOKIE } from "@/lib/auth";
+import { BRIVOLY_SESSION_COOKIE, LEGACY_TRADE_SESSION_COOKIE } from "@/lib/auth";
 import type { AccountSettings } from "@/lib/types";
 
 async function getSessionToken() {
   const cookieStore = await cookies();
-  return cookieStore.get(TRADE_SESSION_COOKIE)?.value ?? null;
+  return cookieStore.get(BRIVOLY_SESSION_COOKIE)?.value ?? cookieStore.get(LEGACY_TRADE_SESSION_COOKIE)?.value ?? null;
 }
 
 export async function GET() {

@@ -1,5 +1,5 @@
 [project]
-name = "trade"
+name = "brivoly"
 version = "0.1.0"
 description = "Market crash monitoring dashboard with de-risk and dip-buy signals"
 readme = "README.md"
