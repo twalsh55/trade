@@ -2,102 +2,123 @@
 
 ## Current Project State
 
-This repo is now a split app:
+This repo is fully migrated to the split production architecture:
 
 - FastAPI backend in `src/adapters/api/`
 - Next.js frontend in `web/`
-- Railway is the intended API host
-- Vercel is the intended frontend host
-- Clerk remains the app auth provider
+- Railway hosts the API
+- Vercel hosts the frontend
+- Clerk handles app auth
 - PostgreSQL remains on Railway
 
-The migration itself is functionally complete. The remaining work is deployment topology cleanup, not application rebuild.
+The live topology is now in place:
+
+- `https://www.brivoly.com` -> Vercel frontend
+- `https://brivoly.com` -> Vercel frontend
+- `https://api.brivoly.com` -> Railway API
+
+The migration/cutover work is done. The remaining work is polish and cleanup of uncommitted improvements made in the latest session.
 
 ## What Was Completed
 
-### Code and test work already finished
+### Production deployment and domain split
 
-- Removed the retired Streamlit runtime and completed the cutover to FastAPI + Next.js
-- Added backend request tracing and readiness checks
-- Added hosted smoke helpers and environment examples
-- Added Playwright E2E coverage for the key user flows
-- Verified:
-  - `uv run pytest`
-  - `cd web && npm run typecheck`
-  - `cd web && npm run build`
-  - `cd web && npm run e2e`
-  - `docker build -t trade-api-deploycheck .`
-  - containerized `/healthz` and `/readyz`
+- Railway API deploy is working
+- Vercel frontend deploy is working
+- Public domains were cut over successfully
+- Vercel frontend env was switched to `TRADE_API_BASE_URL=https://api.brivoly.com`
+- `www.brivoly.com` was removed from Railway after DNS moved to Vercel
+- The final split is verified live:
+  - `https://www.brivoly.com`
+  - `https://brivoly.com`
+  - `https://api.brivoly.com/healthz`
+  - `https://www.brivoly.com/api/session`
 
-### Railway production work completed in the last session
+### Repo work already committed and pushed
 
-- Logged into Railway CLI successfully
-- Linked this repo to Railway project `alert-optimism`
-- Confirmed production service is `trade`
-- Patched missing live env on the Railway service:
-  - `APP_BASE_URL`
-  - `TRADE_API_BASE_URL`
-  - `DATABASE_URL`
-  - Clerk publishable/sign-in/sign-up settings
-  - Clerk authorized parties
-- Redeployed Railway successfully
-- Verified the live API was healthy on the Railway-backed domain:
-  - `/healthz` returned OK
-  - `/readyz` returned OK
-  - `/api/settings/bootstrap` returned the expected payload
+Recent pushed commits:
 
-### Vercel frontend work completed in the last session
+- `aabc4eb` `Add production deploy helper scripts`
+- `4cfe6ba` `Restore dashboard calculations and charts`
+- `cc6e514` `Remove legacy env utils shim`
+- `75f99dc` `Configure Vercel frontend hosting`
+- `d197e40` `Add hosted deployment smoke helpers`
+- `312e2dc` `Harden deployment readiness and observability`
+- `56fac6f` `Document verified deployment workflow`
+- `e64d681` `Migrate app shell to FastAPI and Next.js`
 
-- Logged into Vercel CLI successfully
-- Created Vercel project `brivoly-web`
-- Set Vercel production env `TRADE_API_BASE_URL=https://trade-production-5635.up.railway.app`
-- Disabled Vercel deployment SSO protection for this project so public checks work
-- Fixed Vercel framework detection by adding `web/vercel.json`
-- Deployed the frontend successfully to:
-  - `https://brivoly-web.vercel.app`
-- Attached custom domains to the Vercel project:
-  - `www.brivoly.com`
-  - `brivoly.com`
-- Verified:
-  - `GET /` returned the Next.js app
-  - `GET /sign-in` returned the sign-in page
+### Product behavior restored
 
-### Additional deployment cleanup completed after the first handoff
+- The web dashboard now surfaces the Python crash-risk calculations again instead of only a thin migration shell
+- Restored UI now includes:
+  - richer dashboard metrics
+  - risk component breakdowns
+  - indicator percentile table
+  - action cues
+  - fuller dashboard readout
 
-- Corrected the Railway API service variable `TRADE_API_BASE_URL` to point at the live Railway service origin instead of `https://www.brivoly.com`
-- Confirmed Railway readiness is still healthy after that change
-- Confirmed the remaining blocker is DNS delegation at Porkbun, not app health or deployment packaging
+## What Was Completed In This Session
 
-## What Is Still In Progress
+- Added production deploy helper scripts:
+  - `scripts/deploy_api.sh`
+  - `scripts/deploy_web.sh`
+  - `scripts/deploy_prod.sh`
+- Added better deploy-script logging and retry/timeout behavior in:
+  - `scripts/deploy_api.sh`
+  - `scripts/deploy_web.sh`
+  - `scripts/deploy_prod.sh`
+  - `scripts/smoke_hosted.sh`
+- Removed more migration-era wording from the frontend shell
+- Added a top-of-page crash indicator card:
+  - shows crash percentage
+  - uses green/amber/red shading
+  - links to the component breakdown section
+- Anchored the risk-component section with `#crash-components`
+- Patched the yfinance adapter to set an explicit timezone-cache directory before downloads to reduce Railway log noise:
+  - `src/adapters/market_data/yfinance_provider.py`
 
-The last unfinished task is the public domain split:
+## Verified Status
 
-- `www.brivoly.com` should point to the Vercel frontend
-- `api.brivoly.com` should point to the Railway API
+Most recent verified checks:
 
-Right now the Railway API has been verified live, but `www.brivoly.com` was still serving the backend when the session ended, which means root `/` returned FastAPI `{"detail":"Not Found"}`. The Vercel frontend itself is healthy at `https://brivoly-web.vercel.app`.
+- `uv run pytest` passed
+  - `89` tests
+  - `100%` coverage
+- `cd web && npm run typecheck` passed
+- `cd web && npm run build` passed
+- `cd web && npm run e2e` passed
 
-The Vercel domain attachment is done. DNS is the only remaining blocker:
+Live production checks previously verified:
 
-- `A www.brivoly.com 76.76.21.21`
-- `A brivoly.com 76.76.21.21`
-
-Current resolution still points the public domains at Railway, so the cutover is not live yet.
+- `curl https://api.brivoly.com/healthz`
+- `curl https://www.brivoly.com/api/session`
+- `curl -I https://www.brivoly.com`
+- `curl -I https://brivoly.com`
 
 ## Uncommitted Changes
 
 Current worktree status:
 
+- `scripts/deploy_api.sh`
+- `scripts/deploy_prod.sh`
+- `scripts/deploy_web.sh`
+- `scripts/smoke_hosted.sh`
+- `src/adapters/market_data/yfinance_provider.py`
+- `tests/test_market_data_adapter.py`
+- `web/app/layout.tsx`
+- `web/components/app-shell.tsx`
+- `web/components/dashboard/dashboard-workspace.tsx`
 - `HANDOFF.md`
-- `web/.gitignore`
-- `web/vercel.json`
 
-Notes:
+Meaning of those changes:
 
-- `web/vercel.json` is intentional and needed so Vercel treats `web/` as a Next.js project.
-- `web/.gitignore` currently contains only `.vercel`
+- deploy scripts were hardened so they fail faster and look less “hung”
+- hosted smoke checks now retry with bounded curl timeouts
+- yfinance cache path is configured explicitly
+- top-of-page crash indicator UI was added
+- leftover migration placeholder wording was removed from the UI metadata/shell
 
-These files have not been committed yet.
+None of those latest changes are committed yet.
 
 ## Important Commands
 
@@ -129,79 +150,106 @@ uv run pytest
 cd web && npm run typecheck
 cd web && npm run build
 cd web && npm run e2e
-docker build -t trade-api-deploycheck .
 ```
 
-### Railway
+### Production deploy helpers
+
+API only:
+
+```bash
+./scripts/deploy_api.sh
+```
+
+Frontend only:
+
+```bash
+./scripts/deploy_web.sh
+```
+
+Deploy both:
+
+```bash
+./scripts/deploy_prod.sh
+```
+
+### Manual platform commands
+
+Railway:
 
 ```bash
 npx @railway/cli@latest whoami
-npx @railway/cli@latest status --json
-npx @railway/cli@latest variable list --json
-npx @railway/cli@latest logs --lines 80
-npx @railway/cli@latest redeploy -y --json
+npx @railway/cli@latest status
+npx @railway/cli@latest up
 ```
 
-### Vercel
+Vercel:
 
 ```bash
 npx vercel whoami
-npx vercel project inspect brivoly-web --cwd web
 npx vercel deploy --prod --yes --cwd web
-npx vercel domains ls
-npx vercel domains inspect www.brivoly.com
-npx vercel domains inspect brivoly.com
 ```
 
 ## Environment and Deployment Assumptions
 
-- Root `.env` is still the source for local backend config
+- Root `.env` remains the local backend config source
 - The frontend uses `TRADE_API_BASE_URL` to call the API
-- In production, the frontend currently points to the Railway-generated API URL:
-  - `https://trade-production-5635.up.railway.app`
-- The intended final topology is:
-  - `www.brivoly.com` -> Vercel
-  - `brivoly.com` -> Vercel or redirect to `www`
-  - `api.brivoly.com` -> Railway
+- Production frontend should use:
+  - `TRADE_API_BASE_URL=https://api.brivoly.com`
+  - `APP_BASE_URL=https://www.brivoly.com`
+- Production backend should use:
+  - `APP_BASE_URL=https://www.brivoly.com`
+  - `DATABASE_URL`
+  - Clerk auth variables
 
 ## Known Issues / Caveats
 
-- Railway CLI auth worked earlier, but the `railway domain api.brivoly.com ...` action still returned an unauthorized error even after a successful login. Railway service management otherwise worked.
-- The API is healthy, and the Vercel frontend is healthy. The remaining blocker is DNS at Porkbun.
-- `next build` and Playwright should not share the same `web/.next` directory concurrently.
+- The “deploy all” script can appear to hang because Railway/Vercel deploy commands block on remote build/deploy work; this session added better logging and retry behavior, but those script changes are still uncommitted.
+- Focused `pytest` invocations fail the coverage gate because the repo enforces global 100% coverage; use full `uv run pytest` for final verification.
+- Railway CLI auth can expire unexpectedly; if deploy helpers fail on auth, rerun:
+
+```bash
+npx @railway/cli@latest login
+```
+
+- `next build` and Playwright should not run concurrently against the same `web/.next` directory.
 
 ## Recommended Next Steps
 
-1. Update Porkbun DNS:
+1. Review the current uncommitted changes in the deploy scripts, yfinance cache fix, and crash-indicator UI.
+2. If they look good, commit them together or as two commits:
+   - deploy/runtime hardening
+   - UI polish
+3. Push and redeploy:
 
 ```bash
-A www.brivoly.com 76.76.21.21
-A brivoly.com 76.76.21.21
+./scripts/deploy_prod.sh
 ```
 
-2. Wait for Vercel verification to clear, then verify:
+4. Confirm the yfinance warning is gone or reduced in Railway logs after the next production API deploy.
+
+## Suggested Commit Split
+
+Option A: one commit
 
 ```bash
-npx vercel domains inspect www.brivoly.com
-curl -I https://www.brivoly.com
-curl -I https://brivoly.com
-```
-
-3. After the frontend domain is live on Vercel, remove `www.brivoly.com` / `brivoly.com` from the Railway `trade` service if they are still attached there.
-
-4. Retry adding `api.brivoly.com` to Railway. If the CLI still misbehaves, use the Railway dashboard as a fallback and keep `TRADE_API_BASE_URL` on the Railway-generated domain until `api.brivoly.com` is working.
-
-5. Commit the pending frontend hosting files:
-
-```bash
-git add web/.gitignore web/vercel.json
-git commit -m "Configure Vercel frontend hosting"
+git add scripts/deploy_api.sh scripts/deploy_prod.sh scripts/deploy_web.sh scripts/smoke_hosted.sh src/adapters/market_data/yfinance_provider.py tests/test_market_data_adapter.py web/app/layout.tsx web/components/app-shell.tsx web/components/dashboard/dashboard-workspace.tsx HANDOFF.md
+git commit -m "Polish deploy workflow and crash indicator UI"
 git push
 ```
 
-## Last Pushed Commits
+Option B: two commits
 
-- `d197e40` `Add hosted deployment smoke helpers`
-- `312e2dc` `Harden deployment readiness and observability`
-- `56fac6f` `Document verified deployment workflow`
-- `e64d681` `Migrate app shell to FastAPI and Next.js`
+Runtime/deploy:
+
+```bash
+git add scripts/deploy_api.sh scripts/deploy_prod.sh scripts/deploy_web.sh scripts/smoke_hosted.sh src/adapters/market_data/yfinance_provider.py tests/test_market_data_adapter.py
+git commit -m "Harden deploy scripts and yfinance cache setup"
+```
+
+UI/docs:
+
+```bash
+git add web/app/layout.tsx web/components/app-shell.tsx web/components/dashboard/dashboard-workspace.tsx HANDOFF.md
+git commit -m "Polish crash indicator and remove migration copy"
+git push
+```

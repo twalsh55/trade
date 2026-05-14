@@ -224,38 +224,40 @@ export function DashboardWorkspace({ initialDashboard, settings, bootstrap }: Da
           </div>
         </Panel>
 
-        <Panel
-          eyebrow="Snapshot"
-          title="Risk components"
-          description="These scores come directly from the Python crash-risk model and mirror the old dashboard calculations."
-        >
-          <div className="grid gap-3 sm:grid-cols-2">
-            {Object.keys(riskComponents).length > 0 ? (
-              Object.entries(riskComponents)
-                .slice(0, 8)
-                .map(([label, value]) => <InfoTile key={label} label={label} value={value.toFixed(1)} />)
-            ) : (
-              <>
-                <InfoTile label="Trend stress" value="Pending" />
-                <InfoTile label="Drawdown stress" value="Pending" />
-                <InfoTile label="Volatility stress" value="Pending" />
-                <InfoTile label="Breadth stress" value="Pending" />
-              </>
-            )}
-          </div>
+        <div id="crash-components" className="scroll-mt-24">
+          <Panel
+            eyebrow="Snapshot"
+            title="Risk components"
+            description="These scores come directly from the Python crash-risk model and mirror the old dashboard calculations."
+          >
+            <div className="grid gap-3 sm:grid-cols-2">
+              {Object.keys(riskComponents).length > 0 ? (
+                Object.entries(riskComponents)
+                  .slice(0, 8)
+                  .map(([label, value]) => <InfoTile key={label} label={label} value={value.toFixed(1)} />)
+              ) : (
+                <>
+                  <InfoTile label="Trend stress" value="Pending" />
+                  <InfoTile label="Drawdown stress" value="Pending" />
+                  <InfoTile label="Volatility stress" value="Pending" />
+                  <InfoTile label="Breadth stress" value="Pending" />
+                </>
+              )}
+            </div>
 
-          <div className="mt-6 space-y-3">
-            {Object.keys(riskComponents).length > 0 ? (
-              Object.entries(riskComponents)
-                .sort(([, left], [, right]) => right - left)
-                .map(([label, value]) => <ComponentMeter key={label} label={label} value={value} />)
-            ) : (
-              <div className="rounded-2xl border border-dashed bg-slate-50 px-4 py-6 text-sm text-slate-500">
-                Risk component scores will populate after the first authenticated dashboard refresh.
-              </div>
-            )}
-          </div>
-        </Panel>
+            <div className="mt-6 space-y-3">
+              {Object.keys(riskComponents).length > 0 ? (
+                Object.entries(riskComponents)
+                  .sort(([, left], [, right]) => right - left)
+                  .map(([label, value]) => <ComponentMeter key={label} label={label} value={value} />)
+              ) : (
+                <div className="rounded-2xl border border-dashed bg-slate-50 px-4 py-6 text-sm text-slate-500">
+                  Risk component scores will populate after the first authenticated dashboard refresh.
+                </div>
+              )}
+            </div>
+          </Panel>
+        </div>
       </section>
 
       <DashboardCharts dashboard={dashboard} />

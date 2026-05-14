@@ -17,7 +17,7 @@ const ibmPlexMono = IBM_Plex_Mono({
 
 export const metadata: Metadata = {
   title: "Trade Web",
-  description: "Next.js frontend for the Trade SaaS migration.",
+  description: "Crash-risk monitoring dashboard powered by a Next.js frontend and Python API.",
   icons: {
     icon: "/logo.png",
     apple: "/logo.png",

@@ -7,17 +7,21 @@ RAILWAY_CMD=(npx @railway/cli@latest)
 
 cd "${ROOT_DIR}"
 
+log() {
+  printf '\n[%s] %s\n' "$(date '+%H:%M:%S')" "$*"
+}
+
 if ! command -v npx >/dev/null 2>&1; then
   echo "Missing required command: npx" >&2
   exit 1
 fi
 
-echo "Checking Railway authentication and linked project"
+log "Checking Railway authentication and linked project"
 "${RAILWAY_CMD[@]}" whoami
 "${RAILWAY_CMD[@]}" status
 
-echo "Deploying Trade API to Railway"
-"${RAILWAY_CMD[@]}" up
+log "Deploying Trade API to Railway"
+"${RAILWAY_CMD[@]}" up --ci
 
-echo "Smoke testing deployed API at ${API_BASE_URL}"
+log "Smoke testing deployed API at ${API_BASE_URL}"
 "${ROOT_DIR}/scripts/smoke_hosted.sh" "${API_BASE_URL}"

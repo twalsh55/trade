@@ -9,9 +9,10 @@ import type { ShellData } from "@/lib/types";
 
 const navItems = [
   { label: "Overview", href: "#overview" },
+  { label: "Components", href: "#crash-components" },
   { label: "Alerts", href: "#alerts" },
   { label: "Settings", href: "#settings" },
-  { label: "Contracts", href: "#migration" },
+  { label: "Contracts", href: "#contracts" },
 ];
 
 type AppShellProps = {
@@ -22,6 +23,8 @@ export function AppShell({ data }: AppShellProps) {
   const user = data.session?.user;
   const alertItems = data.alerts?.items ?? [];
   const settings = data.settings;
+  const riskScore = data.dashboard?.risk_score ?? null;
+  const crashTone = getCrashTone(riskScore);
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-7xl gap-6 px-4 py-6 lg:px-8">
@@ -73,34 +76,24 @@ export function AppShell({ data }: AppShellProps) {
               </h2>
               <p className="max-w-2xl text-base leading-7 text-slate-600">
                 The dashboard pulls price history, breadth, volatility, yield, and participation signals from the
-                Python backend so the web app behaves like the original product instead of a migration stub.
+                Python backend so the web app behaves like the original product rather than a thin frontend wrapper.
               </p>
             </div>
 
-            <div className="grid min-w-[280px] gap-3 md:w-[320px]">
-              <MetricCard
-                label="Crash Risk"
-                value={data.dashboard === null ? "No live snapshot" : `${data.dashboard.risk_score.toFixed(1)}/100`}
-                tone={
-                  data.dashboard === null
-                    ? "neutral"
-                    : data.dashboard.risk_score >= 70
-                      ? "critical"
-                      : data.dashboard.risk_score >= 50
-                        ? "warning"
-                        : "positive"
-                }
-              />
-              <MetricCard
-                label="Alert Feed"
-                value={data.alerts ? `${data.alerts.count} recent items` : "Unavailable"}
-                tone={data.alerts ? "positive" : "neutral"}
-              />
-              <MetricCard
-                label="Environment"
-                value={data.bootstrap ? "Connected to bootstrap API" : "Bootstrap unavailable"}
-                tone={data.bootstrap ? "positive" : "warning"}
-              />
+            <div className="grid min-w-[280px] gap-3 md:w-[360px]">
+              <CrashIndicatorCard score={riskScore} tone={crashTone} />
+              <div className="grid gap-3 md:grid-cols-2">
+                <MetricCard
+                  label="Alert Feed"
+                  value={data.alerts ? `${data.alerts.count} recent items` : "Unavailable"}
+                  tone={data.alerts ? "positive" : "neutral"}
+                />
+                <MetricCard
+                  label="Environment"
+                  value={data.bootstrap ? "Connected to bootstrap API" : "Bootstrap unavailable"}
+                  tone={data.bootstrap ? "positive" : "warning"}
+                />
+              </div>
             </div>
           </div>
           <div className="mt-6 flex flex-wrap gap-3">
@@ -239,7 +232,7 @@ export function AppShell({ data }: AppShellProps) {
             />
           </Panel>
 
-          <div id="migration">
+          <div id="contracts">
             <Panel
               eyebrow="Contracts"
               title="Active API surface"
@@ -286,6 +279,64 @@ function MetricCard({
   );
 }
 
+function CrashIndicatorCard({
+  score,
+  tone,
+}: {
+  score: number | null;
+  tone: "positive" | "warning" | "critical" | "neutral";
+}) {
+  const shellClass =
+    tone === "positive"
+      ? "border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-emerald-100/80 text-emerald-950"
+      : tone === "warning"
+        ? "border-amber-200 bg-gradient-to-br from-amber-50 via-white to-amber-100/80 text-amber-950"
+        : tone === "critical"
+          ? "border-rose-200 bg-gradient-to-br from-rose-50 via-white to-rose-100/80 text-rose-950"
+          : "border-slate-200 bg-gradient-to-br from-slate-50 via-white to-slate-100 text-slate-950";
+
+  const chipClass =
+    tone === "positive"
+      ? "bg-emerald-600"
+      : tone === "warning"
+        ? "bg-amber-500"
+        : tone === "critical"
+          ? "bg-rose-500"
+          : "bg-slate-400";
+
+  const meterClass =
+    tone === "positive" ? "bg-emerald-500" : tone === "warning" ? "bg-amber-500" : tone === "critical" ? "bg-rose-500" : "bg-slate-400";
+
+  const clampedScore = score === null ? 0 : Math.max(0, Math.min(score, 100));
+
+  return (
+    <Link href="#crash-components" className={`block rounded-[1.6rem] border p-5 shadow-sm transition hover:shadow-md ${shellClass}`}>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] opacity-75">Crash Indicator</p>
+          <p className="mt-3 text-5xl font-semibold tracking-tight">{score === null ? "N/A" : `${score.toFixed(1)}%`}</p>
+          <p className="mt-3 max-w-xs text-sm leading-6 opacity-80">
+            {score === null
+              ? "Sign in to load the current crash indicator."
+              : tone === "critical"
+                ? "High stress. Scroll down to inspect the largest component penalties."
+                : tone === "warning"
+                  ? "Fragile regime. Scroll down to see which components are driving caution."
+                  : "Constructive regime. Scroll down to inspect the component mix behind the score."}
+          </p>
+        </div>
+        <div className="shrink-0 rounded-full border border-black/5 bg-white/70 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em]">
+          <span className={`mr-2 inline-block h-2.5 w-2.5 rounded-full ${chipClass}`} />
+          Components
+        </div>
+      </div>
+      <div className="mt-5 h-3 overflow-hidden rounded-full bg-white/70">
+        <div className={`h-full rounded-full ${meterClass}`} style={{ width: `${clampedScore}%` }} />
+      </div>
+    </Link>
+  );
+}
+
 function Panel({
   eyebrow,
   title,
@@ -323,6 +374,19 @@ function InfoRow({ label, value }: { label: string; value: string }) {
       <p className="text-right text-sm text-slate-700">{value}</p>
     </div>
   );
+}
+
+function getCrashTone(score: number | null): "positive" | "warning" | "critical" | "neutral" {
+  if (score === null) {
+    return "neutral";
+  }
+  if (score >= 70) {
+    return "critical";
+  }
+  if (score >= 50) {
+    return "warning";
+  }
+  return "positive";
 }
 
 function formatDateTime(value: string) {
