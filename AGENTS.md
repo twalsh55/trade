@@ -43,6 +43,7 @@ Follow SOLID principles in all code changes:
 uv sync
 uv run uvicorn src.adapters.api.app:app --reload
 ./scripts/dev.sh
+cp .env.example .env
 pytest
 cd web && npm install
 cd web && npm run dev
@@ -113,9 +114,11 @@ Notes:
   - `cd web && npm run typecheck`
   - `cd web && npm run build`
   - `cd web && npm run e2e`
-- `docker build -t trade-api-deploycheck .`
-- `docker run ... trade-api-deploycheck` returning `GET /healthz -> {"status":"ok"}`
-- `uv run pytest` now includes a real `uvicorn` smoke test for `/healthz`, `/readyz`, and bootstrap routes
+  - `docker build -t trade-api-deploycheck .`
+  - `docker run ... trade-api-deploycheck` returning `GET /healthz -> {"status":"ok"}`
+  - `uv run pytest` now includes a real `uvicorn` smoke test for `/healthz`, `/readyz`, and bootstrap routes
+- Use `.env.example` as the baseline local/shared environment template.
+- After the first hosted Railway deploy, `./scripts/smoke_hosted.sh <railway-api-url>` can verify `/healthz`, `/readyz`, and bootstrap responses quickly.
 
 ## Directory Direction
 

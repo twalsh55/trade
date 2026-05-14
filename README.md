@@ -46,6 +46,12 @@ cd web && npm run build
 cd web && npm run e2e
 ```
 
+Environment template:
+
+```bash
+cp .env.example .env
+```
+
 ## Authentication
 
 The backend authenticates Clerk session tokens and maps them to internal users stored in Postgres.
@@ -133,6 +139,7 @@ Notes:
 - `curl http://127.0.0.1:18000/readyz` returned `{"status":"ok", ...}` with production-like env values.
 - Avoid running `npm run build` and `npm run e2e` against the same `web/.next` directory in parallel; Next can fail with transient build errors in that case.
 - `npm run typecheck` now self-generates Next route types, so it works from a clean checkout.
+- After the first hosted Railway deploy, you can smoke-test the API with `./scripts/smoke_hosted.sh <railway-api-url>`.
 
 ## Telegram
 

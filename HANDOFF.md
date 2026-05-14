@@ -45,6 +45,7 @@ The frontend supports:
 - Added a real process-level smoke test that launches `uvicorn` and verifies `/healthz`, `/readyz`, bootstrap, and session behavior
 - Hardened the sign-in redirect flow to reject unsafe external `redirectTo` values
 - Updated frontend typechecking so it self-generates Next route types from a clean checkout
+- Added `.env.example` and `scripts/smoke_hosted.sh` to speed up real environment setup and hosted API verification
 
 ## Verified Status
 
@@ -137,3 +138,7 @@ Remaining high-value items:
 1. Configure the real Railway and Vercel services using the verified split deployment settings and environment variables.
 2. Add platform-level monitoring or log shipping on top of the in-app `X-Request-ID` tracing.
 3. Smoke-test the hosted services after the first real deployment using `/healthz`, `/readyz`, and the sign-in flow.
+
+Current blocker:
+
+- Railway CLI auth is not available in this shell yet. `npx @railway/cli@latest status` returns `Unauthorized. Please login with railway login`.
