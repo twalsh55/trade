@@ -210,6 +210,7 @@ What it does:
 - scores posts with local heuristics first to avoid unnecessary model usage
 - uses OpenAI only for a tiny drafting step when `OPENAI_API_KEY` is configured
 - sends a plain-text email digest to `tom.mg.walsh@gmail.com` by default
+- falls back to Telegram digest delivery when SMTP is not configured but Telegram is
 - never posts to Reddit or any other social network
 
 Required email settings:
@@ -222,6 +223,8 @@ SMTP_PASSWORD=your_password
 SMTP_FROM_EMAIL=alerts@your-domain.com
 SMTP_USE_TLS=true
 ```
+
+If SMTP is not configured but Telegram is configured, the digest is delivered to the Telegram chat instead so the agent can still run.
 
 Optional AI settings:
 

@@ -96,9 +96,16 @@ def test_daily_prospecting_use_case_shortlists_and_emails() -> None:
     assert digest.scanned_post_count == 3
     assert digest.shortlisted_count == 1
     assert digest.shortlisted_posts[0].suggested_reply == "draft for 1"
+    assert [entry.decision for entry in digest.audit_entries] == [
+        "candidate_shortlisted",
+        "rejected",
+        "duplicate_skipped",
+    ]
     assert drafter.calls[0][2] == "https://www.brivoly.com"
     assert email_delivery.sent[0][0] == "tom.mg.walsh@gmail.com"
     assert "Looking for a market crash dashboard tool?" in email_delivery.sent[0][2]
+    assert "Full audit trail:" in email_delivery.sent[0][2]
+    assert "Decision: duplicate_skipped" in email_delivery.sent[0][2]
 
 
 def test_daily_prospecting_use_case_handles_empty_shortlist() -> None:
@@ -122,6 +129,31 @@ def test_daily_prospecting_use_case_handles_empty_shortlist() -> None:
     assert digest.shortlisted_count == 0
     assert drafter.calls[0][1] == ()
     assert "No strong social posts were found today." in email_delivery.sent[0][2]
+    assert "Full audit trail:" in email_delivery.sent[0][2]
+
+
+def test_daily_prospecting_use_case_records_excluded_keyword_reason() -> None:
+    excluded_post = make_post("3", "Hiring quant trader", "This job opening is for a trading startup.", 14)
+    lead_source = StubLeadSource({"portfolio risk dashboard": [excluded_post]})
+    drafter = StubDrafter()
+    email_delivery = StubEmailDelivery()
+    use_case = RunDailyProspectingUseCase(
+        lead_source=lead_source,
+        drafter=drafter,
+        email_delivery=email_delivery,
+        now=lambda: datetime(2026, 5, 14, 9, 30, tzinfo=UTC),
+    )
+
+    digest = use_case.execute(
+        DailyProspectingConfig(
+            recipient_email="tom.mg.walsh@gmail.com",
+            search_terms=("portfolio risk dashboard",),
+        )
+    )
+
+    assert digest.audit_entries[0].decision == "rejected"
+    assert "filtered by excluded keyword hiring" in digest.audit_entries[0].reasons
+    assert "filtered by excluded keyword job opening" in digest.audit_entries[0].reasons
 
 
 def test_format_digest_email_truncates_long_body() -> None:
@@ -143,6 +175,19 @@ def test_format_digest_email_truncates_long_body() -> None:
                 },
             )(),
         ),
+        audit_entries=(
+            type(
+                "AuditItem",
+                (),
+                {
+                    "post": post,
+                    "matched_query": "query",
+                    "decision": "candidate_shortlisted",
+                    "score": 12,
+                    "reasons": ("mentions crash",),
+                },
+            )(),
+        ),
     )
     config = DailyProspectingConfig(recipient_email="tom.mg.walsh@gmail.com")
 
@@ -150,3 +195,4 @@ def test_format_digest_email_truncates_long_body() -> None:
 
     assert "..." in body
     assert "Suggested promo reply:" in body
+    assert "Full audit trail:" in body

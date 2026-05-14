@@ -5,9 +5,13 @@ from datetime import UTC, datetime
 from src.adapters.prospecting.runtime import (
     build_config_from_env,
     build_drafter_from_env,
+    build_digest_delivery_from_env,
     build_email_notifier_from_env,
     build_lead_source_from_env,
+    build_telegram_digest_notifier_from_env,
     collect_prospecting_config_errors,
+    has_configured_smtp_delivery,
+    has_configured_telegram_delivery,
     parse_positive_int,
     required_env,
     run_prospecting_job,
@@ -69,17 +73,49 @@ def test_build_lead_source_from_env_uses_custom_user_agent(monkeypatch) -> None:
     assert source.user_agent == "custom-agent"
 
 
+def test_build_telegram_digest_notifier_from_env_requires_telegram(monkeypatch) -> None:
+    monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
+    try:
+        build_telegram_digest_notifier_from_env()
+    except ValueError as exc:
+        assert str(exc) == "Missing TELEGRAM_BOT_TOKEN. Add it to .env first."
+    else:
+        raise AssertionError("Expected ValueError")
+
+
+def test_build_digest_delivery_from_env_prefers_smtp_but_falls_back_to_telegram(monkeypatch) -> None:
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "bot")
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "chat")
+    fallback = build_digest_delivery_from_env()
+    assert fallback.__class__.__name__ == "TelegramDigestNotifier"
+
+    monkeypatch.setenv("SMTP_HOST", "smtp.example.com")
+    monkeypatch.setenv("SMTP_USERNAME", "mailer")
+    monkeypatch.setenv("SMTP_PASSWORD", "secret")
+    monkeypatch.setenv("SMTP_FROM_EMAIL", "alerts@example.com")
+    smtp = build_digest_delivery_from_env()
+    assert smtp.__class__.__name__ == "SMTPEmailNotifier"
+
+
 def test_collect_prospecting_config_errors_reports_missing_and_invalid_fields(monkeypatch) -> None:
-    for name in ("SMTP_HOST", "SMTP_USERNAME", "SMTP_PASSWORD", "SMTP_FROM_EMAIL"):
+    for name in ("SMTP_HOST", "SMTP_USERNAME", "SMTP_PASSWORD", "SMTP_FROM_EMAIL", "TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID"):
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setenv("PROSPECT_MAX_MATCHES", "abc")
     monkeypatch.setenv("SMTP_PORT", "0")
 
     errors = collect_prospecting_config_errors()
 
-    assert "Missing SMTP_HOST" in errors
+    assert "Missing SMTP delivery settings and Telegram delivery fallback is unavailable" in errors
     assert "PROSPECT_MAX_MATCHES must be an integer" in errors
     assert "SMTP_PORT must be greater than zero" in errors
+
+
+def test_collect_prospecting_config_errors_allows_telegram_fallback(monkeypatch) -> None:
+    for name in ("SMTP_HOST", "SMTP_USERNAME", "SMTP_PASSWORD", "SMTP_FROM_EMAIL"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "bot")
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "chat")
+    assert collect_prospecting_config_errors() == []
 
 
 def test_required_env_and_parse_positive_int(monkeypatch) -> None:
@@ -88,6 +124,23 @@ def test_required_env_and_parse_positive_int(monkeypatch) -> None:
 
     assert required_env("SMTP_HOST") == "smtp.example.com"
     assert parse_positive_int("PROSPECT_MAX_MATCHES", default=3) == 4
+
+
+def test_delivery_configuration_helpers(monkeypatch) -> None:
+    for name in ("SMTP_HOST", "SMTP_USERNAME", "SMTP_PASSWORD", "SMTP_FROM_EMAIL", "TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID"):
+        monkeypatch.delenv(name, raising=False)
+    assert has_configured_smtp_delivery() is False
+    assert has_configured_telegram_delivery() is False
+
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "bot")
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "chat")
+    assert has_configured_telegram_delivery() is True
+
+    monkeypatch.setenv("SMTP_HOST", "smtp.example.com")
+    monkeypatch.setenv("SMTP_USERNAME", "mailer")
+    monkeypatch.setenv("SMTP_PASSWORD", "secret")
+    monkeypatch.setenv("SMTP_FROM_EMAIL", "alerts@example.com")
+    assert has_configured_smtp_delivery() is True
 
 
 def test_parse_positive_int_raises_for_invalid_values(monkeypatch) -> None:
@@ -127,7 +180,7 @@ def test_run_prospecting_job_builds_and_executes_use_case(monkeypatch) -> None:
     monkeypatch.setattr("src.adapters.prospecting.runtime.build_config_from_env", lambda: config)
     monkeypatch.setattr("src.adapters.prospecting.runtime.build_lead_source_from_env", lambda: lead_source)
     monkeypatch.setattr("src.adapters.prospecting.runtime.build_drafter_from_env", lambda: drafter)
-    monkeypatch.setattr("src.adapters.prospecting.runtime.build_email_notifier_from_env", lambda: email_delivery)
+    monkeypatch.setattr("src.adapters.prospecting.runtime.build_digest_delivery_from_env", lambda: email_delivery)
 
     class FakeUseCase:
         def __init__(self, lead_source, drafter, email_delivery) -> None:  # type: ignore[no-untyped-def]

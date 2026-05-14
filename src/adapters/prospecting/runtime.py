@@ -4,6 +4,8 @@ import os
 
 from src.adapters.llm.openai_prospect_drafter import OpenAIProspectDrafter, TemplateProspectDrafter
 from src.adapters.notifications.smtp_email_notifier import SMTPEmailNotifier
+from src.adapters.notifications.telegram_digest_notifier import TelegramDigestNotifier
+from src.adapters.notifications.telegram_notifier import TelegramNotifier
 from src.adapters.social.reddit_lead_source import RedditLeadSource
 from src.application.prospecting import (
     DEFAULT_APP_SUMMARY,
@@ -46,6 +48,12 @@ def build_email_notifier_from_env() -> SMTPEmailNotifier:
     )
 
 
+def build_digest_delivery_from_env() -> SMTPEmailNotifier | TelegramDigestNotifier:
+    if has_configured_smtp_delivery():
+        return build_email_notifier_from_env()
+    return build_telegram_digest_notifier_from_env()
+
+
 def build_drafter_from_env() -> OpenAIProspectDrafter | TemplateProspectDrafter:
     api_key = os.getenv("OPENAI_API_KEY", "").strip()
     if not api_key:
@@ -61,21 +69,26 @@ def build_lead_source_from_env() -> RedditLeadSource:
     return RedditLeadSource(user_agent=os.getenv("PROSPECT_REDDIT_USER_AGENT", "trade-prospecting-bot/0.1"))
 
 
+def build_telegram_digest_notifier_from_env() -> TelegramDigestNotifier:
+    bot_token = required_env("TELEGRAM_BOT_TOKEN")
+    chat_id = required_env("TELEGRAM_CHAT_ID")
+    return TelegramDigestNotifier(TelegramNotifier(bot_token=bot_token, chat_id=chat_id))
+
+
 def run_prospecting_job() -> ProspectingDigest:
     config = build_config_from_env()
     use_case = RunDailyProspectingUseCase(
         lead_source=build_lead_source_from_env(),
         drafter=build_drafter_from_env(),
-        email_delivery=build_email_notifier_from_env(),
+        email_delivery=build_digest_delivery_from_env(),
     )
     return use_case.execute(config)
 
 
 def collect_prospecting_config_errors() -> list[str]:
     errors: list[str] = []
-    for name in ("SMTP_HOST", "SMTP_USERNAME", "SMTP_PASSWORD", "SMTP_FROM_EMAIL"):
-        if not os.getenv(name, "").strip():
-            errors.append(f"Missing {name}")
+    if not has_configured_smtp_delivery() and not has_configured_telegram_delivery():
+        errors.append("Missing SMTP delivery settings and Telegram delivery fallback is unavailable")
 
     for name in ("PROSPECT_REDDIT_LIMIT_PER_TERM", "PROSPECT_MAX_MATCHES", "PROSPECT_OPENAI_MAX_OUTPUT_TOKENS", "SMTP_PORT"):
         raw_value = os.getenv(name, "").strip()
@@ -107,3 +120,17 @@ def parse_positive_int(name: str, default: int) -> int:
     if value <= 0:
         raise ValueError(f"{name} must be greater than zero.")
     return value
+
+
+def has_configured_smtp_delivery() -> bool:
+    return all(
+        os.getenv(name, "").strip()
+        for name in ("SMTP_HOST", "SMTP_USERNAME", "SMTP_PASSWORD", "SMTP_FROM_EMAIL")
+    )
+
+
+def has_configured_telegram_delivery() -> bool:
+    return all(
+        os.getenv(name, "").strip()
+        for name in ("TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID")
+    )

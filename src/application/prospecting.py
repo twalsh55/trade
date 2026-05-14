@@ -29,11 +29,21 @@ class DraftedProspectEmail:
 
 
 @dataclass(frozen=True, slots=True)
+class ProspectAuditEntry:
+    post: SocialPost
+    matched_query: str
+    decision: str
+    score: int
+    reasons: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class ProspectingDigest:
     generated_at: datetime
     scanned_post_count: int
     shortlisted_count: int
     shortlisted_posts: tuple[DraftedProspectEmail, ...]
+    audit_entries: tuple[ProspectAuditEntry, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,6 +73,7 @@ class RunDailyProspectingUseCase:
         seen_ids: set[str] = set()
         matches: list[ProspectMatch] = []
         scanned_count = 0
+        audit_entries: list[ProspectAuditEntry] = []
 
         for search_term in config.search_terms:
             posts = self.lead_source.search_recent_posts(search_term, config.per_term_limit)
@@ -70,11 +81,39 @@ class RunDailyProspectingUseCase:
             for post in posts:
                 unique_key = f"{post.source}:{post.external_id}"
                 if unique_key in seen_ids:
+                    audit_entries.append(
+                        ProspectAuditEntry(
+                            post=post,
+                            matched_query=search_term,
+                            decision="duplicate_skipped",
+                            score=0,
+                            reasons=("already reviewed under an earlier query",),
+                        )
+                    )
                     continue
                 seen_ids.add(unique_key)
                 match = score_social_post(post, search_term)
                 if match is not None:
                     matches.append(match)
+                    audit_entries.append(
+                        ProspectAuditEntry(
+                            post=post,
+                            matched_query=search_term,
+                            decision="candidate_shortlisted",
+                            score=match.score,
+                            reasons=match.reasons,
+                        )
+                    )
+                else:
+                    audit_entries.append(
+                        ProspectAuditEntry(
+                            post=post,
+                            matched_query=search_term,
+                            decision="rejected",
+                            score=0,
+                            reasons=_build_rejection_reasons(post, search_term),
+                        )
+                    )
 
         ranked = tuple(
             sorted(
@@ -99,6 +138,7 @@ class RunDailyProspectingUseCase:
             scanned_post_count=scanned_count,
             shortlisted_count=len(drafted_matches),
             shortlisted_posts=drafted_matches,
+            audit_entries=tuple(audit_entries),
         )
         self.email_delivery.send_email(
             recipient=config.recipient_email,
@@ -114,15 +154,15 @@ def format_digest_email(config: DailyProspectingConfig, digest: ProspectingDiges
         f"Recipient: {config.recipient_email}",
         f"Scanned posts: {digest.scanned_post_count}",
         f"Shortlisted posts: {digest.shortlisted_count}",
+        f"Audited decisions: {len(digest.audit_entries)}",
         "",
     ]
 
-    if not digest.shortlisted_posts:
-        lines.append("No strong social posts were found today.")
-        return "\n".join(lines)
-
     if config.app_url:
         lines.extend([f"App URL for drafting context: {config.app_url}", ""])
+
+    if digest.shortlisted_posts:
+        lines.extend(["Shortlisted matches:", ""])
 
     for index, item in enumerate(digest.shortlisted_posts, start=1):
         excerpt = item.post.body.strip().replace("\n", " ")
@@ -145,4 +185,47 @@ def format_digest_email(config: DailyProspectingConfig, digest: ProspectingDiges
             ]
         )
 
+    if not digest.shortlisted_posts:
+        lines.extend(["No strong social posts were found today.", ""])
+
+    lines.extend(["Full audit trail:", ""])
+    for index, entry in enumerate(digest.audit_entries, start=1):
+        excerpt = entry.post.body.strip().replace("\n", " ")
+        if len(excerpt) > 200:
+            excerpt = f"{excerpt[:197]}..."
+        lines.extend(
+            [
+                f"{index}. Audited post",
+                f"Source: {entry.post.source}",
+                f"Title: {entry.post.title}",
+                f"Author: {entry.post.author}",
+                f"Posted at: {entry.post.created_at.isoformat()}",
+                f"URL: {entry.post.permalink}",
+                f"Matched query: {entry.matched_query}",
+                f"Decision: {entry.decision}",
+                f"Score: {entry.score}",
+                f"Reasons: {', '.join(entry.reasons)}",
+                f"Body excerpt: {excerpt or '(no body text)'}",
+                "",
+            ]
+        )
+
     return "\n".join(lines).rstrip()
+
+
+def _build_rejection_reasons(post: SocialPost, matched_query: str) -> tuple[str, ...]:
+    haystack = f"{post.title}\n{post.body}".lower()
+    reasons: list[str] = []
+
+    excluded_keywords = ("hiring", "job", "job opening", "for hire", "meme coin", "sports betting")
+    matched_exclusions = [keyword for keyword in excluded_keywords if keyword in haystack]
+    if matched_exclusions:
+        reasons.extend(f"filtered by excluded keyword {keyword}" for keyword in matched_exclusions)
+        return tuple(reasons)
+
+    if matched_query.lower() not in haystack:
+        reasons.append("did not include the matched query phrase directly")
+    if "?" not in post.title and "?" not in post.body:
+        reasons.append("did not ask a direct question")
+    reasons.append("insufficient intent or fit score for shortlist")
+    return tuple(reasons)
