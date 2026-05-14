@@ -4,7 +4,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
-    PORT=8501
+    PORT=8000
 
 WORKDIR /app
 
@@ -17,6 +17,6 @@ COPY . .
 
 RUN chmod +x /app/scripts/start_railway.sh
 
-EXPOSE 8501
+EXPOSE 8000
 
 CMD ["/bin/sh", "/app/scripts/start_railway.sh"]

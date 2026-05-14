@@ -9,6 +9,7 @@ import jwt
 import pytest
 from psycopg import OperationalError
 
+from src.adapters.auth import runtime
 from src.adapters.auth.clerk_auth import (
     AuthenticationError,
     ClerkAuthConfig,
@@ -19,7 +20,6 @@ from src.adapters.auth.clerk_auth import (
 )
 from src.adapters.persistence import postgres_user_repository as repo_module
 from src.adapters.persistence.postgres_user_repository import PostgresUserRepository
-from src.adapters.ui import streamlit_dashboard as dashboard
 from src.application.auth import AuthenticateUserUseCase
 from src.domain.auth import ExternalIdentity, User
 
@@ -142,16 +142,7 @@ def test_clerk_auth_provider_authenticates_and_normalizes_profile(monkeypatch) -
 
     identity = provider.authenticate_session_token("session-token")
 
-    assert identity == ExternalIdentity(
-        provider="clerk",
-        issuer="https://example.clerk.accounts.dev",
-        subject="user_123",
-        session_id="sess_123",
-        email="user@example.com",
-        given_name="Ada",
-        family_name="Lovelace",
-        display_name="Ada Lovelace",
-    )
+    assert identity == make_identity()
 
 
 def test_clerk_auth_provider_falls_back_to_claims_and_subject(monkeypatch) -> None:
@@ -220,7 +211,11 @@ def test_verify_session_token_rejects_disallowed_authorized_party(monkeypatch) -
     monkeypatch.setattr(
         jwt,
         "decode",
-        lambda *args, **kwargs: {"iss": "https://example.clerk.accounts.dev", "sub": "user_123", "azp": "https://wrong.example"},
+        lambda *args, **kwargs: {
+            "iss": "https://example.clerk.accounts.dev",
+            "sub": "user_123",
+            "azp": "https://wrong.example",
+        },
     )
 
     with pytest.raises(AuthenticationError, match="authorized party is not allowed"):
@@ -240,7 +235,14 @@ def test_verify_session_token_accepts_valid_claims(monkeypatch) -> None:
     monkeypatch.setattr(
         jwt,
         "decode",
-        lambda *args, **kwargs: {"iss": "https://example.clerk.accounts.dev", "sub": "user_123", "azp": "https://allowed.example"},
+        lambda *args, **kwargs: {
+            "iss": "https://example.clerk.accounts.dev",
+            "sub": "user_123",
+            "azp": "https://allowed.example",
+            "exp": 1,
+            "iat": 1,
+            "nbf": 1,
+        },
     )
 
     claims = provider._verify_session_token("session-token")
@@ -298,13 +300,6 @@ def test_load_user_profile_handles_secretless_and_error_cases(monkeypatch) -> No
 
     provider_with_secret = ClerkAuthProvider(
         ClerkAuthConfig(publishable_key="pk_test_ZXhhbXBsZS5jbGVyay5hY2NvdW50cy5kZXYk", secret_key="secret")
-    )
-    monkeypatch.setattr(repo_module, "connect", repo_module.connect)
-    monkeypatch.setattr(
-        dashboard,
-        "st",
-        SimpleNamespace(),
-        raising=False,
     )
     monkeypatch.setattr(
         __import__("urllib.request").request,
@@ -463,30 +458,19 @@ def test_postgres_user_repository_parse_and_optional_helpers() -> None:
     assert repo_module._optional_string(123) is None
 
 
-def test_get_request_cookie_handles_missing_and_present_context(monkeypatch) -> None:
-    monkeypatch.setattr(dashboard, "st", SimpleNamespace())
-    assert dashboard.get_request_cookie("name") is None
-
-    monkeypatch.setattr(dashboard, "st", SimpleNamespace(context=SimpleNamespace(cookies={"name": "value"})))
-    assert dashboard.get_request_cookie("name") == "value"
-
-
-def test_build_authenticate_user_use_case_requires_env(monkeypatch) -> None:
-    dashboard.build_authenticate_user_use_case.cache_clear()
+def test_runtime_build_authenticate_user_use_case_requires_env(monkeypatch) -> None:
     monkeypatch.delenv("CLERK_PUBLISHABLE_KEY", raising=False)
     monkeypatch.delenv("DATABASE_URL", raising=False)
 
     with pytest.raises(RuntimeError, match="CLERK_PUBLISHABLE_KEY"):
-        dashboard.build_authenticate_user_use_case()
+        runtime.build_authenticate_user_use_case()
 
-    dashboard.build_authenticate_user_use_case.cache_clear()
     monkeypatch.setenv("CLERK_PUBLISHABLE_KEY", "pk_test_ZXhhbXBsZS5jbGVyay5hY2NvdW50cy5kZXYk")
     with pytest.raises(RuntimeError, match="DATABASE_URL"):
-        dashboard.build_authenticate_user_use_case()
+        runtime.build_authenticate_user_use_case()
 
 
-def test_build_authenticate_user_use_case_builds_and_initializes_repository(monkeypatch) -> None:
-    dashboard.build_authenticate_user_use_case.cache_clear()
+def test_runtime_build_authenticate_user_use_case_builds_repository_and_provider(monkeypatch) -> None:
     monkeypatch.setenv("CLERK_PUBLISHABLE_KEY", "pk_test_ZXhhbXBsZS5jbGVyay5hY2NvdW50cy5kZXYk")
     monkeypatch.setenv("CLERK_SECRET_KEY", "secret")
     monkeypatch.setenv("DATABASE_URL", "postgres://example")
@@ -501,6 +485,9 @@ def test_build_authenticate_user_use_case_builds_and_initializes_repository(monk
         def __init__(self, config: ClerkAuthConfig) -> None:
             captured["config"] = config
 
+        def authenticate_session_token(self, session_token: str) -> ExternalIdentity:
+            return make_identity()
+
     class FakeUsers:
         def __init__(self, database_url: str) -> None:
             captured["database_url"] = database_url
@@ -508,10 +495,13 @@ def test_build_authenticate_user_use_case_builds_and_initializes_repository(monk
         def ensure_schema(self) -> None:
             captured["ensure_schema"] = True
 
-    monkeypatch.setattr(dashboard, "ClerkAuthProvider", FakeProvider)
-    monkeypatch.setattr(dashboard, "PostgresUserRepository", FakeUsers)
+        def upsert_authenticated_user(self, identity: ExternalIdentity) -> User:
+            return make_user()
 
-    use_case = dashboard.build_authenticate_user_use_case()
+    use_case = runtime.build_authenticate_user_use_case(
+        auth_provider_cls=FakeProvider,
+        user_repository_cls=FakeUsers,
+    )
 
     assert isinstance(use_case, AuthenticateUserUseCase)
     assert captured["database_url"] == "postgres://example"
@@ -519,8 +509,7 @@ def test_build_authenticate_user_use_case_builds_and_initializes_repository(monk
     assert captured["config"].authorized_parties == ("https://a.example", "https://b.example")
 
 
-def test_build_authenticate_user_use_case_surfaces_database_connectivity_error(monkeypatch) -> None:
-    dashboard.build_authenticate_user_use_case.cache_clear()
+def test_runtime_build_authenticate_user_use_case_surfaces_database_connectivity_error(monkeypatch) -> None:
     monkeypatch.setenv("CLERK_PUBLISHABLE_KEY", "pk_test_ZXhhbXBsZS5jbGVyay5hY2NvdW50cy5kZXYk")
     monkeypatch.setenv("DATABASE_URL", "postgres://example")
 
@@ -531,271 +520,37 @@ def test_build_authenticate_user_use_case_surfaces_database_connectivity_error(m
         def ensure_schema(self) -> None:
             raise OperationalError("dns failed")
 
-    monkeypatch.setattr(dashboard, "PostgresUserRepository", FakeUsers)
-
     with pytest.raises(RuntimeError, match="Authentication database is unavailable"):
-        dashboard.build_authenticate_user_use_case()
+        runtime.build_authenticate_user_use_case(user_repository_cls=FakeUsers)
 
 
-def test_get_current_user_reads_cookie_and_handles_authentication_error(monkeypatch) -> None:
-    fake_st = SimpleNamespace(session_state={}, query_params={})
-    monkeypatch.setattr(dashboard, "st", fake_st)
-    monkeypatch.setattr(dashboard, "get_request_cookie", lambda name: "session-token")
-    monkeypatch.setattr(dashboard, "get_query_param", lambda name: None)
-    monkeypatch.setattr(
-        dashboard,
-        "build_authenticate_user_use_case",
-        lambda: SimpleNamespace(execute=lambda token: make_user()),
+def test_runtime_url_helpers(monkeypatch) -> None:
+    publishable_key = "pk_test_ZXhhbXBsZS5jbGVyay5hY2NvdW50cy5kZXYk"
+    monkeypatch.setenv("APP_BASE_URL", "https://app.example.com")
+    monkeypatch.setenv("CLERK_SIGN_IN_URL", "https://accounts.example.com/sign-in")
+    monkeypatch.setenv("CLERK_SIGN_UP_URL", "/sign-up")
+
+    assert runtime.derive_clerk_frontend_api_host(publishable_key) == "example.clerk.accounts.dev"
+    assert runtime.get_app_base_url() == "https://app.example.com"
+    assert runtime.get_configured_clerk_page_url("sign-in") == (
+        "https://accounts.example.com/sign-in?redirect_url=https%3A%2F%2Fapp.example.com"
+    )
+    assert runtime.get_configured_clerk_page_url("sign-up") == (
+        "https://app.example.com/sign-up?redirect_url=https%3A%2F%2Fapp.example.com"
     )
 
-    assert dashboard.get_current_user() == make_user()
-    assert fake_st.query_params == {}
 
-    monkeypatch.setattr(
-        dashboard,
-        "build_authenticate_user_use_case",
-        lambda: SimpleNamespace(execute=lambda token: (_ for _ in ()).throw(AuthenticationError("bad token"))),
-    )
-    assert dashboard.get_current_user() is None
-    assert fake_st.session_state[dashboard.AUTH_ERROR_KEY] == "Authentication failed: bad token"
+def test_runtime_url_helpers_handle_fallbacks_and_preserve_existing_redirect(monkeypatch) -> None:
+    monkeypatch.delenv("APP_BASE_URL", raising=False)
+    monkeypatch.delenv("PUBLIC_APP_URL", raising=False)
+    monkeypatch.delenv("CLERK_SIGN_IN_URL", raising=False)
+    monkeypatch.delenv("CLERK_SIGN_UP_URL", raising=False)
 
-    monkeypatch.setattr(
-        dashboard,
-        "build_authenticate_user_use_case",
-        lambda: (_ for _ in ()).throw(RuntimeError("missing config")),
-    )
-    assert dashboard.get_current_user() is None
-    assert fake_st.session_state[dashboard.AUTH_ERROR_KEY] == "missing config"
-
-
-def test_get_current_user_skips_bootstrap_without_session_cookie(monkeypatch) -> None:
-    fake_st = SimpleNamespace(session_state={dashboard.AUTH_ERROR_KEY: "old error"}, query_params={})
-    monkeypatch.setattr(dashboard, "st", fake_st)
-    monkeypatch.setattr(dashboard, "get_request_cookie", lambda name: None)
-    monkeypatch.setattr(dashboard, "get_query_param", lambda name: None)
-
-    def fail() -> AuthenticateUserUseCase:
-        raise AssertionError("should not build auth use case without a session cookie")
-
-    monkeypatch.setattr(dashboard, "build_authenticate_user_use_case", fail)
-
-    assert dashboard.get_current_user() is None
-    assert dashboard.AUTH_ERROR_KEY not in fake_st.session_state
-
-
-def test_get_current_user_prefers_query_param_token_and_clears_it(monkeypatch) -> None:
-    fake_st = SimpleNamespace(session_state={}, query_params={dashboard.CLERK_SESSION_TOKEN_PARAM: "token-123"})
-    monkeypatch.setattr(dashboard, "st", fake_st)
-    monkeypatch.setattr(dashboard, "get_request_cookie", lambda name: "cookie-token")
-
-    captured: list[str] = []
-    monkeypatch.setattr(
-        dashboard,
-        "build_authenticate_user_use_case",
-        lambda: SimpleNamespace(
-            execute=lambda token: captured.append(token) or make_user()
-        ),
-    )
-
-    assert dashboard.get_current_user() == make_user()
-    assert captured == ["token-123"]
-    assert dashboard.CLERK_SESSION_TOKEN_PARAM not in fake_st.query_params
-
-
-def test_mount_clerk_auth_bridge_reads_session_token_from_component(monkeypatch) -> None:
-    class FakeBridgeResult:
-        session_token = "token-123"
-
-    monkeypatch.setattr(dashboard, "get_clerk_auth_bridge", lambda: lambda **kwargs: FakeBridgeResult())
-
-    assert dashboard.mount_clerk_auth_bridge("pk_test_ZXhhbXBsZS5jbGVyay5hY2NvdW50cy5kZXYk", None) == "token-123"
-
-
-def test_get_clerk_auth_bridge_registers_v2_component(monkeypatch) -> None:
-    dashboard.get_clerk_auth_bridge.cache_clear()
-    captured: dict[str, object] = {}
-
-    def fake_component(name: str, **kwargs):  # type: ignore[no-untyped-def]
-        captured["name"] = name
-        captured.update(kwargs)
-        return "bridge"
-
-    monkeypatch.setattr(dashboard.components_v2, "component", fake_component)
-
-    assert dashboard.get_clerk_auth_bridge() == "bridge"
-    assert captured["name"] == "clerk_auth_bridge"
-    assert captured["html"] == dashboard.CLERK_AUTH_BRIDGE_HTML
-    assert captured["js"] == dashboard.CLERK_AUTH_BRIDGE_JS
-    assert captured["css"] == dashboard.CLERK_AUTH_BRIDGE_CSS
-    assert captured["isolate_styles"] is False
-
-
-def test_get_image_data_uri_and_panel_html(tmp_path, monkeypatch) -> None:
-    original_get_image_data_uri = dashboard.get_image_data_uri
-    logo_path = tmp_path / "logo.png"
-    logo_path.write_bytes(b"fake-png")
-    logo_text_path = tmp_path / "logo_text.png"
-    logo_text_path.write_bytes(b"fake-png-text")
-
-    data_uri = original_get_image_data_uri(str(logo_path))
-
-    assert data_uri is not None
-    assert data_uri.startswith("data:image/png;base64,")
-    text_data_uri = original_get_image_data_uri(str(logo_text_path))
-    assert text_data_uri is not None
-
-    monkeypatch.setattr(
-        dashboard,
-        "get_image_data_uri",
-        lambda path: data_uri if path == "logo.png" else text_data_uri if path == "logo_text.png" else None,
-    )
-    html = dashboard.build_brivoly_auth_panel_html()
-    assert "alt=\"Brivoly logo\"" in html
-    assert dashboard.BRIVOLY_LOGO_IMAGE_PLACEHOLDER not in html
-    assert dashboard.BRIVOLY_LOGO_TEXT_IMAGE_PLACEHOLDER not in html
-
-    monkeypatch.setattr(dashboard, "get_image_data_uri", lambda path: data_uri if path == "logo.png" else None)
-    symbol_only_html = dashboard.build_brivoly_auth_panel_html()
-    assert "alt=\"Brivoly symbol\"" in symbol_only_html
-    assert "alt=\"Brivoly logo\"" not in symbol_only_html
-
-    monkeypatch.setattr(dashboard, "get_image_data_uri", lambda path: None)
-    fallback_html = dashboard.build_brivoly_auth_panel_html()
-    assert "Brivoly</div>" in fallback_html
-
-    assert original_get_image_data_uri(str(tmp_path / "missing.png")) is None
-
-
-def test_render_brivoly_auth_panel_mounts_component(monkeypatch) -> None:
-    rendered: list[dict[str, object]] = []
-    monkeypatch.setattr(dashboard, "build_brivoly_auth_panel_html", lambda: "<div>panel</div>")
-    monkeypatch.setattr(
-        dashboard,
-        "get_html_block_renderer",
-        lambda: lambda **kwargs: rendered.append(kwargs),
-    )
-
-    dashboard.render_brivoly_auth_panel()
-
-    assert rendered == [{"data": {"html": "<div>panel</div>"}, "key": "brivoly_auth_panel"}]
-
-
-def test_get_html_block_renderer_registers_v2_component(monkeypatch) -> None:
-    dashboard.get_html_block_renderer.cache_clear()
-    captured: dict[str, object] = {}
-
-    def fake_component(name: str, **kwargs):  # type: ignore[no-untyped-def]
-        captured["name"] = name
-        captured.update(kwargs)
-        return "html-block"
-
-    monkeypatch.setattr(dashboard.components_v2, "component", fake_component)
-
-    assert dashboard.get_html_block_renderer() == "html-block"
-    assert captured["name"] == "trade_html_block"
-    assert captured["html"] == dashboard.HTML_BLOCK_COMPONENT_HTML
-    assert captured["js"] == dashboard.HTML_BLOCK_COMPONENT_JS
-    assert captured["isolate_styles"] is False
-
-
-def test_get_clerk_account_widget_registers_v2_component(monkeypatch) -> None:
-    dashboard.get_clerk_account_widget.cache_clear()
-    captured: dict[str, object] = {}
-
-    def fake_component(name: str, **kwargs):  # type: ignore[no-untyped-def]
-        captured["name"] = name
-        captured.update(kwargs)
-        return "widget"
-
-    monkeypatch.setattr(dashboard.components_v2, "component", fake_component)
-
-    assert dashboard.get_clerk_account_widget() == "widget"
-    assert captured["name"] == "clerk_account_widget"
-    assert captured["html"] == dashboard.CLERK_ACCOUNT_WIDGET_HTML
-    assert captured["css"] == dashboard.CLERK_ACCOUNT_WIDGET_CSS
-    assert captured["js"] == dashboard.CLERK_ACCOUNT_WIDGET_JS
-    assert captured["isolate_styles"] is False
-
-
-def test_render_auth_gate_requires_config_and_renders_clerk_component(monkeypatch) -> None:
-    messages: list[str] = []
-    bridge_calls: list[tuple[str, str | None]] = []
-    brand_calls: list[str] = []
-    monkeypatch.setattr(
-        dashboard,
-        "st",
-        SimpleNamespace(
-            markdown=lambda value: messages.append(value),
-            caption=lambda value: messages.append(value),
-            error=lambda value: messages.append(value),
-        ),
-    )
-    monkeypatch.setattr(dashboard, "render_brivoly_auth_panel", lambda: brand_calls.append("panel"))
-    monkeypatch.setattr(dashboard, "mount_clerk_auth_bridge", lambda publishable_key, auth_error: bridge_calls.append((publishable_key, auth_error)) or None)
-    monkeypatch.delenv("CLERK_PUBLISHABLE_KEY", raising=False)
-    monkeypatch.delenv("DATABASE_URL", raising=False)
-
-    assert dashboard.render_auth_gate() is None
-    assert "Authentication is not configured. Set CLERK_PUBLISHABLE_KEY." in messages
-
-    monkeypatch.setenv("CLERK_PUBLISHABLE_KEY", "pk_test_ZXhhbXBsZS5jbGVyay5hY2NvdW50cy5kZXYk")
-    assert dashboard.render_auth_gate() is None
-
-    assert "Authentication database is not configured. Set DATABASE_URL before completing sign-in." in messages
-    assert any("Need self-service signup?" in message for message in messages)
-    assert bridge_calls[0] == ("pk_test_ZXhhbXBsZS5jbGVyay5hY2NvdW50cy5kZXYk", None)
-    assert brand_calls == ["panel", "panel"]
-
-    monkeypatch.setenv("DATABASE_URL", "postgres://example")
-    monkeypatch.setenv("CLERK_SIGN_UP_URL", "https://accounts.example.com/sign-up")
-    assert dashboard.render_auth_gate() is None
-
-    assert bridge_calls[1] == ("pk_test_ZXhhbXBsZS5jbGVyay5hY2NvdW50cy5kZXYk", None)
-    assert any("New to Brivoly?" in message for message in messages)
-    assert any("Create an account" in message for message in messages)
-
-
-def test_render_auth_gate_surfaces_bootstrap_error(monkeypatch) -> None:
-    messages: list[str] = []
-    bridge_calls: list[tuple[str, str | None]] = []
-    brand_calls: list[str] = []
-    monkeypatch.setattr(
-        dashboard,
-        "st",
-        SimpleNamespace(
-            session_state={dashboard.AUTH_ERROR_KEY: "database unavailable"},
-            markdown=lambda value: messages.append(value),
-            caption=lambda value: messages.append(value),
-            error=lambda value: messages.append(value),
-        ),
-    )
-    monkeypatch.setattr(dashboard, "render_brivoly_auth_panel", lambda: brand_calls.append("panel"))
-    monkeypatch.setattr(dashboard, "mount_clerk_auth_bridge", lambda publishable_key, auth_error: bridge_calls.append((publishable_key, auth_error)) or None)
-    monkeypatch.setenv("CLERK_PUBLISHABLE_KEY", "pk_test_ZXhhbXBsZS5jbGVyay5hY2NvdW50cy5kZXYk")
-    monkeypatch.setenv("DATABASE_URL", "postgres://example")
-
-    assert dashboard.render_auth_gate() is None
-
-    assert "database unavailable" in messages
-    assert bridge_calls[0] == ("pk_test_ZXhhbXBsZS5jbGVyay5hY2NvdW50cy5kZXYk", "database unavailable")
-    assert brand_calls == ["panel"]
-
-
-def test_render_account_widget_skips_without_key_and_renders_with_key(monkeypatch) -> None:
-    mounted: list[dict[str, object]] = []
-    monkeypatch.setattr(
-        dashboard,
-        "get_clerk_account_widget",
-        lambda: lambda **kwargs: mounted.append(kwargs),
-    )
-    monkeypatch.delenv("CLERK_PUBLISHABLE_KEY", raising=False)
-
-    dashboard.render_account_widget()
-    assert mounted == []
-
-    monkeypatch.setenv("CLERK_PUBLISHABLE_KEY", "pk_test_ZXhhbXBsZS5jbGVyay5hY2NvdW50cy5kZXYk")
-    dashboard.render_account_widget()
-
-    assert mounted[0]["key"] == "clerk_account_widget"
-    assert mounted[0]["data"]["publishableKey"] == "pk_test_ZXhhbXBsZS5jbGVyay5hY2NvdW50cy5kZXYk"
-    assert mounted[0]["data"]["host"] == "example.clerk.accounts.dev"
+    assert runtime.get_app_base_url() == "http://localhost:3000"
+    assert runtime.get_configured_clerk_page_url("sign-in") is None
+    assert runtime.with_redirect_url(
+        "https://accounts.example.com/sign-in?redirect_url=https%3A%2F%2Falready.example.com",
+        "https://app.example.com",
+    ) == "https://accounts.example.com/sign-in?redirect_url=https%3A%2F%2Falready.example.com"
+    assert runtime.CLERK_SESSION_COOKIE == "__session"
+    assert runtime.CLERK_SESSION_TOKEN_PARAM == "clerk_session_token"

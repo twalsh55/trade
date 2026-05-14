@@ -1,1 +1,1 @@
-"""Adapters layer: external systems and UI."""
+"""Adapters layer: external systems and delivery adapters."""

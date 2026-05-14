@@ -1,19 +1,53 @@
-# Market Crash Monitor Dashboard
+# Trade
 
-Python dashboard for monitoring market crash indicators and generating rule-based:
-- de-risk suggestions during stress regimes
-- buy-the-dip cues when pullbacks become statistically attractive
+Trade is a split-stack market monitoring app:
+
+- Next.js frontend in `web/`
+- FastAPI backend in `src/adapters/api/`
+- Python domain and application layers as the source of truth
+- PostgreSQL-backed auth and personalization
+
+The legacy Streamlit UI has been removed. The supported product surface is now the Next.js app talking to the Python API.
 
 ## Run
 
+One command for local development:
+
+```bash
+./scripts/dev.sh
+```
+
+This starts:
+
+- API: `http://127.0.0.1:8000`
+- Frontend: `http://127.0.0.1:3000`
+
+You can override ports:
+
+```bash
+API_PORT=8001 WEB_PORT=3001 ./scripts/dev.sh
+```
+
+Manual commands:
+
 ```bash
 uv sync
-uv run streamlit run main.py
+uv run uvicorn src.adapters.api.app:app --reload --host 0.0.0.0 --port 8000
+cd web && npm install
+cd web && TRADE_API_BASE_URL=http://127.0.0.1:8000 npm run dev
+```
+
+Verification:
+
+```bash
+uv run pytest
+cd web && npm run typecheck
+cd web && npm run build
 ```
 
 ## Authentication
 
-The app now authenticates users through an auth-provider adapter and stores its own internal user records in Postgres.
+The backend authenticates Clerk session tokens and maps them to internal users stored in Postgres.
 
 Required environment variables:
 
@@ -29,102 +63,81 @@ CLERK_SECRET_KEY=your_clerk_secret_key
 CLERK_FRONTEND_API_URL=https://your-instance.clerk.accounts.dev
 CLERK_JWKS_URL=https://your-instance.clerk.accounts.dev/.well-known/jwks.json
 CLERK_ISSUER=https://your-instance.clerk.accounts.dev
-CLERK_AUTHORIZED_PARTIES=https://your-app.example.com,http://localhost:8501
+CLERK_AUTHORIZED_PARTIES=https://your-app.example.com,http://localhost:3000
 CLERK_SIGN_IN_URL=https://your-account-portal-domain/sign-in
 CLERK_SIGN_UP_URL=https://your-account-portal-domain/sign-up
-APP_BASE_URL=http://localhost:8501
+APP_BASE_URL=http://localhost:3000
+TRADE_API_BASE_URL=http://127.0.0.1:8000
 ```
 
-Notes:
-- The dashboard uses Clerk's signed session token and validates it with JWKS.
-- The app keeps its own `app_user` table in Postgres with an internal UUID primary key.
-- Clerk is isolated behind an application auth port so a future migration can swap adapters without rewriting the dashboard or domain logic.
-- For hosted Account Portal links, use the exact URLs shown in Clerk Dashboard > Account Portal > Pages instead of trying to derive them from the publishable key.
-- Hosted sign-in and sign-up links should redirect back to `APP_BASE_URL`, so set that to your real local or deployed app URL.
+## Deploy
 
-## Deploy on Railway
+The root `Dockerfile`, `railway.toml`, and `scripts/start_railway.sh` now target the Python API service.
 
-This repo includes a `Dockerfile` and `railway.toml` for Railway deployment.
+Railway API deployment:
 
-Railway setup:
 ```bash
 railway up
 ```
 
 Container behavior:
-- installs dependencies with `uv sync --frozen`
-- starts Streamlit directly on `0.0.0.0:$PORT`
-- serves `GET /_stcore/health` for Railway healthchecks
-- disables CORS/XSRF protections for proxy compatibility
 
-Set these Railway environment variables if you want Telegram alerts:
-- `TELEGRAM_BOT_TOKEN`
-- `TELEGRAM_CHAT_ID`
+- installs Python dependencies with `uv sync --frozen`
+- sends the optional Telegram startup notification
+- starts `uvicorn` on `0.0.0.0:$PORT`
+- exposes `GET /healthz` for Railway health checks
 
-## Telegram Alerts
+Recommended production topology:
 
-Create a local `.env` file or export these before running if you want Telegram messages when the dashboard produces an actionable alert:
+- Python API on Railway
+- Next.js frontend on Vercel
+- PostgreSQL on Railway
+
+For the frontend, set `TRADE_API_BASE_URL` to the deployed API origin.
+
+## Telegram
+
+Optional startup and alert notifications use:
 
 ```bash
 TELEGRAM_BOT_TOKEN=your_bot_token
 TELEGRAM_CHAT_ID=your_chat_id
 ```
 
-Alerts are sent once per distinct signal and will re-send only when the regime/actions change.
-
-To discover your `TELEGRAM_CHAT_ID` after messaging the bot:
+Utilities:
 
 ```bash
 uv run python scripts/get_telegram_chat_id.py
-```
-
-To test whether your bot token and chat ID can send successfully:
-
-```bash
 uv run python scripts/test_telegram_send.py
 ```
 
-## Ports and Adapters Structure
+## Structure
 
 ```text
 src/
   domain/
-    auth.py         # provider-agnostic identity and internal user models
-    models.py       # entities, policies, thresholds
-    services.py     # pure business logic for metrics/scoring/actions
   application/
-    ports.py        # interfaces used by use-cases
-    auth.py         # authentication use-case
-    use_cases.py    # orchestration of the dashboard workflow
+    account.py
+    auth.py
+    dashboard.py
+    dto.py
+    ports.py
+    use_cases.py
   adapters/
+    api/
     auth/
-      clerk_auth.py             # Clerk JWT verification + profile lookup adapter
     market_data/
-      yfinance_provider.py   # outbound adapter for market data
+    notifications/
     persistence/
-      postgres_user_repository.py # Postgres user persistence adapter
-    ui/
-      streamlit_dashboard.py # inbound adapter (Streamlit)
-main.py              # composition root / entrypoint
+web/
+  app/
+  components/
+  lib/
+  public/
 ```
-
-### Boundaries
-
-- Domain: no Streamlit or yfinance dependencies.
-- Application: depends on domain + abstract port only.
-- Adapters: implement ports and render UI.
-
-## What It Tracks
-
-- Trend stress: benchmark price vs. 200-day moving average
-- Drawdown stress: benchmark drawdown from 252-day high
-- Volatility stress: annualized 20-day realized volatility
-- Momentum stress: RSI(14) on benchmark
-- Breadth stress: share of the risk universe above 200-day moving average
-- Yield-curve stress: long-short Treasury spread and inversion flag
-- Optional fear/risk overlays: `^VIX` and a risk proxy like `HYG`
 
 ## Notes
 
-- Signals are systematic heuristics, not guarantees.
-- Intended for education/research, not financial advice.
+- Domain logic stays in Python, not in Next.js components or routes.
+- The web app is an adapter over explicit API contracts.
+- Signals are systematic heuristics for research and education, not financial advice.
