@@ -2,90 +2,119 @@
 
 ## Current Project State
 
-This repo now runs as a split application:
+This repo is now a split app:
 
-- Python backend/API in `src/adapters/api/` using FastAPI
+- FastAPI backend in `src/adapters/api/`
 - Next.js frontend in `web/`
-- Python domain and application layers remain the source of truth
-- Postgres-backed auth and personalization are wired on the backend
-- The legacy Streamlit UI has been removed
+- Railway is the intended API host
+- Vercel is the intended frontend host
+- Clerk remains the app auth provider
+- PostgreSQL remains on Railway
 
-The frontend supports:
-
-- Clerk-based sign-in bootstrap through a local app session cookie
-- server-rendered dashboard overview
-- interactive dashboard filter refresh
-- editable account/dashboard settings
-- refreshable alert history
-- richer chart rendering on top of Python API responses
+The migration itself is functionally complete. The remaining work is deployment topology cleanup, not application rebuild.
 
 ## What Was Completed
 
-### Earlier migration work already present
+### Code and test work already finished
 
-- Added FastAPI API layer in `src/adapters/api/app.py`
-- Added DTOs in `src/application/dto.py`
-- Added account/settings and alert-history application layer in `src/application/account.py`
-- Added shared auth runtime helpers in `src/adapters/auth/runtime.py`
-- Added Postgres-backed personalization repository
-- Added Next.js app shell, sign-in flow, local proxy routes, charts, alerts, and settings UI
-
-### This session
-
-- Removed `main.py` and the Streamlit dashboard adapter
-- Removed Streamlit-only test coverage and replaced it with auth/runtime coverage that still exercises the Python backend architecture
-- Added shared dashboard settings/config logic in `src/application/dashboard.py` as part of the earlier migration work, then completed the cutover away from the Streamlit runtime
-- Updated Railway deployment files to start the FastAPI app instead of Streamlit
-- Updated `README.md` and `AGENTS.md` to reflect the new primary architecture
-- Set `web/next.config.ts` to `output: "standalone"` for cleaner frontend deployment packaging
-- Added Playwright end-to-end coverage for session bootstrap, dashboard refresh, settings save, and alert refresh
-- Verified the split deployment path locally, including the Railway Docker image and Next standalone build
-- Added `.dockerignore` to keep the Railway build context focused on deployable files
-- Added API request tracing with `X-Request-ID` and a `/readyz` endpoint for config/readiness inspection
-- Added a real process-level smoke test that launches `uvicorn` and verifies `/healthz`, `/readyz`, bootstrap, and session behavior
-- Hardened the sign-in redirect flow to reject unsafe external `redirectTo` values
-- Updated frontend typechecking so it self-generates Next route types from a clean checkout
-- Added `.env.example` and `scripts/smoke_hosted.sh` to speed up real environment setup and hosted API verification
-
-## Verified Status
-
-Last verified successfully:
-
-- Backend tests:
+- Removed the retired Streamlit runtime and completed the cutover to FastAPI + Next.js
+- Added backend request tracing and readiness checks
+- Added hosted smoke helpers and environment examples
+- Added Playwright E2E coverage for the key user flows
+- Verified:
   - `uv run pytest`
-- Frontend checks:
   - `cd web && npm run typecheck`
   - `cd web && npm run build`
   - `cd web && npm run e2e`
-- Deployment checks:
   - `docker build -t trade-api-deploycheck .`
-  - `docker run ... trade-api-deploycheck`
-  - `GET /healthz` returned `{"status":"ok"}`
-  - `GET /readyz` returned `{"status":"ok", ...}` with production-like env wiring
+  - containerized `/healthz` and `/readyz`
 
-## Important Run Commands
+### Railway production work completed in the last session
 
-### One-command local dev
+- Logged into Railway CLI successfully
+- Linked this repo to Railway project `alert-optimism`
+- Confirmed production service is `trade`
+- Patched missing live env on the Railway service:
+  - `APP_BASE_URL`
+  - `TRADE_API_BASE_URL`
+  - `DATABASE_URL`
+  - Clerk publishable/sign-in/sign-up settings
+  - Clerk authorized parties
+- Redeployed Railway successfully
+- Verified the live API was healthy on the Railway-backed domain:
+  - `/healthz` returned OK
+  - `/readyz` returned OK
+  - `/api/settings/bootstrap` returned the expected payload
+
+### Vercel frontend work completed in the last session
+
+- Logged into Vercel CLI successfully
+- Created Vercel project `brivoly-web`
+- Set Vercel production env `TRADE_API_BASE_URL=https://trade-production-5635.up.railway.app`
+- Disabled Vercel deployment SSO protection for this project so public checks work
+- Fixed Vercel framework detection by adding `web/vercel.json`
+- Deployed the frontend successfully to:
+  - `https://brivoly-web.vercel.app`
+- Attached custom domains to the Vercel project:
+  - `www.brivoly.com`
+  - `brivoly.com`
+- Verified:
+  - `GET /` returned the Next.js app
+  - `GET /sign-in` returned the sign-in page
+
+### Additional deployment cleanup completed after the first handoff
+
+- Corrected the Railway API service variable `TRADE_API_BASE_URL` to point at the live Railway service origin instead of `https://www.brivoly.com`
+- Confirmed Railway readiness is still healthy after that change
+- Confirmed the remaining blocker is DNS delegation at Porkbun, not app health or deployment packaging
+
+## What Is Still In Progress
+
+The last unfinished task is the public domain split:
+
+- `www.brivoly.com` should point to the Vercel frontend
+- `api.brivoly.com` should point to the Railway API
+
+Right now the Railway API has been verified live, but `www.brivoly.com` was still serving the backend when the session ended, which means root `/` returned FastAPI `{"detail":"Not Found"}`. The Vercel frontend itself is healthy at `https://brivoly-web.vercel.app`.
+
+The Vercel domain attachment is done. DNS is the only remaining blocker:
+
+- `A www.brivoly.com 76.76.21.21`
+- `A brivoly.com 76.76.21.21`
+
+Current resolution still points the public domains at Railway, so the cutover is not live yet.
+
+## Uncommitted Changes
+
+Current worktree status:
+
+- `HANDOFF.md`
+- `web/.gitignore`
+- `web/vercel.json`
+
+Notes:
+
+- `web/vercel.json` is intentional and needed so Vercel treats `web/` as a Next.js project.
+- `web/.gitignore` currently contains only `.vercel`
+
+These files have not been committed yet.
+
+## Important Commands
+
+### Local development
 
 ```bash
 ./scripts/dev.sh
 ```
 
-Defaults:
-
-- API: `http://127.0.0.1:8000`
-- Frontend: `http://127.0.0.1:3000`
-
-### Manual local run
-
-Backend:
+Backend only:
 
 ```bash
 uv sync
 uv run uvicorn src.adapters.api.app:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Frontend:
+Frontend only:
 
 ```bash
 cd web
@@ -93,52 +122,86 @@ npm install
 TRADE_API_BASE_URL=http://127.0.0.1:8000 npm run dev
 ```
 
-## Environment Assumptions
+### Verification
 
-Root `.env` currently contains local values for:
+```bash
+uv run pytest
+cd web && npm run typecheck
+cd web && npm run build
+cd web && npm run e2e
+docker build -t trade-api-deploycheck .
+```
 
-- `DATABASE_URL`
-- Clerk variables
-- Telegram config
+### Railway
 
-Notes:
+```bash
+npx @railway/cli@latest whoami
+npx @railway/cli@latest status --json
+npx @railway/cli@latest variable list --json
+npx @railway/cli@latest logs --lines 80
+npx @railway/cli@latest redeploy -y --json
+```
 
-- Python loads root `.env`
-- Next.js uses `TRADE_API_BASE_URL` for backend access
-- `APP_BASE_URL` should point to the frontend origin, typically `http://localhost:3000` in local development
+### Vercel
 
-## Deployment Assumptions
+```bash
+npx vercel whoami
+npx vercel project inspect brivoly-web --cwd web
+npx vercel deploy --prod --yes --cwd web
+npx vercel domains ls
+npx vercel domains inspect www.brivoly.com
+npx vercel domains inspect brivoly.com
+```
 
-Current root deployment files now target the Python API:
+## Environment and Deployment Assumptions
 
-- `Dockerfile`
-- `railway.toml`
-- `scripts/start_railway.sh`
+- Root `.env` is still the source for local backend config
+- The frontend uses `TRADE_API_BASE_URL` to call the API
+- In production, the frontend currently points to the Railway-generated API URL:
+  - `https://trade-production-5635.up.railway.app`
+- The intended final topology is:
+  - `www.brivoly.com` -> Vercel
+  - `brivoly.com` -> Vercel or redirect to `www`
+  - `api.brivoly.com` -> Railway
 
-Recommended production topology:
+## Known Issues / Caveats
 
-- Python API on Railway
-- Next.js frontend on Vercel
-- Postgres on Railway
-
-## Known Risks / Caveats
-
-- `next build` and the Playwright suite should not be run against the same `web/.next` directory in parallel; doing so can produce transient Next build errors.
-- Production deployment still depends on correct per-service environment configuration in Railway and Vercel.
-
-## What Is Still In Progress
-
-Remaining high-value items:
-
-- Configure the actual Railway and Vercel services with the verified environment values
-- Add any external monitoring, alerting, or log shipping needed beyond the in-app request tracing
+- Railway CLI auth worked earlier, but the `railway domain api.brivoly.com ...` action still returned an unauthorized error even after a successful login. Railway service management otherwise worked.
+- The API is healthy, and the Vercel frontend is healthy. The remaining blocker is DNS at Porkbun.
+- `next build` and Playwright should not share the same `web/.next` directory concurrently.
 
 ## Recommended Next Steps
 
-1. Configure the real Railway and Vercel services using the verified split deployment settings and environment variables.
-2. Add platform-level monitoring or log shipping on top of the in-app `X-Request-ID` tracing.
-3. Smoke-test the hosted services after the first real deployment using `/healthz`, `/readyz`, and the sign-in flow.
+1. Update Porkbun DNS:
 
-Current blocker:
+```bash
+A www.brivoly.com 76.76.21.21
+A brivoly.com 76.76.21.21
+```
 
-- Railway CLI auth is not available in this shell yet. `npx @railway/cli@latest status` returns `Unauthorized. Please login with railway login`.
+2. Wait for Vercel verification to clear, then verify:
+
+```bash
+npx vercel domains inspect www.brivoly.com
+curl -I https://www.brivoly.com
+curl -I https://brivoly.com
+```
+
+3. After the frontend domain is live on Vercel, remove `www.brivoly.com` / `brivoly.com` from the Railway `trade` service if they are still attached there.
+
+4. Retry adding `api.brivoly.com` to Railway. If the CLI still misbehaves, use the Railway dashboard as a fallback and keep `TRADE_API_BASE_URL` on the Railway-generated domain until `api.brivoly.com` is working.
+
+5. Commit the pending frontend hosting files:
+
+```bash
+git add web/.gitignore web/vercel.json
+git commit -m "Configure Vercel frontend hosting"
+git push
+```
+
+## Last Pushed Commits
+
+- `d197e40` `Add hosted deployment smoke helpers`
+- `312e2dc` `Harden deployment readiness and observability`
+- `56fac6f` `Document verified deployment workflow`
+- `e64d681` `Migrate app shell to FastAPI and Next.js`
