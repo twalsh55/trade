@@ -43,6 +43,7 @@ Verification:
 uv run pytest
 cd web && npm run typecheck
 cd web && npm run build
+cd web && npm run e2e
 ```
 
 ## Authentication
@@ -93,7 +94,41 @@ Recommended production topology:
 - Next.js frontend on Vercel
 - PostgreSQL on Railway
 
-For the frontend, set `TRADE_API_BASE_URL` to the deployed API origin.
+Vercel frontend deployment:
+
+- set the project root to `web/`
+- install command: `npm install`
+- build command: `npm run build`
+- output mode is already configured through `web/next.config.ts` with `output: "standalone"`
+
+Required service environment variables:
+
+- Railway API:
+  - `DATABASE_URL`
+  - Clerk server-side/auth variables
+  - optional Telegram variables
+  - `APP_BASE_URL` should point at the deployed frontend origin
+- Vercel frontend:
+  - `TRADE_API_BASE_URL` set to the deployed Railway API origin
+  - `APP_BASE_URL` set to the deployed frontend origin
+  - Clerk publishable/sign-in/sign-up variables used by the sign-in bridge
+
+Deployment verification completed locally on 2026-05-14:
+
+```bash
+uv run pytest
+cd web && npm run typecheck
+cd web && npm run build
+cd web && npm run e2e
+docker build -t trade-api-deploycheck .
+docker run -d --rm --name trade-api-deploycheck-run -p 18000:8000 trade-api-deploycheck
+curl http://127.0.0.1:18000/healthz
+```
+
+Notes:
+
+- `curl` returned `{"status":"ok"}` from the containerized API.
+- Avoid running `npm run build` and `npm run e2e` against the same `web/.next` directory in parallel; Next can fail with transient build errors in that case.
 
 ## Telegram
 

@@ -38,6 +38,9 @@ The frontend supports:
 - Updated Railway deployment files to start the FastAPI app instead of Streamlit
 - Updated `README.md` and `AGENTS.md` to reflect the new primary architecture
 - Set `web/next.config.ts` to `output: "standalone"` for cleaner frontend deployment packaging
+- Added Playwright end-to-end coverage for session bootstrap, dashboard refresh, settings save, and alert refresh
+- Verified the split deployment path locally, including the Railway Docker image and Next standalone build
+- Added `.dockerignore` to keep the Railway build context focused on deployable files
 
 ## Verified Status
 
@@ -46,7 +49,13 @@ Last verified successfully:
 - Backend tests:
   - `uv run pytest`
 - Frontend checks:
-  - pending re-verification after the final decommissioning changes in this session
+  - `cd web && npm run typecheck`
+  - `cd web && npm run build`
+  - `cd web && npm run e2e`
+- Deployment checks:
+  - `docker build -t trade-api-deploycheck .`
+  - `docker run ... trade-api-deploycheck`
+  - `GET /healthz` returned `{"status":"ok"}`
 
 ## Important Run Commands
 
@@ -108,21 +117,19 @@ Recommended production topology:
 
 ## Known Risks / Caveats
 
-- End-to-end browser tests are still not present.
-- The frontend should be re-verified with `npm run typecheck` and `npm run build` after any further web changes.
-- There are many unrelated uncommitted changes in the working tree.
+- The Playwright suite currently uses a mock backend for deterministic browser coverage rather than the live FastAPI app.
+- `next build` and the Playwright suite should not be run against the same `web/.next` directory in parallel; doing so can produce transient Next build errors.
+- Production deployment still depends on correct per-service environment configuration in Railway and Vercel.
 
 ## What Is Still In Progress
 
 Remaining high-value items:
 
-- Add end-to-end tests for critical user journeys
-- Continue hardening deployment docs and environment setup for separate frontend/backend production services
+- Add a thin real-stack smoke test layer that exercises the live FastAPI app in addition to the mocked Playwright suite
+- Continue hardening environment setup and observability for separate frontend/backend production services
 
 ## Recommended Next Steps
 
-1. Add E2E coverage for sign-in bootstrap, dashboard refresh, settings save, and alert refresh.
-2. Verify production deployment for:
-   - Railway API
-   - Vercel frontend
-3. Add any final observability or auth-boundary checks needed for production readiness.
+1. Configure the real Railway and Vercel services using the verified split deployment settings and environment variables.
+2. Add a thin smoke test against the live FastAPI app to complement the mocked Playwright suite.
+3. Add structured logging and auth-boundary observability for production readiness.

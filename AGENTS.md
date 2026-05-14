@@ -48,6 +48,7 @@ cd web && npm install
 cd web && npm run dev
 cd web && npm run typecheck
 cd web && npm run build
+cd web && npm run e2e
 ```
 
 ## Product Direction
@@ -94,8 +95,24 @@ Notes:
 - [x] Implement sign-in/session bootstrap flow against the Python backend.
 - [x] Rebuild the dashboard overview in Next.js using backend API responses.
 - [x] Rebuild chart, alerts, and settings flows in the Next.js UI.
-- [ ] Add end-to-end tests for critical user journeys.
+- [x] Add end-to-end tests for critical user journeys.
 - [x] Cut traffic from Streamlit to Next.js and remove the Streamlit runtime.
+
+## Deployment Notes
+
+- Railway deploys the Python API from the repo root using `Dockerfile`, `railway.toml`, and `scripts/start_railway.sh`.
+- Vercel should use `web/` as the frontend project root.
+- Required frontend deployment env: `TRADE_API_BASE_URL` pointing at the deployed Railway API origin.
+- Required shared/auth env depends on environment:
+  - API service: `DATABASE_URL`, Clerk variables, optional Telegram variables
+  - Frontend service: `TRADE_API_BASE_URL`, `APP_BASE_URL`, Clerk publishable/sign-in/sign-up values as needed by the sign-in bridge
+- Local verification completed for the current split:
+  - `uv run pytest`
+  - `cd web && npm run typecheck`
+  - `cd web && npm run build`
+  - `cd web && npm run e2e`
+  - `docker build -t trade-api-deploycheck .`
+  - `docker run ... trade-api-deploycheck` returning `GET /healthz -> {"status":"ok"}`
 
 ## Directory Direction
 
