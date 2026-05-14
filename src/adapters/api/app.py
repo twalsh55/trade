@@ -17,6 +17,7 @@ from src.adapters.api.observability import (
     build_runtime_report,
     configure_api_logger,
 )
+from src.adapters.billing.runtime import build_billing_adapter
 from src.adapters.auth.clerk_auth import AuthenticationError
 from src.adapters.auth.runtime import (
     CLERK_SESSION_COOKIE,
@@ -34,6 +35,11 @@ from src.application.account import (
     UpdateUserDashboardSettingsUseCase,
     UserDashboardSettings,
 )
+from src.application.billing import (
+    CreateBillingPortalSessionUseCase,
+    CreateCheckoutSessionUseCase,
+    GetBillingOverviewUseCase,
+)
 from src.application.dashboard import (
     DEFAULT_BENCHMARK,
     DEFAULT_LONG_YIELD_SYMBOL,
@@ -48,6 +54,7 @@ from src.application.dashboard import (
 from src.application.dto import (
     build_alert_history_entry_dto,
     build_authenticated_user_dto,
+    build_billing_overview_dto,
     build_dashboard_snapshot_dto,
     build_user_dashboard_settings_dto,
     dto_to_dict,
@@ -63,6 +70,7 @@ class ApiDependencies:
     auth_use_case_factory: Callable[[], object]
     market_data_factory: Callable[[], object]
     personalization_repository_factory: Callable[[], object]
+    billing_port_factory: Callable[[], object | None]
     now: Callable[[], datetime]
 
 
@@ -77,6 +85,10 @@ class UserDashboardSettingsPayload(BaseModel):
     telegram_enabled: bool
 
 
+class BillingSessionPayload(BaseModel):
+    return_url: str | None = None
+
+
 def create_app(dependencies: ApiDependencies | None = None) -> FastAPI:
     load_env_file()
     logger = configure_api_logger()
@@ -84,6 +96,7 @@ def create_app(dependencies: ApiDependencies | None = None) -> FastAPI:
         auth_use_case_factory=build_authenticate_user_use_case,
         market_data_factory=YFinanceMarketDataAdapter,
         personalization_repository_factory=build_personalization_repository,
+        billing_port_factory=build_billing_adapter,
         now=lambda: datetime.now(tz=UTC),
     )
     app = FastAPI(title="Trade API", version="0.1.0")
@@ -193,6 +206,48 @@ def create_app(dependencies: ApiDependencies | None = None) -> FastAPI:
             "items": [dto_to_dict(build_alert_history_entry_dto(entry)) for entry in entries],
             "count": len(entries),
         }
+
+    @app.get("/api/account/billing")
+    def billing_overview(
+        authorization: str | None = Header(default=None),
+        session_cookie: str | None = Cookie(default=None, alias=CLERK_SESSION_COOKIE),
+    ) -> dict[str, object]:
+        user = _require_authenticated_user(deps, authorization, session_cookie)
+        billing = deps.billing_port_factory()
+        if billing is None:
+            return dto_to_dict(
+                build_billing_overview_dto(
+                    GetBillingOverviewUseCase(_DisabledBillingPort()).execute(user)
+                )
+            )
+        overview = GetBillingOverviewUseCase(billing).execute(user)
+        return dto_to_dict(build_billing_overview_dto(overview))
+
+    @app.post("/api/account/billing/checkout")
+    def create_checkout_session(
+        payload: BillingSessionPayload,
+        authorization: str | None = Header(default=None),
+        session_cookie: str | None = Cookie(default=None, alias=CLERK_SESSION_COOKIE),
+    ) -> dict[str, str]:
+        user = _require_authenticated_user(deps, authorization, session_cookie)
+        billing = deps.billing_port_factory()
+        if billing is None:
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Stripe billing is not configured.")
+        url = CreateCheckoutSessionUseCase(billing).execute(user, return_url=payload.return_url)
+        return {"url": url}
+
+    @app.post("/api/account/billing/portal")
+    def create_billing_portal_session(
+        payload: BillingSessionPayload,
+        authorization: str | None = Header(default=None),
+        session_cookie: str | None = Cookie(default=None, alias=CLERK_SESSION_COOKIE),
+    ) -> dict[str, str]:
+        user = _require_authenticated_user(deps, authorization, session_cookie)
+        billing = deps.billing_port_factory()
+        if billing is None:
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Stripe billing is not configured.")
+        url = CreateBillingPortalSessionUseCase(billing).execute(user, return_url=payload.return_url)
+        return {"url": url}
 
     @app.get("/api/session")
     def session_bootstrap(
@@ -307,6 +362,29 @@ def _build_default_dashboard_settings(user_id: UUID) -> UserDashboardSettings:
         user_id,
         telegram_enabled=bool(os.environ.get("TELEGRAM_BOT_TOKEN")) and bool(os.environ.get("TELEGRAM_CHAT_ID")),
     )
+
+
+class _DisabledBillingPort:
+    def get_billing_overview(self, user: User):  # type: ignore[no-untyped-def]
+        from src.application.billing import BillingOverview
+
+        return BillingOverview(
+            enabled=False,
+            customer_id=None,
+            subscription_id=None,
+            subscription_status=None,
+            price_id=None,
+            cancel_at_period_end=False,
+            current_period_end=None,
+            checkout_available=False,
+            portal_available=False,
+        )
+
+    def create_checkout_session(self, user: User, return_url: str | None = None) -> str:
+        raise RuntimeError("Stripe billing is not configured.")
+
+    def create_portal_session(self, user: User, return_url: str | None = None) -> str:
+        raise RuntimeError("Stripe billing is not configured.")
 
 
 app = create_app()

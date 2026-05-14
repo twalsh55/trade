@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { AlertsPanel } from "@/components/alerts/alerts-panel";
 import { SignOutButton } from "@/components/auth/sign-out-button";
+import { BillingPanel } from "@/components/billing/billing-panel";
 import { BrandLockup } from "@/components/brand-lockup";
 import { DashboardWorkspace } from "@/components/dashboard/dashboard-workspace";
 import { SettingsEditor } from "@/components/settings/settings-editor";
@@ -196,6 +197,18 @@ export function AppShell({ data }: AppShellProps) {
           </Panel>
         </section>
 
+        {user ? (
+          <section className="grid gap-6 xl:grid-cols-[1fr_1fr]">
+            <Panel
+              eyebrow="Billing"
+              title="Stripe subscription access"
+              description="Manage the paid plan through Stripe Checkout and the customer portal without moving billing logic into the frontend."
+            >
+              <BillingPanel initialBilling={data.billing} />
+            </Panel>
+          </section>
+        ) : null}
+
         <section id="alerts" className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
           <Panel
             eyebrow="Alert History"
@@ -310,7 +323,11 @@ function CrashIndicatorCard({
   const clampedScore = score === null ? 0 : Math.max(0, Math.min(score, 100));
 
   return (
-    <Link href="#crash-components" className={`block rounded-[1.6rem] border p-5 shadow-sm transition hover:shadow-md ${shellClass}`}>
+    <Link
+      href="#crash-components"
+      aria-label="View crash components"
+      className={`block rounded-[1.6rem] border p-5 shadow-sm transition hover:shadow-md ${shellClass}`}
+    >
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.24em] opacity-75">Crash Indicator</p>

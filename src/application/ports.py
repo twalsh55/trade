@@ -10,6 +10,7 @@ from src.domain.auth import ExternalIdentity, User
 
 if TYPE_CHECKING:
     from src.application.account import AlertHistoryEntry, UserDashboardSettings
+    from src.application.billing import BillingOverview
 
 
 class MarketDataPort(Protocol):
@@ -41,3 +42,14 @@ class AlertHistoryPort(Protocol):
 
     def append_alert_history(self, user_id: UUID, entry: AlertHistoryEntry) -> None:
         """Append an alert history entry for a user."""
+
+
+class BillingPort(Protocol):
+    def get_billing_overview(self, user: User) -> BillingOverview:
+        """Return billing status for the authenticated user."""
+
+    def create_checkout_session(self, user: User, return_url: str | None = None) -> str:
+        """Create a Stripe Checkout session URL for the authenticated user."""
+
+    def create_portal_session(self, user: User, return_url: str | None = None) -> str:
+        """Create a Stripe Billing Portal session URL for the authenticated user."""

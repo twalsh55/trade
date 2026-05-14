@@ -6,6 +6,7 @@ Trade is a split-stack market monitoring app:
 - FastAPI backend in `src/adapters/api/`
 - Python domain and application layers as the source of truth
 - PostgreSQL-backed auth and personalization
+- Stripe-backed subscription billing
 
 The legacy Streamlit UI has been removed. The supported product surface is now the Next.js app talking to the Python API.
 
@@ -85,6 +86,14 @@ APP_BASE_URL=http://localhost:3000
 TRADE_API_BASE_URL=http://127.0.0.1:8000
 ```
 
+Stripe billing variables for the API service:
+
+```bash
+STRIPE_SECRET_KEY=sk_test_or_live
+STRIPE_PRICE_ID=price_123
+STRIPE_PORTAL_CONFIGURATION_ID=bpc_123_optional
+```
+
 ## Deploy
 
 The root `Dockerfile`, `railway.toml`, and `scripts/start_railway.sh` now target the Python API service.
@@ -134,6 +143,9 @@ Required service environment variables:
 - Railway API:
   - `DATABASE_URL`
   - Clerk server-side/auth variables
+  - `STRIPE_SECRET_KEY`
+  - `STRIPE_PRICE_ID`
+  - optional `STRIPE_PORTAL_CONFIGURATION_ID`
   - optional Telegram variables
   - `APP_BASE_URL` should point at the deployed frontend origin
 - Vercel frontend:
@@ -185,6 +197,7 @@ src/
   application/
     account.py
     auth.py
+    billing.py
     dashboard.py
     dto.py
     ports.py
@@ -192,6 +205,7 @@ src/
   adapters/
     api/
     auth/
+    billing/
     market_data/
     notifications/
     persistence/
@@ -204,6 +218,7 @@ web/
 
 ## Notes
 
+- Billing is created and managed through backend-owned Stripe Checkout and Billing Portal sessions exposed by `/api/account/billing`, `/api/account/billing/checkout`, and `/api/account/billing/portal`.
 - Domain logic stays in Python, not in Next.js components or routes.
 - The web app is an adapter over explicit API contracts.
 - Signals are systematic heuristics for research and education, not financial advice.

@@ -3,6 +3,8 @@ import { expect, test } from "@playwright/test";
 
 const mockApiBaseUrl = "http://127.0.0.1:8001";
 
+test.describe.configure({ mode: "serial" });
+
 async function resetMockApi(request: APIRequestContext) {
   await request.post(`${mockApiBaseUrl}/__reset`);
 }

@@ -176,6 +176,31 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (url.pathname === "/api/account/billing" && request.method === "GET") {
+    json(response, 200, {
+      enabled: true,
+      customer_id: "cus_mock_123",
+      subscription_id: "sub_mock_123",
+      subscription_status: "active",
+      price_id: "price_mock_123",
+      cancel_at_period_end: false,
+      current_period_end: "2024-06-06T12:30:00+00:00",
+      checkout_available: false,
+      portal_available: true,
+    });
+    return;
+  }
+
+  if (url.pathname === "/api/account/billing/checkout" && request.method === "POST") {
+    json(response, 200, { url: "https://checkout.stripe.test/session_mock_123" });
+    return;
+  }
+
+  if (url.pathname === "/api/account/billing/portal" && request.method === "POST") {
+    json(response, 200, { url: "https://billing.stripe.test/session_mock_123" });
+    return;
+  }
+
   if (url.pathname === "/api/account/settings" && request.method === "PUT") {
     const payload = await readRequestBody(request);
     state.settings = {

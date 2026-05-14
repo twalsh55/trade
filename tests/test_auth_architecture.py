@@ -44,6 +44,7 @@ def make_user() -> User:
         auth_provider="clerk",
         auth_issuer="https://example.clerk.accounts.dev",
         auth_subject="user_123",
+        stripe_customer_id=None,
         email="user@example.com",
         given_name="Ada",
         family_name="Lovelace",
@@ -407,6 +408,7 @@ def test_postgres_user_repository_ensure_schema_executes_setup_sql(monkeypatch) 
 
     assert "CREATE EXTENSION IF NOT EXISTS pgcrypto" in cursor.executed[0][0]
     assert "CREATE TABLE IF NOT EXISTS app_user" in cursor.executed[1][0]
+    assert "ADD COLUMN IF NOT EXISTS stripe_customer_id" in cursor.executed[2][0]
     assert connection.commit_calls == 1
 
 
@@ -417,6 +419,7 @@ def test_postgres_user_repository_upserts_and_maps_internal_user(monkeypatch) ->
         "auth_provider": "clerk",
         "auth_issuer": "https://example.clerk.accounts.dev",
         "auth_subject": "user_123",
+        "stripe_customer_id": "cus_123",
         "email": "user@example.com",
         "given_name": "Ada",
         "family_name": "Lovelace",
@@ -434,7 +437,22 @@ def test_postgres_user_repository_upserts_and_maps_internal_user(monkeypatch) ->
 
     assert user.id == UUID("11111111-1111-1111-1111-111111111111")
     assert user.display_name == "Ada Lovelace"
+    assert user.stripe_customer_id == "cus_123"
     assert cursor.executed[0][1]["auth_subject"] == "user_123"
+    assert cursor.executed[0][1]["stripe_customer_id"] is None
+    assert connection.commit_calls == 1
+
+
+def test_postgres_user_repository_updates_stripe_customer_id(monkeypatch) -> None:
+    cursor = FakeCursor()
+    connection = FakeConnection(cursor)
+    monkeypatch.setattr(repo_module, "connect", lambda *args, **kwargs: connection)
+
+    repository = PostgresUserRepository("postgres://example")
+    repository.set_stripe_customer_id(UUID("11111111-1111-1111-1111-111111111111"), "cus_123")
+
+    assert "UPDATE app_user" in cursor.executed[0][0]
+    assert cursor.executed[0][1]["stripe_customer_id"] == "cus_123"
     assert connection.commit_calls == 1
 
 

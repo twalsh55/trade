@@ -8,7 +8,7 @@ import pandas as pd
 from fastapi.testclient import TestClient
 import pytest
 
-from src.adapters.api.app import ApiDependencies, _normalize_universe, create_app
+from src.adapters.api.app import ApiDependencies, _DisabledBillingPort, _normalize_universe, create_app
 from src.adapters.auth.clerk_auth import AuthenticationError
 from src.adapters.persistence.in_memory_personalization_repository import InMemoryPersonalizationRepository
 from src.application.account import (
@@ -18,6 +18,7 @@ from src.application.account import (
     UpdateUserDashboardSettingsUseCase,
     UserDashboardSettings,
 )
+from src.application.billing import BillingOverview
 from src.application.dashboard import (
     build_dashboard_config,
     build_default_dashboard_settings,
@@ -42,6 +43,7 @@ def make_user() -> User:
         auth_provider="clerk",
         auth_issuer="https://example.clerk.accounts.dev",
         auth_subject="user_123",
+        stripe_customer_id=None,
         email="user@example.com",
         given_name="Ada",
         family_name="Lovelace",
@@ -141,6 +143,37 @@ class FakeMarketDataAdapter:
         return self.result.close_data
 
 
+@dataclass
+class FakeBillingPort:
+    overview: BillingOverview | None = None
+    checkout_url: str = "https://checkout.stripe.test/session_123"
+    portal_url: str = "https://billing.stripe.test/session_123"
+    seen_return_urls: list[str | None] | None = None
+
+    def get_billing_overview(self, user: User) -> BillingOverview:
+        return self.overview or BillingOverview(
+            enabled=True,
+            customer_id="cus_123",
+            subscription_id="sub_123",
+            subscription_status="active",
+            price_id="price_123",
+            cancel_at_period_end=False,
+            current_period_end=datetime(2024, 6, 1, tzinfo=UTC),
+            checkout_available=False,
+            portal_available=True,
+        )
+
+    def create_checkout_session(self, user: User, return_url: str | None = None) -> str:
+        if self.seen_return_urls is not None:
+            self.seen_return_urls.append(return_url)
+        return self.checkout_url
+
+    def create_portal_session(self, user: User, return_url: str | None = None) -> str:
+        if self.seen_return_urls is not None:
+            self.seen_return_urls.append(return_url)
+        return self.portal_url
+
+
 def make_client(
     *,
     user: User | None = None,
@@ -148,6 +181,7 @@ def make_client(
     dashboard_result: DashboardResult | None = None,
     seen_tokens: list[str] | None = None,
     personalization_repository: InMemoryPersonalizationRepository | None = None,
+    billing_port: FakeBillingPort | None = None,
 ) -> TestClient:
     result = dashboard_result or make_dashboard_result()
     now = datetime(2024, 5, 6, 12, 30, tzinfo=UTC)
@@ -158,6 +192,7 @@ def make_client(
             auth_use_case_factory=lambda: auth_use_case,
             market_data_factory=lambda: FakeMarketDataAdapter(result=result, captured_configs=[]),
             personalization_repository_factory=lambda: repository,
+            billing_port_factory=lambda: billing_port,
             now=lambda: now,
         )
     )
@@ -199,6 +234,68 @@ def test_account_settings_and_alert_history_dtos_serialize_values() -> None:
     assert settings_payload["telegram_enabled"] is True
     assert alert_payload["title"] == "Updated"
     assert alert_payload["occurred_at"] == "2024-05-06T12:30:00+00:00"
+
+
+def test_billing_overview_route_returns_disabled_status_when_stripe_is_unconfigured() -> None:
+    response = make_client(user=make_user()).get("/api/account/billing", headers={"Authorization": "Bearer session-token"})
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "enabled": False,
+        "customer_id": None,
+        "subscription_id": None,
+        "subscription_status": None,
+        "price_id": None,
+        "cancel_at_period_end": False,
+        "current_period_end": None,
+        "checkout_available": False,
+        "portal_available": False,
+    }
+
+
+def test_billing_routes_round_trip_overview_checkout_and_portal_urls() -> None:
+    seen_return_urls: list[str | None] = []
+    billing_port = FakeBillingPort(seen_return_urls=seen_return_urls)
+    client = make_client(user=make_user(), billing_port=billing_port)
+
+    overview_response = client.get("/api/account/billing", headers={"Authorization": "Bearer session-token"})
+    checkout_response = client.post(
+        "/api/account/billing/checkout",
+        headers={"Authorization": "Bearer session-token"},
+        json={"return_url": "https://www.brivoly.com/account"},
+    )
+    portal_response = client.post(
+        "/api/account/billing/portal",
+        headers={"Authorization": "Bearer session-token"},
+        json={"return_url": "https://www.brivoly.com/account"},
+    )
+
+    assert overview_response.status_code == 200
+    assert overview_response.json()["subscription_status"] == "active"
+    assert checkout_response.json() == {"url": "https://checkout.stripe.test/session_123"}
+    assert portal_response.json() == {"url": "https://billing.stripe.test/session_123"}
+    assert seen_return_urls == ["https://www.brivoly.com/account", "https://www.brivoly.com/account"]
+
+
+def test_billing_routes_require_auth_and_configuration() -> None:
+    anonymous_client = make_client(user=make_user())
+    unauthenticated_response = anonymous_client.get("/api/account/billing")
+    unavailable_checkout = anonymous_client.post(
+        "/api/account/billing/checkout",
+        headers={"Authorization": "Bearer session-token"},
+        json={"return_url": "https://www.brivoly.com/account"},
+    )
+    unavailable_portal = anonymous_client.post(
+        "/api/account/billing/portal",
+        headers={"Authorization": "Bearer session-token"},
+        json={"return_url": "https://www.brivoly.com/account"},
+    )
+
+    assert unauthenticated_response.status_code == 401
+    assert unavailable_checkout.status_code == 503
+    assert unavailable_checkout.json()["detail"] == "Stripe billing is not configured."
+    assert unavailable_portal.status_code == 503
+    assert unavailable_checkout.json()["detail"] == "Stripe billing is not configured."
 
 
 def test_dashboard_snapshot_dto_serializes_frontend_safe_shapes() -> None:
@@ -558,6 +655,7 @@ def test_dashboard_endpoint_maps_value_errors_to_422() -> None:
                     },
                 )(),
                 personalization_repository_factory=lambda: InMemoryPersonalizationRepository(),
+                billing_port_factory=lambda: None,
                 now=lambda: datetime(2024, 5, 6, 12, 30, tzinfo=UTC),
             )
         )
@@ -567,3 +665,13 @@ def test_dashboard_endpoint_maps_value_errors_to_422() -> None:
 
     assert response.status_code == 422
     assert "Could not load market data" in response.json()["detail"]
+
+
+def test_disabled_billing_port_raises_for_redirect_flows() -> None:
+    port = _DisabledBillingPort()
+
+    with pytest.raises(RuntimeError, match="not configured"):
+        port.create_checkout_session(make_user())
+
+    with pytest.raises(RuntimeError, match="not configured"):
+        port.create_portal_session(make_user())

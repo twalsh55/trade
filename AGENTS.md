@@ -13,6 +13,7 @@
 - Market data provider: `yfinance`
 - Database: PostgreSQL via `psycopg`
 - Authentication: Clerk JWT auth with internal Postgres-backed user records
+- Billing: Stripe Checkout + Billing Portal
 - Notifications: Telegram bot integration
 - Testing: `pytest` with `pytest-cov`
 - Containerization: Docker
@@ -77,11 +78,15 @@ The backend exposes these routes from `src/adapters/api/app.py`:
 - `GET /api/dashboard`
 - `GET /api/account/settings`
 - `PUT /api/account/settings`
+- `GET /api/account/billing`
+- `POST /api/account/billing/checkout`
+- `POST /api/account/billing/portal`
 - `GET /api/alerts/history`
 
 Notes:
 
 - `account/settings` and `alerts/history` use a Postgres-backed personalization adapter when `DATABASE_URL` is configured.
+- Stripe billing routes are enabled when `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID`, and `DATABASE_URL` are configured on the API service.
 - The in-memory personalization adapter remains available as a fallback for local or isolated test contexts.
 - The Next.js app supports sign-in bootstrap, dashboard rendering, interactive dashboard filters, editable settings, refreshable alert history, and richer chart rendering on top of the Python API contracts.
 - API responses include `X-Request-ID` for request tracing.
@@ -114,7 +119,7 @@ Notes:
   - `./scripts/deploy_prod.sh`
 - Required frontend deployment env: `TRADE_API_BASE_URL` pointing at the deployed Railway API origin.
 - Required shared/auth env depends on environment:
-  - API service: `DATABASE_URL`, Clerk variables, optional Telegram variables
+  - API service: `DATABASE_URL`, Clerk variables, `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID`, optional `STRIPE_PORTAL_CONFIGURATION_ID`, optional Telegram variables
   - Frontend service: `TRADE_API_BASE_URL`, `APP_BASE_URL`, Clerk publishable/sign-in/sign-up values as needed by the sign-in bridge
 - Local verification completed for the current split:
   - `uv run pytest`
@@ -136,6 +141,7 @@ src/
   adapters/
     api/
     auth/
+    billing/
     persistence/
     notifications/
     market_data/

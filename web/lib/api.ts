@@ -1,6 +1,7 @@
 import type {
   AccountSettings,
   AlertHistoryResponse,
+  BillingOverview,
   DashboardFilters,
   DashboardSnapshot,
   SessionResponse,
@@ -126,6 +127,38 @@ export async function getAlertHistory(options: ApiRequestOptions = {}): Promise<
   return apiRequest<AlertHistoryResponse>("/api/alerts/history", {}, options);
 }
 
+export async function getBillingOverview(options: ApiRequestOptions = {}): Promise<BillingOverview> {
+  return apiRequest<BillingOverview>("/api/account/billing", {}, options);
+}
+
+export async function createBillingCheckoutSession(
+  payload: { return_url?: string | null } = {},
+  options: ApiRequestOptions = {},
+): Promise<{ url: string }> {
+  return apiRequest<{ url: string }>(
+    "/api/account/billing/checkout",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+    options,
+  );
+}
+
+export async function createBillingPortalSession(
+  payload: { return_url?: string | null } = {},
+  options: ApiRequestOptions = {},
+): Promise<{ url: string }> {
+  return apiRequest<{ url: string }>(
+    "/api/account/billing/portal",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+    options,
+  );
+}
+
 export async function getDashboard(options: DashboardRequestOptions = {}): Promise<DashboardSnapshot> {
   return apiRequest<DashboardSnapshot>(`/api/dashboard${buildDashboardQuery(options.filters)}`, {}, options);
 }
@@ -148,18 +181,23 @@ export async function getShellData(options: ApiRequestOptions = {}): Promise<She
       session,
       settings: null,
       alerts: null,
+      billing: null,
       dashboard: null,
       errors,
     };
   }
 
-  const [settings, alerts, dashboard] = await Promise.all([
+  const [settings, alerts, billing, dashboard] = await Promise.all([
     getAccountSettings(options).catch((error: unknown) => {
       errors.push(extractErrorMessage(error, "Unable to load account settings."));
       return null;
     }),
     getAlertHistory(options).catch((error: unknown) => {
       errors.push(extractErrorMessage(error, "Unable to load alert history."));
+      return null;
+    }),
+    getBillingOverview(options).catch((error: unknown) => {
+      errors.push(extractErrorMessage(error, "Unable to load billing status."));
       return null;
     }),
     getDashboard(options).catch((error: unknown) => {
@@ -173,6 +211,7 @@ export async function getShellData(options: ApiRequestOptions = {}): Promise<She
     session,
     settings,
     alerts,
+    billing,
     dashboard,
     errors,
   };

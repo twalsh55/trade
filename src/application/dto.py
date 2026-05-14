@@ -6,6 +6,7 @@ from datetime import datetime
 import pandas as pd
 
 from src.application.account import AlertHistoryEntry, UserDashboardSettings
+from src.application.billing import BillingOverview
 from src.domain.auth import User
 from src.domain.models import DashboardConfig, DashboardResult
 from src.domain.services import compute_buyer_participation_series, compute_new_high_ratio_series
@@ -95,6 +96,19 @@ class AlertHistoryEntryDTO:
     severity: str
     title: str
     message: str
+
+
+@dataclass(frozen=True)
+class BillingOverviewDTO:
+    enabled: bool
+    customer_id: str | None
+    subscription_id: str | None
+    subscription_status: str | None
+    price_id: str | None
+    cancel_at_period_end: bool
+    current_period_end: str | None
+    checkout_available: bool
+    portal_available: bool
 
 
 def build_authenticated_user_dto(user: User) -> AuthenticatedUserDTO:
@@ -201,6 +215,20 @@ def build_alert_history_entry_dto(entry: AlertHistoryEntry) -> AlertHistoryEntry
         severity=entry.severity,
         title=entry.title,
         message=entry.message,
+    )
+
+
+def build_billing_overview_dto(overview: BillingOverview) -> BillingOverviewDTO:
+    return BillingOverviewDTO(
+        enabled=overview.enabled,
+        customer_id=overview.customer_id,
+        subscription_id=overview.subscription_id,
+        subscription_status=overview.subscription_status,
+        price_id=overview.price_id,
+        cancel_at_period_end=overview.cancel_at_period_end,
+        current_period_end=overview.current_period_end.isoformat() if overview.current_period_end else None,
+        checkout_available=overview.checkout_available,
+        portal_available=overview.portal_available,
     )
 
 

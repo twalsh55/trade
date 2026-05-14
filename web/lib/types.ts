@@ -56,6 +56,18 @@ export type AlertHistoryResponse = {
   count: number;
 };
 
+export type BillingOverview = {
+  enabled: boolean;
+  customer_id: string | null;
+  subscription_id: string | null;
+  subscription_status: string | null;
+  price_id: string | null;
+  cancel_at_period_end: boolean;
+  current_period_end: string | null;
+  checkout_available: boolean;
+  portal_available: boolean;
+};
+
 export type IndicatorPercentile = {
   name: string;
   current: number | null;
@@ -114,6 +126,7 @@ export type ShellData = {
   session: SessionResponse | null;
   settings: AccountSettings | null;
   alerts: AlertHistoryResponse | null;
+  billing: BillingOverview | null;
   dashboard: DashboardSnapshot | null;
   errors: string[];
 };

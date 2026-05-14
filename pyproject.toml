@@ -13,6 +13,7 @@ dependencies = [
     "psycopg[binary]>=3.2.9",
     "pyjwt[crypto]>=2.10.1",
     "pytest-cov>=7.1.0",
+    "stripe>=15.1.0",
     "uvicorn>=0.34.2",
     "yfinance>=0.2.56",
 ]

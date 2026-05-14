@@ -23,6 +23,7 @@ class User:
     auth_provider: str
     auth_issuer: str
     auth_subject: str
+    stripe_customer_id: str | None
     email: str | None
     given_name: str | None
     family_name: str | None
