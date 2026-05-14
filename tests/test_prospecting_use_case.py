@@ -2,7 +2,13 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from src.application.prospecting import DailyProspectingConfig, ProspectingDigest, RunDailyProspectingUseCase, format_digest_email
+from src.application.prospecting import (
+    DailyProspectingConfig,
+    ProspectingDigest,
+    RunDailyProspectingUseCase,
+    _summarize_post_text,
+    format_digest_email,
+)
 from src.domain.prospecting import ProspectMatch, SocialPost
 
 
@@ -104,8 +110,9 @@ def test_daily_prospecting_use_case_shortlists_and_emails() -> None:
     assert drafter.calls[0][2] == "https://www.brivoly.com"
     assert email_delivery.sent[0][0] == "tom.mg.walsh@gmail.com"
     assert "Looking for a market crash dashboard tool?" in email_delivery.sent[0][2]
-    assert "Full audit trail:" in email_delivery.sent[0][2]
-    assert "Decision: duplicate_skipped" in email_delivery.sent[0][2]
+    assert "Summary:" in email_delivery.sent[0][2]
+    assert "Decision summary:" in email_delivery.sent[0][2]
+    assert "Audit detail mode: concise" in email_delivery.sent[0][2]
 
 
 def test_daily_prospecting_use_case_handles_empty_shortlist() -> None:
@@ -129,7 +136,7 @@ def test_daily_prospecting_use_case_handles_empty_shortlist() -> None:
     assert digest.shortlisted_count == 0
     assert drafter.calls[0][1] == ()
     assert "No strong social posts were found today." in email_delivery.sent[0][2]
-    assert "Full audit trail:" in email_delivery.sent[0][2]
+    assert "Audit detail mode: concise" in email_delivery.sent[0][2]
 
 
 def test_daily_prospecting_use_case_records_excluded_keyword_reason() -> None:
@@ -195,4 +202,72 @@ def test_format_digest_email_truncates_long_body() -> None:
 
     assert "..." in body
     assert "Suggested promo reply:" in body
+    assert "Summary:" in body
+    assert "Audit detail mode: concise" in body
+
+
+def test_format_digest_email_includes_full_audit_when_verbose() -> None:
+    post = make_post("1", "Title", "body", 14)
+    digest = ProspectingDigest(
+        generated_at=datetime(2026, 5, 14, 9, 30, tzinfo=UTC),
+        scanned_post_count=1,
+        shortlisted_count=0,
+        shortlisted_posts=(),
+        audit_entries=(
+            type(
+                "AuditItem",
+                (),
+                {
+                    "post": post,
+                    "matched_query": "query",
+                    "decision": "rejected",
+                    "score": 0,
+                    "reasons": ("insufficient intent or fit score for shortlist",),
+                },
+            )(),
+        ),
+    )
+    config = DailyProspectingConfig(
+        recipient_email="tom.mg.walsh@gmail.com",
+        verbose_audit=True,
+    )
+
+    body = format_digest_email(config, digest)
+
     assert "Full audit trail:" in body
+    assert "Decision: rejected" in body
+
+
+def test_daily_prospecting_use_case_applies_top_five_and_min_score() -> None:
+    lead_source = StubLeadSource(
+        {
+            "portfolio risk dashboard": [
+                make_post(str(index), f"Looking for a crash dashboard tool? #{index}", "I need a tool to monitor portfolio risk during volatility.", 14)
+                for index in range(1, 8)
+            ]
+        }
+    )
+    drafter = StubDrafter()
+    email_delivery = StubEmailDelivery()
+    use_case = RunDailyProspectingUseCase(
+        lead_source=lead_source,
+        drafter=drafter,
+        email_delivery=email_delivery,
+        now=lambda: datetime(2026, 5, 14, 9, 30, tzinfo=UTC),
+    )
+
+    digest = use_case.execute(
+        DailyProspectingConfig(
+            recipient_email="tom.mg.walsh@gmail.com",
+            search_terms=("portfolio risk dashboard",),
+            max_matches=5,
+            min_score=12,
+        )
+    )
+
+    assert digest.shortlisted_count == 5
+
+
+def test_summarize_post_text_handles_empty_and_title_only_body() -> None:
+    assert _summarize_post_text("Title", "   ", 50) == ""
+    assert _summarize_post_text("Same title", "Same title", 50) == "Same title"

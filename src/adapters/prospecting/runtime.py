@@ -27,7 +27,9 @@ def build_config_from_env() -> DailyProspectingConfig:
         app_url=os.getenv("APP_BASE_URL", "").strip() or None,
         search_terms=search_terms,
         per_term_limit=parse_positive_int("PROSPECT_REDDIT_LIMIT_PER_TERM", default=8),
-        max_matches=parse_positive_int("PROSPECT_MAX_MATCHES", default=3),
+        max_matches=parse_positive_int("PROSPECT_MAX_MATCHES", default=5),
+        min_score=parse_positive_int("PROSPECT_MIN_SCORE", default=12),
+        verbose_audit=os.getenv("PROSPECT_VERBOSE_AUDIT", "false").strip().lower() == "true",
     )
 
 
@@ -90,7 +92,13 @@ def collect_prospecting_config_errors() -> list[str]:
     if not has_configured_smtp_delivery() and not has_configured_telegram_delivery():
         errors.append("Missing SMTP delivery settings and Telegram delivery fallback is unavailable")
 
-    for name in ("PROSPECT_REDDIT_LIMIT_PER_TERM", "PROSPECT_MAX_MATCHES", "PROSPECT_OPENAI_MAX_OUTPUT_TOKENS", "SMTP_PORT"):
+    for name in (
+        "PROSPECT_REDDIT_LIMIT_PER_TERM",
+        "PROSPECT_MAX_MATCHES",
+        "PROSPECT_MIN_SCORE",
+        "PROSPECT_OPENAI_MAX_OUTPUT_TOKENS",
+        "SMTP_PORT",
+    ):
         raw_value = os.getenv(name, "").strip()
         if not raw_value:
             continue

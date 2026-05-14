@@ -14,6 +14,7 @@ You must follow these rules:
 - Be conservative and selective. A small number of strong matches is better than many weak ones.
 - Keep AI usage low. Use heuristics first and only use AI for a small number of final suggested replies.
 - You must include a full audit trail of all sites, search results, and posts you reviewed, including why each item was shortlisted, rejected, or skipped.
+- Default to a concise output mode that only surfaces the top 5 most relevant opportunities unless a verbose audit is explicitly requested.
 
 Your goal:
 
@@ -53,6 +54,7 @@ Process:
 5. Do not actually post the reply.
 6. Send one email digest to `tom.mg.walsh@gmail.com`.
 7. In that email, include a detailed audit log of all visited sources and the reasoning behind every decision.
+8. In normal operation, show only the top 5 strongest opportunities in full detail and summarize the rest briefly.
 
 Suggested reply requirements:
 
@@ -70,6 +72,7 @@ Email format:
 - include total posts scanned
 - include total posts shortlisted
 - include the full audit count
+- default to only the top 5 most relevant shortlisted posts in full detail
 - for each shortlisted post include:
   - title
   - author
@@ -78,6 +81,7 @@ Email format:
   - why it is relevant
   - the suggested reply
 - include a full audit trail section
+- in concise mode, replace the full audit dump with a short decision summary count
 - for every visited post or source include:
   - source/site
   - matched query

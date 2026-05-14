@@ -246,7 +246,9 @@ Useful prospecting settings:
 PROSPECT_EMAIL_RECIPIENT=tom.mg.walsh@gmail.com
 PROSPECT_REDDIT_SEARCH_TERMS=looking for stock market crash app,portfolio risk dashboard,market crash alert tool
 PROSPECT_REDDIT_LIMIT_PER_TERM=8
-PROSPECT_MAX_MATCHES=3
+PROSPECT_MAX_MATCHES=5
+PROSPECT_MIN_SCORE=12
+PROSPECT_VERBOSE_AUDIT=false
 ```
 
 Scheduling:

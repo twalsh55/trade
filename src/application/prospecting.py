@@ -53,7 +53,9 @@ class DailyProspectingConfig:
     app_url: str | None = None
     search_terms: tuple[str, ...] = DEFAULT_PROSPECT_SEARCH_TERMS
     per_term_limit: int = 8
-    max_matches: int = 3
+    max_matches: int = 5
+    min_score: int = 12
+    verbose_audit: bool = False
 
 
 class RunDailyProspectingUseCase:
@@ -117,7 +119,7 @@ class RunDailyProspectingUseCase:
 
         ranked = tuple(
             sorted(
-                matches,
+                (match for match in matches if match.score >= config.min_score),
                 key=lambda item: (item.score, item.post.created_at),
                 reverse=True,
             )[: config.max_matches]
@@ -149,12 +151,19 @@ class RunDailyProspectingUseCase:
 
 
 def format_digest_email(config: DailyProspectingConfig, digest: ProspectingDigest) -> str:
+    decision_counts = _build_decision_counts(digest.audit_entries)
     lines = [
         f"Daily prospecting digest generated at {digest.generated_at.isoformat()}",
         f"Recipient: {config.recipient_email}",
         f"Scanned posts: {digest.scanned_post_count}",
         f"Shortlisted posts: {digest.shortlisted_count}",
         f"Audited decisions: {len(digest.audit_entries)}",
+        (
+            "Decision summary: "
+            f"shortlisted={decision_counts['candidate_shortlisted']}, "
+            f"rejected={decision_counts['rejected']}, "
+            f"duplicates={decision_counts['duplicate_skipped']}"
+        ),
         "",
     ]
 
@@ -165,9 +174,7 @@ def format_digest_email(config: DailyProspectingConfig, digest: ProspectingDiges
         lines.extend(["Shortlisted matches:", ""])
 
     for index, item in enumerate(digest.shortlisted_posts, start=1):
-        excerpt = item.post.body.strip().replace("\n", " ")
-        if len(excerpt) > 280:
-            excerpt = f"{excerpt[:277]}..."
+        excerpt = _summarize_post_text(item.post.title, item.post.body, max_length=180)
         lines.extend(
             [
                 f"{index}. Reddit post",
@@ -178,7 +185,7 @@ def format_digest_email(config: DailyProspectingConfig, digest: ProspectingDiges
                 f"Matched query: {item.matched_query}",
                 f"Score: {item.score}",
                 f"Reasons: {', '.join(item.reasons)}",
-                f"Body excerpt: {excerpt or '(no body text)'}",
+                f"Summary: {excerpt or '(no body text)'}",
                 "Suggested promo reply:",
                 item.suggested_reply,
                 "",
@@ -188,24 +195,31 @@ def format_digest_email(config: DailyProspectingConfig, digest: ProspectingDiges
     if not digest.shortlisted_posts:
         lines.extend(["No strong social posts were found today.", ""])
 
-    lines.extend(["Full audit trail:", ""])
-    for index, entry in enumerate(digest.audit_entries, start=1):
-        excerpt = entry.post.body.strip().replace("\n", " ")
-        if len(excerpt) > 200:
-            excerpt = f"{excerpt[:197]}..."
+    if config.verbose_audit:
+        lines.extend(["Full audit trail:", ""])
+        for index, entry in enumerate(digest.audit_entries, start=1):
+            excerpt = _summarize_post_text(entry.post.title, entry.post.body, max_length=140)
+            lines.extend(
+                [
+                    f"{index}. Audited post",
+                    f"Source: {entry.post.source}",
+                    f"Title: {entry.post.title}",
+                    f"Author: {entry.post.author}",
+                    f"Posted at: {entry.post.created_at.isoformat()}",
+                    f"URL: {entry.post.permalink}",
+                    f"Matched query: {entry.matched_query}",
+                    f"Decision: {entry.decision}",
+                    f"Score: {entry.score}",
+                    f"Reasons: {', '.join(entry.reasons)}",
+                    f"Summary: {excerpt or '(no body text)'}",
+                    "",
+                ]
+            )
+    else:
         lines.extend(
             [
-                f"{index}. Audited post",
-                f"Source: {entry.post.source}",
-                f"Title: {entry.post.title}",
-                f"Author: {entry.post.author}",
-                f"Posted at: {entry.post.created_at.isoformat()}",
-                f"URL: {entry.post.permalink}",
-                f"Matched query: {entry.matched_query}",
-                f"Decision: {entry.decision}",
-                f"Score: {entry.score}",
-                f"Reasons: {', '.join(entry.reasons)}",
-                f"Body excerpt: {excerpt or '(no body text)'}",
+                "Audit detail mode: concise",
+                "Only the most relevant shortlisted results are shown in full.",
                 "",
             ]
         )
@@ -229,3 +243,29 @@ def _build_rejection_reasons(post: SocialPost, matched_query: str) -> tuple[str,
         reasons.append("did not ask a direct question")
     reasons.append("insufficient intent or fit score for shortlist")
     return tuple(reasons)
+
+
+def _build_decision_counts(audit_entries: tuple[ProspectAuditEntry, ...]) -> dict[str, int]:
+    counts = {
+        "candidate_shortlisted": 0,
+        "rejected": 0,
+        "duplicate_skipped": 0,
+    }
+    for entry in audit_entries:
+        counts[entry.decision] = counts.get(entry.decision, 0) + 1
+    return counts
+
+
+def _summarize_post_text(title: str, body: str, max_length: int) -> str:
+    normalized_body = " ".join(body.strip().split())
+    if not normalized_body:
+        return ""
+
+    first_sentence = normalized_body.split(". ", 1)[0].strip()
+    candidate = first_sentence if first_sentence else normalized_body
+    if candidate.lower() == title.strip().lower():
+        candidate = normalized_body
+
+    if len(candidate) <= max_length:
+        return candidate
+    return f"{candidate[: max_length - 3].rstrip()}..."
