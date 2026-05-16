@@ -55,13 +55,13 @@ export function AppShell({ data }: AppShellProps) {
             </Link>
           ))}
         </nav>
-        <div className="mt-8 rounded-[1.5rem] border border-cyan-300/20 bg-cyan-300/10 p-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-200">Session</p>
-          <p className="mt-2 text-lg font-medium">
-            {user ? user.display_name ?? user.email ?? user.auth_subject : "Signed out"}
+        <div className={`mt-8 rounded-[1.5rem] border p-4 ${user ? "border-emerald-300/20 bg-emerald-300/10" : "border-amber-300/20 bg-amber-300/10"}`}>
+          <p className={`text-xs font-semibold uppercase tracking-[0.24em] ${user ? "text-emerald-200" : "text-amber-200"}`}>
+            {user ? "Signed in" : "Sign-in needed"}
           </p>
+          <p className="mt-2 text-lg font-medium">{user ? user.display_name ?? user.email ?? user.auth_subject : "No active account session"}</p>
           <p className="mt-2 text-sm text-slate-300">
-            {user ? "Authenticated through the Python API layer." : "Connect Clerk session cookies to unlock live data."}
+            {user ? "Your account is connected and live dashboard data is available." : "Sign in to load live dashboard data, saved settings, alerts, and billing access."}
           </p>
         </div>
       </aside>
@@ -141,17 +141,17 @@ export function AppShell({ data }: AppShellProps) {
         <section className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
           <Panel
             eyebrow="Account"
-            title={user ? "Authenticated API session" : "Session bridge still pending"}
+            title={user ? "You are signed in" : "You are not signed in yet"}
             description={
               user
-                ? `${user.display_name ?? user.email ?? user.auth_subject} is mapped to an internal application user.`
-                : "The Next.js shell is ready for Clerk session bootstrap, but no authenticated backend session was available for this render."
+                ? `${user.display_name ?? user.email ?? user.auth_subject} is recognized and mapped to an internal application user.`
+                : "This dashboard shell loaded, but it did not receive an authenticated account session for this request."
             }
           >
             <div className="space-y-3">
               <InfoRow label="Auth provider" value={user?.auth_provider ?? "clerk"} />
               <InfoRow label="Email" value={user?.email ?? "Not available"} />
-              <InfoRow label="Last login" value={user ? formatDateTime(user.last_login_at) : "Pending session bridge"} />
+              <InfoRow label="Last login" value={user ? formatDateTime(user.last_login_at) : "Sign in to load account details"} />
               <InfoRow label="Sign up URL" value={data.bootstrap?.clerk_sign_up_url ?? "Configure CLERK_SIGN_UP_URL"} />
             </div>
           </Panel>

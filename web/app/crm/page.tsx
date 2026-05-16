@@ -41,6 +41,14 @@ export default async function CRMPortalPage() {
               It is the place to grow deal tracking, notes, customer follow-up, and operator context without cluttering
               the crash-monitor experience.
             </p>
+            <div className={`mt-6 rounded-[1.5rem] border px-5 py-4 ${user ? "border-emerald-200 bg-emerald-50 text-emerald-900" : "border-amber-200 bg-amber-50 text-amber-900"}`}>
+              <p className="text-xs font-semibold uppercase tracking-[0.22em]">{user ? "Signed in" : "Sign in required for the live queue"}</p>
+              <p className="mt-2 text-sm leading-6">
+                {user
+                  ? `Welcome back, ${user.display_name ?? user.email ?? user.auth_subject}. Your follow-up queue and account history are ready below.`
+                  : "You can look around the CRM portal now, but sign in to open the actual follow-up queue, notes, and relationship memory."}
+              </p>
+            </div>
             <div className="mt-8 flex flex-wrap gap-3">
               <Button asChild size="lg">
                 <Link href="/">Back to portal hub</Link>
@@ -59,8 +67,8 @@ export default async function CRMPortalPage() {
           <div className="w-full max-w-md rounded-[1.75rem] border bg-slate-950 p-5 text-slate-50 shadow-[0_24px_80px_-50px_rgba(15,23,42,0.9)]">
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300">Portal Status</p>
             <div className="mt-4 space-y-3">
-              <CRMStatusRow label="Session" value={user ? "Signed in" : "Guest mode"} />
-              <CRMStatusRow label="Product state" value={followUps ? "Follow-up queue live" : "Sign in to load queue"} />
+              <CRMStatusRow label="Session" value={user ? "Signed in and recognized" : "Browsing as guest"} />
+              <CRMStatusRow label="Product state" value={followUps ? "Follow-up queue live" : "Sign in to load live queue"} />
               <CRMStatusRow label="Next focus" value="Lead follow-up discipline" />
             </div>
           </div>
@@ -70,20 +78,36 @@ export default async function CRMPortalPage() {
       {followUps ? (
         <CRMFollowUpWorkspace initialOverview={followUps} />
       ) : (
-        <section className="mt-6 grid gap-6 lg:grid-cols-3">
-          <FeatureCard
-            title="Pipeline"
-            body="Track active deals, stages, blockers, and next actions in one operational queue."
-          />
-          <FeatureCard
-            title="Relationship Memory"
-            body="Keep notes, conversations, and context close to the account instead of scattered across inboxes."
-          />
-          <FeatureCard
-            title="Follow-up Rhythm"
-            body="Use reminders and lightweight workflows to keep opportunities warm without manual sprawl."
-          />
-        </section>
+        <>
+          <section className="mt-6 rounded-[1.75rem] border border-amber-200 bg-amber-50 p-6 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-700">Before you continue</p>
+            <h2 className="mt-3 text-3xl font-semibold tracking-tight text-amber-950">Sign in to unlock the real CRM workspace.</h2>
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-amber-900">
+              The live product starts with a follow-up-first queue. Signing in connects your account so Brivoly can load your leads, notes, timeline, and next actions cleanly.
+            </p>
+            {bootstrap?.clerk_sign_in_url ? (
+              <div className="mt-5">
+                <Button asChild size="lg">
+                  <Link href="/sign-in?redirectTo=%2Fcrm">Sign in to open CRM</Link>
+                </Button>
+              </div>
+            ) : null}
+          </section>
+          <section className="mt-6 grid gap-6 lg:grid-cols-3">
+            <FeatureCard
+              title="Pipeline"
+              body="Track active deals, stages, blockers, and next actions in one operational queue."
+            />
+            <FeatureCard
+              title="Relationship Memory"
+              body="Keep notes, conversations, and context close to the account instead of scattered across inboxes."
+            />
+            <FeatureCard
+              title="Follow-up Rhythm"
+              body="Use reminders and lightweight workflows to keep opportunities warm without manual sprawl."
+            />
+          </section>
+        </>
       )}
     </main>
   );

@@ -50,7 +50,7 @@ export default async function HomePage() {
                   <Link href="/crm">Open CRM Portal</Link>
                 </Button>
                 {user ? (
-                  <div className="inline-flex items-center rounded-full border border-emerald-300/30 bg-emerald-300/15 px-4 py-3 text-sm font-medium text-emerald-50">
+                  <div className="inline-flex items-center rounded-[1.25rem] border border-emerald-300/30 bg-emerald-300/15 px-4 py-3 text-sm font-medium text-emerald-50">
                     Signed in as {user.display_name ?? user.email ?? user.auth_subject}
                   </div>
                 ) : bootstrap?.clerk_sign_in_url ? (
@@ -101,26 +101,29 @@ export default async function HomePage() {
 
         <section className="mt-6 grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
           <div className="rounded-[1.75rem] border bg-white/80 p-6 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Workspace Logic</p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Use the homepage like a control deck.</h2>
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Access Status</p>
+            <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
+              {user ? "You are signed in and ready to work." : "Choose a workspace, then sign in when you’re ready."}
+            </h2>
             <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
-              Instead of dropping straight into one app, the root page now separates the product lines. That keeps the
-              existing crash monitor easy to reach while giving the CRM app its own front door.
+              {user
+                ? "Your account is active on this device, so both product portals can load authenticated data and account-aware actions."
+                : "You can browse the workspace hub first. When you open a protected flow, Brivoly will guide you through a clean sign-in and send you back to the right product area."}
             </p>
             <div className="mt-6 grid gap-3 md:grid-cols-3">
-              <MiniTile label="Routing" value="/crash-monitor and /crm" />
-              <MiniTile label="Auth" value={user ? "Session detected" : "Anonymous until sign-in"} />
-              <MiniTile label="Bootstrap" value={bootstrap ? "Backend connected" : "Bootstrap unavailable"} />
+              <MiniTile label="Status" value={user ? "Signed in" : "Not signed in"} />
+              <MiniTile label="Next stop" value={user ? "Open either portal" : "Sign in from CRM or crash monitor"} />
+              <MiniTile label="Connection" value={bootstrap ? "Backend connected" : "Bootstrap unavailable"} />
             </div>
           </div>
 
           <div className="rounded-[1.75rem] border bg-slate-950 p-6 text-slate-50 shadow-[0_20px_70px_-45px_rgba(15,23,42,0.9)]">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300">Next Moves</p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight">Build each app without a crowded root screen.</h2>
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300">How Access Works</p>
+            <h2 className="mt-3 text-3xl font-semibold tracking-tight">Clear portal entry, clear sign-in state.</h2>
             <ul className="mt-5 space-y-3 text-sm leading-6 text-slate-300">
-              <li>Crash monitor keeps the current authenticated analytics flow.</li>
-              <li>CRM can now grow into its own screens, nav, and product language.</li>
-              <li>The homepage remains a lightweight hub instead of a mixed-product dashboard.</li>
+              <li>Each portal keeps its own purpose instead of mixing products on one screen.</li>
+              <li>Protected flows now have a more explicit sign-in handoff and return path.</li>
+              <li>The homepage tells you plainly whether your account is already active.</li>
             </ul>
           </div>
         </section>

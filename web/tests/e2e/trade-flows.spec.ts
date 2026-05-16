@@ -30,6 +30,9 @@ test("bootstraps a local app session and renders the authenticated dashboard she
   await bootstrapSession(page);
   await page.goto("/");
 
+  await expect(page.getByText("Signed in as Ada Lovelace")).toBeVisible();
+  await page.getByRole("link", { name: "Open Crash Monitor" }).click();
+
   await expect(page.getByText("Ada Lovelace", { exact: true })).toBeVisible();
   await expect(page.getByTestId("dashboard-benchmark-value")).toHaveText("SPY");
   await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
@@ -37,7 +40,7 @@ test("bootstraps a local app session and renders the authenticated dashboard she
 
 test("refreshes the dashboard with updated filters", async ({ page }) => {
   await bootstrapSession(page);
-  await page.goto("/");
+  await page.goto("/crash-monitor");
 
   await page.getByTestId("dashboard-benchmark-input").fill("QQQ");
   await page.getByTestId("dashboard-refresh-button").click();
@@ -49,7 +52,7 @@ test("refreshes the dashboard with updated filters", async ({ page }) => {
 
 test("saves settings and applies them back to the dashboard", async ({ page }) => {
   await bootstrapSession(page);
-  await page.goto("/");
+  await page.goto("/crash-monitor");
 
   await page.getByRole("heading", { name: "User dashboard defaults" }).scrollIntoViewIfNeeded();
   await page.getByTestId("settings-benchmark-input").fill("QQQ");
@@ -62,7 +65,7 @@ test("saves settings and applies them back to the dashboard", async ({ page }) =
 
 test("refreshes the alert feed through the local proxy route", async ({ page }) => {
   await bootstrapSession(page);
-  await page.goto("/");
+  await page.goto("/crash-monitor");
 
   await expect(page.getByText("Baseline alert")).toBeVisible();
 

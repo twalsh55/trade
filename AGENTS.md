@@ -183,6 +183,8 @@ Use this section to give the next session a fast, practical starting point. Refr
   - complete and snooze/reschedule actions
   - contact timeline history per lead
   - lightweight internal note capture
+  - a clearer signed-in versus signed-out portal state
+  - a more explicit and welcoming sign-in handoff
 - The current CRM wedge is:
   - follow-up-first
   - spreadsheet-friendly
@@ -241,6 +243,7 @@ Use this section to give the next session a fast, practical starting point. Refr
   - deployed to Railway and Vercel
   - logged into `product_updates.jsonl`
   - summarized by email through the operator briefing flow
+- The latest frontend UX improvement is clearer login state across the portal hub, CRM entry page, sign-in screen, and crash-monitor shell.
 - The latest platform automation addition is the Telegram `/code` workflow on the API side; it is production-facing and should be kept in sync with the fast-start notes and README.
 - The newest reliability fix is that `/code` and `/prospect` now tolerate SMTP failure as long as Telegram delivery still works.
 - The newest remote-autonomy bridge is that production prospect runs can now queue strong build recommendations into the same durable inbox path used for founder `/code` requests.
@@ -251,6 +254,7 @@ Use this section to give the next session a fast, practical starting point. Refr
   - `uv run pytest`
 - Frontend verification standard:
   - `cd web && npm run build`
+- Current frontend e2e coverage now assumes `/` is the portal hub and `/crash-monitor` is the authenticated dashboard route.
 - `cd web && npm run typecheck` currently has a known pre-existing issue with missing `.next/types/**` generated files referenced by `web/tsconfig.json`. Treat this as a repo issue unless the failure changes shape.
 
 ### Next Recommended Product Moves
