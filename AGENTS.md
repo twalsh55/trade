@@ -1,344 +1,165 @@
 # AGENTS
 
-## Current Dev Stack
+## Core Rules
 
-- Language/runtime: Python 3.12
-- Package manager: `uv`
-- Virtual environment: local `.venv`
-- Primary UI: Next.js + TypeScript in `web/`
-- Styling: Tailwind CSS
-- Component direction: `shadcn/ui` on top of accessible primitives
-- API layer: FastAPI in `src/adapters/api/`
-- Data and analytics: NumPy, pandas, Plotly
-- Market data provider: `yfinance`
-- Database: PostgreSQL via `psycopg`
-- Authentication: Clerk JWT auth with internal Postgres-backed user records
-- Billing: Stripe Checkout + Billing Portal
-- Notifications: Telegram bot integration and SMTP email delivery
-- AI drafting: OpenAI API for optional low-cost prospecting reply generation
-- Social lead sourcing: Reddit read-only search for daily prospecting workflows
-- Testing: `pytest` with `pytest-cov`
-- Containerization: Docker
-- Deployment target: Railway for the API, Vercel for the web frontend
+- Read `HANDOFF.md` at the start of a new session if it exists.
+- Keep domain logic in Python (`src/domain`, `src/application`); keep the web app as a UI/API client.
+- Preserve hexagonal boundaries and SOLID principles.
+- Do not duplicate core business logic in TypeScript.
+- Update this file when the stack, architecture, deployment model, or core workflows materially change.
+- Refresh `Fast Start` at the end of each meaningful session.
+
+## Stack
+
+- Backend: Python 3.12, `uv`, FastAPI, PostgreSQL (`psycopg`)
+- Frontend: Next.js, TypeScript, Tailwind, `shadcn/ui`
+- Auth: Clerk with internal Postgres-backed users
+- Billing: Stripe
+- Notifications: Telegram + SMTP email
+- AI: OpenAI API
+- Deploy: Railway (API), Vercel (web)
+- Tests: `pytest`, Playwright
 
 ## Architecture
 
-This repo uses a hexagonal, ports-and-adapters style:
+- `src/domain`: pure business rules and entities
+- `src/application`: use-cases, DTOs, ports
+- `src/adapters`: HTTP, persistence, auth, billing, notifications, external integrations
+- `web/`: authenticated SaaS UI
 
-- `src/domain`: business entities and pure domain logic
-- `src/application`: use-cases and port interfaces
-- `src/adapters`: auth, persistence, notifications, market-data, and HTTP API delivery
-- `web/`: Next.js application acting as the primary user-facing adapter
-
-Use hexagonal architecture for new features and refactors. Keep domain logic independent from frameworks, I/O, and third-party services by expressing integrations through ports and implementing them in adapters.
-
-Follow SOLID principles in all code changes:
-
-- Single Responsibility Principle
-- Open/Closed Principle
-- Liskov Substitution Principle
-- Interface Segregation Principle
-- Dependency Inversion Principle
+Python is the source of truth for product logic. The web app should only cross the boundary through explicit API contracts.
 
 ## Common Commands
 
 ```bash
 uv sync
 uv run uvicorn src.adapters.api.app:app --reload
-./scripts/dev.sh
+uv run pytest
 ./scripts/deploy_api.sh
 ./scripts/deploy_web.sh
 ./scripts/deploy_prod.sh
-cp .env.example .env
-pytest
-cd web && npm install
 cd web && npm run dev
-cd web && npm run typecheck
+cd web && rm -rf .next && npm run typecheck
 cd web && npm run build
 cd web && npm run e2e
 ```
 
-## Product Direction
+## Key API Surface
 
-Python remains the source of truth for domain logic and application use-cases. The Next.js app is the primary product UI and communicates with Python only through explicit API boundaries.
-
-### Responsibility Split
-
-- `src/domain`: pure business rules, entities, calculations, policies, and invariants in Python
-- `src/application`: Python use-cases, DTOs, and port definitions
-- `src/adapters`: Python adapters for persistence, external APIs, notifications, auth, and HTTP API delivery
-- `web/`: Next.js application for authenticated SaaS UI
-
-### Current API Surface
-
-The backend exposes these routes from `src/adapters/api/app.py`:
-
-- `GET /healthz`
-- `GET /readyz`
-- `GET /api/settings/bootstrap`
-- `GET /api/session`
-- `GET /api/dashboard`
-- `GET /api/account/settings`
-- `PUT /api/account/settings`
-- `GET /api/account/billing`
-- `POST /api/account/billing/checkout`
-- `POST /api/account/billing/portal`
-- `GET /api/alerts/history`
-- `POST /api/crm/import/preview`
-- `POST /api/crm/import`
-- `GET /api/internal/founder-code-requests`
-
-Notes:
-
-- `account/settings` and `alerts/history` use a Postgres-backed personalization adapter when `DATABASE_URL` is configured.
-- Stripe billing routes are enabled when `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID`, and `DATABASE_URL` are configured on the API service.
-- The in-memory personalization adapter remains available as a fallback for local or isolated test contexts.
-- The Next.js app supports sign-in bootstrap, dashboard rendering, interactive dashboard filters, editable settings, refreshable alert history, and richer chart rendering on top of the Python API contracts.
-- The CRM surface now supports CSV and Google Sheets import preview plus commit flows, with header normalization, duplicate detection, and imported lead mapping into the queue and timeline.
-- API responses include `X-Request-ID` for request tracing.
-
-## Execution Checklist
-
-- [x] Move decision-making logic out of the retired Streamlit adapter and into `src/domain` or `src/application`.
-- [x] Introduce Python DTOs for frontend-safe dashboard responses instead of leaking UI-specific shapes.
-- [x] Add a Python HTTP adapter layer under `src/adapters/api/`.
-- [x] Define initial API routes for session bootstrap, dashboard data, alerts, and settings.
-- [x] Add contract tests for those API routes.
-- [x] Create `web/` frontend scaffold for Next.js + TypeScript.
-- [x] Add Tailwind CSS base setup in the frontend scaffold.
-- [x] Add `shadcn/ui`-ready aliases and component configuration.
-- [x] Add shared frontend app shell, navigation, and authenticated layout.
-- [x] Implement typed API client utilities in `web/lib/`.
-- [x] Implement sign-in/session bootstrap flow against the Python backend.
-- [x] Rebuild the dashboard overview in Next.js using backend API responses.
-- [x] Rebuild chart, alerts, and settings flows in the Next.js UI.
-- [x] Add end-to-end tests for critical user journeys.
-- [x] Cut traffic from Streamlit to Next.js and remove the Streamlit runtime.
+- Health/session/dashboard/settings/billing routes are live.
+- CRM routes are live, including:
+  - `GET /api/crm/followups`
+  - `PATCH /api/crm/followups/{id}`
+  - `POST /api/crm/import/preview`
+  - `POST /api/crm/import`
+  - `GET /api/crm/intake-channel`
+- Internal founder-code bridge route is live:
+  - `GET /api/internal/founder-code-requests`
 
 ## Deployment Notes
 
-- Railway deploys the Python API from the repo root using `Dockerfile`, `railway.toml`, and `scripts/start_railway.sh`.
-- Vercel should use `web/` as the frontend project root.
-- Preferred release helpers:
-  - `./scripts/deploy_api.sh`
-  - `./scripts/deploy_web.sh`
-  - `./scripts/deploy_prod.sh`
-- Required frontend deployment env: `BRIVOLY_API_BASE_URL` pointing at the deployed Railway API origin.
-- Required shared/auth env depends on environment:
-  - API service: `DATABASE_URL`, Clerk variables, `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID`, optional `STRIPE_PORTAL_CONFIGURATION_ID`, optional Telegram variables
-  - Frontend service: `BRIVOLY_API_BASE_URL`, `APP_BASE_URL`, Clerk publishable/sign-in/sign-up values as needed by the sign-in bridge
-- Local verification completed for the current split:
+- Railway deploys the API from repo root using `Dockerfile`, `railway.toml`, and `scripts/start_railway.sh`.
+- Vercel uses `web/` as project root.
+- Important envs:
+  - API: `DATABASE_URL`, Clerk vars, Stripe vars, Telegram vars, `APP_OPENAI_API_KEY`/`OPENAI_API_KEY`
+  - Web: `BRIVOLY_API_BASE_URL`, `APP_BASE_URL`, Clerk frontend vars
+- Preferred smoke checks:
   - `uv run pytest`
-  - `cd web && npm run typecheck`
+  - `cd web && rm -rf .next && npm run typecheck`
   - `cd web && npm run build`
   - `cd web && npm run e2e`
-  - `docker build -t trade-api-deploycheck .`
-  - `docker run ... trade-api-deploycheck` returning `GET /healthz -> {"status":"ok"}`
-  - `uv run pytest` now includes a real `uvicorn` smoke test for `/healthz`, `/readyz`, and bootstrap routes
-- Use `.env.example` as the baseline local/shared environment template.
-- After the first hosted Railway deploy, `./scripts/smoke_hosted.sh <railway-api-url>` can verify `/healthz`, `/readyz`, and bootstrap responses quickly.
-
-## Directory Direction
-
-```text
-src/
-  domain/
-  application/
-  adapters/
-    api/
-    auth/
-    billing/
-    persistence/
-    notifications/
-    market_data/
-web/
-  app/
-  components/
-  lib/
-  public/
-```
-
-## Non-Goals
-
-- Do not move domain rules into Next.js server actions or client components.
-- Do not duplicate calculation logic across Python and TypeScript.
-- Do not couple frontend components directly to database structure.
-- Do not break hexagonal boundaries just to speed up delivery.
-
-## Maintenance Rule
-
-Keep this file up to date whenever the stack, deployment model, architecture, or core tooling changes. Update it when adding or removing major frameworks, infrastructure dependencies, auth providers, databases, package managers, or primary developer workflows.
 
 ## Fast Start
 
-Use this section to give the next session a fast, practical starting point. Refresh it at the end of every meaningful session so a new session can get oriented quickly without re-discovering the current product state.
+### Current Product
 
-### Current Product Progress
-
-- The product is now a multi-surface SaaS app with two active tracks:
-  - `crash-monitor` for market risk monitoring
-  - `crm` for the new greenfield CRM wedge
-- The CRM direction is currently the main build focus.
-- The CRM app already has:
-  - a homepage portal entry
-  - an authenticated `/crm` workspace
-  - a lead follow-up queue
-  - complete and snooze/reschedule actions
-  - contact timeline history per lead
-  - lightweight internal note capture
-  - CSV, XLSX, and XLS upload import preview and commit
-  - Google Sheets import preview and commit
-  - messy header normalization and duplicate detection before import
-  - guided import mapping with inline remapping before commit
-  - AI-assisted header rescue when no recognizable CRM headers are found in a spreadsheet
-  - interactive AI clarification questions during import when mapping confidence is still weak
-  - imported owner visibility in the queue and memory panel
-  - a paid-only AI Intake Profile foundation in CRM
-  - per-user AI intake prompts stored with account settings
-  - per-user preferred import-format memory stored with account settings
-  - per-user image-intake channel preferences stored with account settings
-  - per-user image-intake routing notes stored with account settings
-  - first-login business profile onboarding with a skip-for-now path
-  - persisted business name, website, logo, and auto-email sender naming
-  - paid AI note-image upload support inside the CRM import flow
-  - remote Telegram note capture with per-user signed `/intake ...` captions
-  - a clearer signed-in versus signed-out portal state
-  - a more explicit and welcoming sign-in handoff
-- The current CRM wedge is:
+- Brivoly has two live surfaces:
+  - `crash-monitor`
+  - `crm`
+- Current main focus: CRM.
+- Current CRM wedge:
   - follow-up-first
   - spreadsheet-friendly
   - relationship-memory oriented
-  - aimed at operators, agencies, and similar SMB workflows
+  - aimed at operators, agencies, and SMB service workflows
 
-### Current Agent Progress
+### CRM State
 
-- The prospect agent is being used as a research partner to guide CRM direction.
-- The prospecting profile is tuned toward `crm_direction`.
-- Prospect discovery now spans:
-  - Reddit
-  - Hacker News
-  - broad public web search
-  - Indie Hackers
-  - review sites like G2, Capterra, and Shopify app listings
-  - X
-  - public Discord discovery
-- Cooperative runs have repeatedly reinforced:
+- `/crm` is authenticated and production live.
+- Current CRM capabilities:
+  - follow-up queue
+  - complete and snooze actions
+  - contact timeline + internal notes
+  - CSV/XLSX/XLS/Google Sheets import
+  - guided field mapping
+  - duplicate detection + validation preview
+  - AI header rescue for messy spreadsheets
+  - interactive AI clarification questions when mapping is still ambiguous
+  - commit blocked until required clarification is resolved
+  - paid AI intake profile per user
+  - first-login business onboarding with skip-for-now path
+  - paid image-note intake
+  - Telegram remote note capture with signed `/intake ...` captions
+
+### Agent / Automation State
+
+- Prospect agent is a research partner for CRM direction.
+- Prospecting is tuned to `crm_direction`.
+- Repeated validated signals:
   - follow-up discipline
   - spreadsheet-held CRM workflows
   - pipeline hygiene
   - relationship memory
-- The strongest recurring adjacent idea is later `message / DM capture` into CRM, but that is still secondary to the core follow-up workflow.
-- The sentiment agent is live separately for ETF analysis and is not the main product direction.
-- Telegram now has a `/code` command that runs the cooperative prospect pass, makes a build/no-build judgment, and appends a structured recommendation to `var/autonomous_build_queue.jsonl` by default.
-- `/code <guidance>` should treat the trailing text as explicit founder direction unless it clearly harms the current goal of building a narrow, profitable CRM wedge.
-- `/code` requests are now also stored durably in Postgres so this always-on machine can mirror them into a local inbox.
-- Strong unguided prospect-agent build recommendations now use that same durable queue path, tagged as `agent:prospect`, so the server can hand off autonomous build suggestions to the local machine without inventing a second inbox.
+- Strong secondary idea, still not core: message / DM capture.
+- `/code` in Telegram can:
+  - take founder guidance
+  - run cooperative prospecting
+  - queue durable work items
+- Prospect-agent recommendations can also enter that same durable queue.
+- Local always-on automation is the main 24/7 path.
+- Local worker can sync/stage remote requests and launch headless `codex exec` runs.
+- Progress from remote runs is forwarded via Telegram/email.
+- Local app automation should prefer `APP_OPENAI_API_KEY` over `OPENAI_API_KEY`.
 
-### Current Automation Progress
+### Current Deployment / Verification Reality
 
-- Local automation is the primary reliable 24/7 path.
-- The local automation worker can run prospecting and operator briefing jobs continuously on this machine.
-- The operator briefing system can email the founder with:
-  - agent interaction summaries
-  - guidance received
-  - features/refinements shipped
-  - profitability progress
-- Prospecting automation cadence is currently set to every 12 hours, not every hour.
-- Each successful automated prospect run should trigger an operator briefing email; the separate scheduled operator briefing job is optional rather than the default.
-- Local app agents should prefer `APP_OPENAI_API_KEY` over `OPENAI_API_KEY` so app automation can use a dedicated credential path separate from the editor/Codex environment.
-- Remote CRM note capture now works through Telegram first:
-  - the CRM page exposes a per-user signed intake caption
-  - the Telegram webhook can accept photo or image-document uploads with that caption
-  - the image is interpreted through the paid AI intake path and imported into the user’s CRM queue
-  - `CRM_INTAKE_SECRET` should be configured anywhere the API needs to validate those captions
-- `/code` does not let Railway self-edit the repo. It truthfully triggers research, queues a build brief, and notifies the founder; actual code changes still happen through this coding agent.
-- The newest bridge layer is a founder-code sync job: Railway stores both `/code` requests and prospect-agent build prompts, and the local automation worker can poll them into `var/founder_code_inbox.jsonl` when the sync env vars are configured.
-- This bridge has now been proven end to end with a live production `/prospect` run; the first mirrored `agent:prospect` prompt recommended `CSV and Google Sheets import`.
-- The local worker now also stages newly synced remote instructions into `var/founder_code_pending.jsonl` and writes the newest one to `var/founder_code_latest.json`, so remote requests are surfaced automatically instead of waiting for manual inbox inspection.
-- The local worker can now optionally launch one headless `codex exec` run at a time from that pending queue, tracked via `var/founder_code_active.json` and `var/founder_code_executor.pid`, so remote requests can become live autonomous work on this machine.
-- Headless remote Codex runs now use `codex exec --json`, and the local worker forwards mid-run `agent_message` events as progress updates so the founder can see more of what would normally appear in the local chat, not just `started` / `finished` / `failed`.
-
-### Current Deployment Status
-
-- API deploy target: Railway
-- Frontend deploy target: Vercel
-- Latest autonomous CRM follow-up action feature has already been:
-  - implemented
-  - tested
-  - deployed to Railway and Vercel
-  - logged into `product_updates.jsonl`
-  - summarized by email through the operator briefing flow
-- The latest CRM wedge expansion is spreadsheet import:
-  - CSV upload support
-  - Google Sheets URL support
-  - preview with validation issues and duplicate detection
-  - import into the live follow-up queue and timeline memory
-- The latest CRM onboarding refinement is guided import mapping:
-  - preview now exposes original headers and Brivoly's suggested field mapping
-  - users can remap ambiguous columns inline without editing the source sheet first
-  - imports require a refreshed preview after mapping changes so validation stays trustworthy
-- The latest CRM AI-intake refinement is spreadsheet header rescue:
-  - when import preview cannot recognize CRM headers, paid AI assistance can infer likely CRM field mappings from messy headers and sample rows
-  - manual field-mapping overrides still win over AI suggestions
-  - already-good imports skip the AI path entirely
-- The latest CRM AI-intake UX refinement is interactive clarification:
-  - when AI can draft a mapping but still sees ambiguity, the import preview now returns a short assistant message plus 1-3 multiple-choice clarification questions
-  - answering a clarification reruns preview automatically so the user gives minimal input instead of hand-editing every column
-  - commit is blocked while required clarification is still unresolved
-- The latest CRM reliability refinement is hardened spreadsheet parsing:
-  - messy CSV exports with problematic line endings no longer crash preview or commit
-  - native Excel uploads now normalize into the same preview/import flow
-  - malformed spreadsheet files now return a user-facing validation error instead of a backend 500
-- The latest CRM monetization/intake foundation is AI Intake Profile:
-  - CRM now exposes a per-user AI intake prompt and preferred format memory
-  - these settings persist through the existing account-settings persistence layer, including Postgres
-  - the CRM workspace now shows advanced AI intake as paywalled unless billing is active or trialing
-  - this is only the control-plane foundation, not full AI file/image ingestion yet
-- The latest frontend UX improvement is much more explicit login-state messaging across the portal hub, CRM entry page, sign-in screen, and crash-monitor shell, including stronger guest-versus-signed-in banners and clearer next-step copy.
-- The latest frontend polish fix is that the CRM portal label now uses the Brivoly logo blue/navy brand colors instead of the old red accent.
-- The latest platform automation addition is the Telegram `/code` workflow on the API side; it is production-facing and should be kept in sync with the fast-start notes and README.
-- The newest reliability fix is that `/code` and `/prospect` now tolerate SMTP failure as long as Telegram delivery still works.
-- The newest remote-autonomy bridge is that production prospect runs can now queue strong build recommendations into the same durable inbox path used for founder `/code` requests.
-
-### Current Verification Notes
-
-- Backend verification standard:
+- API target: Railway
+- Web target: Vercel
+- Local typecheck is safest with:
+  - `cd web && rm -rf .next && npm run typecheck`
+- Current reliable verification standard:
   - `uv run pytest`
-- Frontend verification standard:
-  - `cd web && npm run typecheck`
   - `cd web && npm run build`
   - `cd web && npm run e2e`
-- `web` typecheck now clears `tsconfig.tsbuildinfo` first to avoid stale `.next/types` false negatives.
-- Current frontend e2e coverage now assumes `/` is the portal hub and `/crash-monitor` is the authenticated dashboard route.
-- Current CRM e2e coverage now also exercises spreadsheet import preview and commit through the local proxy routes.
 
-### Next Recommended Product Moves
+### Next Likely Moves
 
-- Highest-conviction next CRM features:
-  - actual AI-assisted messy-file and image interpretation behind the paid gate
-  - richer handoff history and stage memory
-  - deeper spreadsheet cleanup and field-mapping controls after preview
-  - consultant / agency specific templates or checklists
-- Broader CRM expansion should stay constrained until the follow-up-first wedge shows stronger pull.
+- Highest-conviction CRM next steps:
+  - deeper AI-assisted messy file / image intake behind the paid gate
+  - richer stage memory / handoff history
+  - spreadsheet cleanup and field-mapping controls after preview
+  - consultant / agency templates
 
 ## Autonomy Rule
 
-- The agent should proactively implement the next high-conviction feature set when product direction is already clear, without waiting for explicit step-by-step instructions.
-- Each autonomous change set should include implementation, local verification, commit, push, and deployment when the affected surface is production-facing and deployment credentials are already available.
-- The agent should use existing email and operator-briefing mechanisms to keep the founder updated on shipped work, validation learnings, and profitability progress.
-- The agent should still pause when a change would introduce hidden risk, destructive actions, major architectural drift, or unclear product tradeoffs.
-- The agent should update the `Fast Start` section in this file at the end of each meaningful session so the next session begins with a current snapshot.
+- If product direction is already clear, proactively implement the next high-conviction feature set.
+- Each coherent change set should include:
+  - implementation
+  - local verification
+  - commit
+  - push
+  - deploy when the affected surface is live and credentials already exist
+- Use existing briefing/email mechanisms to keep the founder updated.
+- Pause only for hidden-risk, destructive, or high-ambiguity changes.
 
 ## Handoff Rule
 
-Always read `HANDOFF.md` at the start of a new session if it exists.
-
-When the user writes the exact prompt `handoff`, create or overwrite `HANDOFF.md` with the information needed for a useful next-session handoff. Include at minimum:
+If the user writes the exact prompt `handoff`, create or overwrite `HANDOFF.md` with:
 
 - current project state
-- what was completed in the current session
+- what was completed this session
 - what is still in progress
 - next recommended steps
-- important environment or run commands
+- important run/deploy commands
 - known issues, risks, or caveats
-- any active architectural or deployment assumptions
+- active architectural or deployment assumptions
