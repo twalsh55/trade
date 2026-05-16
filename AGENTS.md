@@ -227,6 +227,7 @@ Use this section to give the next session a fast, practical starting point. Refr
 - Local app agents should prefer `APP_OPENAI_API_KEY` over `OPENAI_API_KEY` so app automation can use a dedicated credential path separate from the editor/Codex environment.
 - `/code` does not let Railway self-edit the repo. It truthfully triggers research, queues a build brief, and notifies the founder; actual code changes still happen through this coding agent.
 - The newest bridge layer is a founder-code sync job: Railway stores both `/code` requests and prospect-agent build prompts, and the local automation worker can poll them into `var/founder_code_inbox.jsonl` when the sync env vars are configured.
+- This bridge has now been proven end to end with a live production `/prospect` run; the first mirrored `agent:prospect` prompt recommended `CSV and Google Sheets import`.
 
 ### Current Deployment Status
 
