@@ -7,6 +7,7 @@ from src.adapters.prospecting.runtime import (
     build_drafter_from_env,
     build_digest_delivery_from_env,
     build_email_notifier_from_env,
+    get_app_openai_api_key,
     build_lead_source_from_env,
     build_usage_log_from_env,
     build_telegram_digest_notifier_from_env,
@@ -73,23 +74,30 @@ def test_build_email_notifier_from_env_builds_configured_notifier(monkeypatch) -
 
 
 def test_build_drafter_from_env_uses_template_without_api_key(monkeypatch) -> None:
+    monkeypatch.delenv("APP_OPENAI_API_KEY", raising=False)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     assert build_drafter_from_env().__class__.__name__ == "TemplateProspectDrafter"
 
 
 def test_build_drafter_from_env_uses_openai_when_api_key_present(monkeypatch) -> None:
-    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-realistic-key-1234567890")
+    monkeypatch.setenv("APP_OPENAI_API_KEY", "sk-test-realistic-key-1234567890")
     drafter = build_drafter_from_env()
     assert drafter.__class__.__name__ == "OpenAIProspectDrafter"
     assert drafter.model == "gpt-5.4"
 
 
 def test_build_drafter_from_env_uses_template_for_placeholder_api_key(monkeypatch) -> None:
-    monkeypatch.setenv("OPENAI_API_KEY", "sk-...")
+    monkeypatch.setenv("APP_OPENAI_API_KEY", "sk-...")
     assert build_drafter_from_env().__class__.__name__ == "TemplateProspectDrafter"
     assert is_placeholder_openai_key("sk-...") is True
     assert is_placeholder_openai_key("your-openai-api-key") is True
     assert is_placeholder_openai_key("sk-test-realistic-key-1234567890") is False
+
+
+def test_get_app_openai_api_key_prefers_app_key(monkeypatch) -> None:
+    monkeypatch.setenv("APP_OPENAI_API_KEY", "app-key")
+    monkeypatch.setenv("OPENAI_API_KEY", "fallback-key")
+    assert get_app_openai_api_key() == "app-key"
 
 
 def test_build_lead_source_from_env_uses_custom_user_agent(monkeypatch) -> None:
@@ -173,14 +181,14 @@ def test_build_digest_delivery_from_env_requires_at_least_one_channel(monkeypatc
 def test_collect_prospecting_config_errors_reports_missing_and_invalid_fields(monkeypatch) -> None:
     for name in ("SMTP_HOST", "SMTP_USERNAME", "SMTP_PASSWORD", "SMTP_FROM_EMAIL", "TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID"):
         monkeypatch.delenv(name, raising=False)
-    monkeypatch.setenv("OPENAI_API_KEY", "sk-...")
+    monkeypatch.setenv("APP_OPENAI_API_KEY", "sk-...")
     monkeypatch.setenv("PROSPECT_MAX_MATCHES", "abc")
     monkeypatch.setenv("PROSPECT_PERIODIC_INTERVAL_MINUTES", "bad")
     monkeypatch.setenv("SMTP_PORT", "0")
 
     errors = collect_prospecting_config_errors()
 
-    assert "OPENAI_API_KEY looks like a placeholder. Replace it with a real OpenAI API key." in errors
+    assert "App OpenAI key looks like a placeholder. Set APP_OPENAI_API_KEY or a real OPENAI_API_KEY." in errors
     assert "Missing SMTP delivery settings and Telegram delivery fallback is unavailable" in errors
     assert "PROSPECT_MAX_MATCHES must be an integer" in errors
     assert "PROSPECT_PERIODIC_INTERVAL_MINUTES must be an integer" in errors
@@ -190,6 +198,7 @@ def test_collect_prospecting_config_errors_reports_missing_and_invalid_fields(mo
 def test_collect_prospecting_config_errors_allows_telegram_fallback(monkeypatch) -> None:
     for name in ("SMTP_HOST", "SMTP_USERNAME", "SMTP_PASSWORD", "SMTP_FROM_EMAIL"):
         monkeypatch.delenv(name, raising=False)
+    monkeypatch.delenv("APP_OPENAI_API_KEY", raising=False)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "bot")
     monkeypatch.setenv("TELEGRAM_CHAT_ID", "chat")
@@ -262,6 +271,8 @@ def test_run_prospecting_job_builds_and_executes_use_case(monkeypatch) -> None:
     monkeypatch.setattr("src.adapters.prospecting.runtime.build_drafter_from_env", lambda: drafter)
     monkeypatch.setattr("src.adapters.prospecting.runtime.build_digest_delivery_from_env", lambda: email_delivery)
     monkeypatch.setattr("src.adapters.prospecting.runtime.build_usage_log_from_env", lambda: None)
+    briefing_triggers: list[str] = []
+    monkeypatch.setattr("src.adapters.prospecting.runtime.run_operator_briefing_job", lambda trigger_label="scheduled update": briefing_triggers.append(trigger_label))
 
     class FakeUseCase:
         def __init__(self, lead_source, drafter, email_delivery) -> None:  # type: ignore[no-untyped-def]
@@ -279,6 +290,7 @@ def test_run_prospecting_job_builds_and_executes_use_case(monkeypatch) -> None:
     monkeypatch.setattr("src.adapters.prospecting.runtime.RunDailyProspectingUseCase", FakeUseCase)
 
     assert run_prospecting_job() is digest
+    assert briefing_triggers == ["prospect run"]
 
 
 def test_run_prospecting_job_appends_usage_log_when_configured(monkeypatch) -> None:
@@ -299,6 +311,7 @@ def test_run_prospecting_job_appends_usage_log_when_configured(monkeypatch) -> N
     monkeypatch.setattr("src.adapters.prospecting.runtime.build_lead_source_from_env", lambda: object())
     monkeypatch.setattr("src.adapters.prospecting.runtime.build_drafter_from_env", lambda: object())
     monkeypatch.setattr("src.adapters.prospecting.runtime.build_digest_delivery_from_env", lambda: object())
+    monkeypatch.setattr("src.adapters.prospecting.runtime.run_operator_briefing_job", lambda trigger_label="scheduled update": None)
 
     class FakeUseCase:
         def __init__(self, lead_source, drafter, email_delivery) -> None:  # type: ignore[no-untyped-def]
@@ -319,6 +332,43 @@ def test_run_prospecting_job_appends_usage_log_when_configured(monkeypatch) -> N
 
     assert run_prospecting_job() is digest
     assert appended == [digest]
+
+
+def test_run_prospecting_job_can_disable_operator_briefing(monkeypatch) -> None:
+    config = object()
+    digest = type(
+        "Digest",
+        (),
+        {
+            "generated_at": datetime(2026, 5, 14, tzinfo=UTC),
+            "profile": "crm_direction",
+            "scanned_post_count": 5,
+            "shortlisted_count": 2,
+            "shortlisted_posts": (),
+            "token_usage": None,
+        },
+    )()
+    monkeypatch.setenv("PROSPECT_SEND_OPERATOR_BRIEFING", "false")
+    monkeypatch.setattr("src.adapters.prospecting.runtime.build_config_from_env", lambda: config)
+    monkeypatch.setattr("src.adapters.prospecting.runtime.build_lead_source_from_env", lambda: object())
+    monkeypatch.setattr("src.adapters.prospecting.runtime.build_drafter_from_env", lambda: object())
+    monkeypatch.setattr("src.adapters.prospecting.runtime.build_digest_delivery_from_env", lambda: object())
+    monkeypatch.setattr("src.adapters.prospecting.runtime.build_usage_log_from_env", lambda: None)
+    briefing_triggers: list[str] = []
+    monkeypatch.setattr("src.adapters.prospecting.runtime.run_operator_briefing_job", lambda trigger_label="scheduled update": briefing_triggers.append(trigger_label))
+
+    class FakeUseCase:
+        def __init__(self, lead_source, drafter, email_delivery) -> None:  # type: ignore[no-untyped-def]
+            pass
+
+        def execute(self, passed_config):  # type: ignore[no-untyped-def]
+            assert passed_config is config
+            return digest
+
+    monkeypatch.setattr("src.adapters.prospecting.runtime.RunDailyProspectingUseCase", FakeUseCase)
+
+    assert run_prospecting_job() is digest
+    assert briefing_triggers == []
 
 
 def test_build_usage_log_from_env_respects_toggle_and_path(monkeypatch, tmp_path) -> None:

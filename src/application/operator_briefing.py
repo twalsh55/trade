@@ -81,6 +81,7 @@ class DailyOperatorBriefingConfig:
     recipient_email: str
     lookback_hours: int = 24
     goal: str = DEFAULT_OPERATOR_BRIEFING_GOAL
+    trigger_label: str = "scheduled update"
 
 
 @dataclass(frozen=True, slots=True)
@@ -144,7 +145,7 @@ class RunDailyOperatorBriefingUseCase:
         )
         self.email_delivery.send_email(
             recipient=config.recipient_email,
-            subject=f"Daily operator briefing for {generated_at.date().isoformat()}",
+            subject=f"Operator briefing ({config.trigger_label}) for {generated_at.date().isoformat()}",
             text_body=format_operator_briefing_email(config, briefing),
         )
         return briefing
@@ -153,7 +154,8 @@ class RunDailyOperatorBriefingUseCase:
 def format_operator_briefing_email(config: DailyOperatorBriefingConfig, briefing: OperatorBriefing) -> str:
     model_path, intelligence_setting = _describe_model_usage(briefing.token_usage)
     lines = [
-        f"Daily operator briefing generated at {briefing.generated_at.isoformat()}",
+        f"Operator briefing generated at {briefing.generated_at.isoformat()}",
+        f"Trigger: {config.trigger_label}",
         f"Lookback window start: {briefing.lookback_started_at.isoformat()}",
         f"Goal: {config.goal}",
         "",

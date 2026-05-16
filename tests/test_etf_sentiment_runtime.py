@@ -64,10 +64,11 @@ def test_load_etf_sentiment_prompt_rejects_missing_and_empty_files(tmp_path, mon
 
 
 def test_build_etf_sentiment_agent_from_env_switches_modes(monkeypatch) -> None:
+    monkeypatch.delenv("APP_OPENAI_API_KEY", raising=False)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     assert build_etf_sentiment_agent_from_env().__class__.__name__ == "TemplateETFSentimentAgent"
 
-    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.setenv("APP_OPENAI_API_KEY", "sk-test")
     monkeypatch.setenv("ETF_SENTIMENT_OPENAI_MODEL", "gpt-5-mini")
     monkeypatch.setenv("ETF_SENTIMENT_OPENAI_MAX_OUTPUT_TOKENS", "123")
     agent = build_etf_sentiment_agent_from_env()

@@ -73,7 +73,7 @@ from src.application.dto import (
 from src.application.use_cases import BuildCrashDashboardUseCase
 from src.domain.auth import User
 from src.domain.models import DEFAULT_UNIVERSE
-from src.env_utils import load_env_file
+from src.env_utils import get_first_configured_env, load_env_file
 
 api_logger = logging.getLogger("brivoly.api")
 
@@ -534,7 +534,7 @@ def _build_telegram_notifier() -> TelegramNotifier:
 
 def _build_prospecting_status_message() -> str:
     errors = collect_prospecting_config_errors()
-    openai_enabled = bool(os.getenv("OPENAI_API_KEY", "").strip())
+    openai_enabled = bool(get_first_configured_env("APP_OPENAI_API_KEY", "OPENAI_API_KEY"))
     if errors:
         return "Prospecting agent is not ready:\n- " + "\n- ".join(errors)
     model_line = (
@@ -562,7 +562,7 @@ def _run_prospecting_from_telegram(notifier: TelegramNotifier) -> None:
 
 def _build_etf_sentiment_status_message() -> str:
     errors = collect_etf_sentiment_config_errors()
-    openai_enabled = bool(os.getenv("OPENAI_API_KEY", "").strip())
+    openai_enabled = bool(get_first_configured_env("APP_OPENAI_API_KEY", "OPENAI_API_KEY"))
     if errors:
         return "ETF sentiment agent is not ready:\n- " + "\n- ".join(errors)
     model_line = (

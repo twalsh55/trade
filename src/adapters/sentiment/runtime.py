@@ -19,6 +19,7 @@ from src.adapters.sentiment.sources.google_news_rss import GoogleNewsRSSSource, 
 from src.adapters.sentiment.sources.reddit_discussion import RedditDiscussionSource
 from src.adapters.sentiment.sources.x_search import XDiscussionSource
 from src.application.ports import EmailDeliveryPort
+from src.env_utils import get_first_configured_env
 
 DEFAULT_ETF_PROMPT_FILE = Path(__file__).resolve().parents[3] / "prompts" / "ETF_SENTIMENT.md"
 DEFAULT_ETF_UNIVERSE: tuple[tuple[str, str], ...] = (
@@ -96,7 +97,7 @@ def load_etf_sentiment_prompt() -> str:
 
 
 def build_etf_sentiment_agent_from_env() -> OpenAIETFSentimentAgent | TemplateETFSentimentAgent:
-    api_key = os.getenv("OPENAI_API_KEY", "").strip()
+    api_key = get_first_configured_env("APP_OPENAI_API_KEY", "OPENAI_API_KEY")
     if not api_key:
         return TemplateETFSentimentAgent()
     return OpenAIETFSentimentAgent(

@@ -14,7 +14,7 @@ from pathlib import Path
 from src.adapters.notifications.smtp_email_notifier import EmailNotificationError
 from src.adapters.llm.openai_prospect_drafter import OpenAIProspectDrafterError
 from src.adapters.operator_briefing.runtime import run_daily_operator_briefing_job
-from src.adapters.prospecting.runtime import is_placeholder_openai_key, parse_positive_int, run_prospecting_job
+from src.adapters.prospecting.runtime import get_app_openai_api_key, is_placeholder_openai_key, parse_positive_int, run_prospecting_job
 from src.adapters.social.reddit_lead_source import RedditLeadSourceError
 from src.application.automation import (
     AutomationHeartbeat,
@@ -99,12 +99,15 @@ def build_jobs_from_env() -> tuple[AutomationJob, ...]:
             interval=timedelta(minutes=parse_positive_int("AUTOMATION_PROSPECT_INTERVAL_MINUTES", default=720)),
             runner=lambda: _run_job_with_timeout("prospect_hourly", _run_prospect_job, timeout_seconds),
         ),
-        AutomationJob(
-            name="operator_briefing_daily",
-            interval=timedelta(hours=parse_positive_int("AUTOMATION_OPERATOR_BRIEFING_INTERVAL_HOURS", default=24)),
-            runner=lambda: _run_job_with_timeout("operator_briefing_daily", _run_operator_briefing_job, timeout_seconds),
-        ),
     ]
+    if os.getenv("AUTOMATION_ENABLE_SCHEDULED_OPERATOR_BRIEFING", "false").strip().lower() == "true":
+        jobs.append(
+            AutomationJob(
+                name="operator_briefing_daily",
+                interval=timedelta(hours=parse_positive_int("AUTOMATION_OPERATOR_BRIEFING_INTERVAL_HOURS", default=24)),
+                runner=lambda: _run_job_with_timeout("operator_briefing_daily", _run_operator_briefing_job, timeout_seconds),
+            )
+        )
     if os.getenv("AUTOMATION_ENABLE_SENTIMENT_JOB", "false").strip().lower() == "true":
         from src.adapters.sentiment.runtime import run_etf_sentiment_job
 
@@ -193,14 +196,15 @@ def _run_prospect_job() -> AutomationJobResult:
         fallback_suffix = " fallback=template"
     except (ValueError, EmailNotificationError, RedditLeadSourceError, RuntimeError) as exc:
         return AutomationJobResult(status="failed", detail=str(exc))
-    openai_api_key = os.getenv("OPENAI_API_KEY", "").strip()
+    openai_api_key = get_app_openai_api_key()
     if openai_api_key and is_placeholder_openai_key(openai_api_key):
         placeholder_suffix = " openai_key=placeholder"
     return AutomationJobResult(
         status="ok",
         detail=(
             f"profile={digest.profile} scanned={digest.scanned_post_count} shortlisted={digest.shortlisted_count} "
-            f"token_usage={_format_token_usage(digest.token_usage)}{fallback_suffix}{placeholder_suffix}"
+            f"token_usage={_format_token_usage(digest.token_usage)} briefing=sent"
+            f"{fallback_suffix}{placeholder_suffix}"
         ),
     )
 
@@ -234,15 +238,21 @@ def _format_token_usage(usage) -> str:  # type: ignore[no-untyped-def]
 
 
 def _run_prospect_with_template_fallback():
-    original_api_key = os.environ.get("OPENAI_API_KEY")
+    original_app_api_key = os.environ.get("APP_OPENAI_API_KEY")
+    original_openai_api_key = os.environ.get("OPENAI_API_KEY")
+    os.environ["APP_OPENAI_API_KEY"] = ""
     os.environ["OPENAI_API_KEY"] = ""
     try:
         return run_prospecting_job()
     finally:
-        if original_api_key is None:
+        if original_app_api_key is None:
+            os.environ.pop("APP_OPENAI_API_KEY", None)
+        else:
+            os.environ["APP_OPENAI_API_KEY"] = original_app_api_key
+        if original_openai_api_key is None:
             os.environ.pop("OPENAI_API_KEY", None)
         else:
-            os.environ["OPENAI_API_KEY"] = original_api_key
+            os.environ["OPENAI_API_KEY"] = original_openai_api_key
 
 
 def _run_job_with_timeout(job_name: str, runner, timeout_seconds: int) -> AutomationJobResult:  # type: ignore[no-untyped-def]

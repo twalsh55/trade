@@ -8,7 +8,7 @@ from src.adapters.notifications.composite_email_notifier import CompositeEmailNo
 from src.adapters.notifications.smtp_email_notifier import SMTPEmailNotifier
 from src.adapters.notifications.telegram_digest_notifier import TelegramDigestNotifier
 from src.adapters.notifications.telegram_notifier import TelegramNotifier
-from src.adapters.operator_briefing.runtime import append_prospect_digest_to_history
+from src.adapters.operator_briefing.runtime import append_prospect_digest_to_history, run_operator_briefing_job
 from src.adapters.prospecting.usage_log import ProspectUsageLog
 from src.adapters.social.composite_lead_source import CompositeLeadSource
 from src.adapters.social.discord_lead_source import DiscordLeadSource
@@ -25,8 +25,10 @@ from src.application.prospecting import (
     ProspectingDigest,
     RunDailyProspectingUseCase,
 )
+from src.env_utils import get_first_configured_env
 
 DEFAULT_RECIPIENT = "tom.mg.walsh@gmail.com"
+APP_OPENAI_ENV_NAMES = ("APP_OPENAI_API_KEY", "OPENAI_API_KEY")
 
 
 def is_placeholder_openai_key(api_key: str) -> bool:
@@ -84,7 +86,7 @@ def build_digest_delivery_from_env() -> EmailDeliveryPort:
 
 
 def build_drafter_from_env() -> OpenAIProspectDrafter | TemplateProspectDrafter:
-    api_key = os.getenv("OPENAI_API_KEY", "").strip()
+    api_key = get_app_openai_api_key()
     if not api_key or is_placeholder_openai_key(api_key):
         return TemplateProspectDrafter()
     return OpenAIProspectDrafter(
@@ -126,14 +128,16 @@ def run_prospecting_job() -> ProspectingDigest:
     if usage_log is not None:
         usage_log.append(digest)
     append_prospect_digest_to_history(digest)
+    if os.getenv("PROSPECT_SEND_OPERATOR_BRIEFING", "true").strip().lower() != "false":
+        run_operator_briefing_job(trigger_label="prospect run")
     return digest
 
 
 def collect_prospecting_config_errors() -> list[str]:
     errors: list[str] = []
-    raw_openai_key = os.getenv("OPENAI_API_KEY", "").strip()
+    raw_openai_key = get_app_openai_api_key()
     if raw_openai_key and is_placeholder_openai_key(raw_openai_key):
-        errors.append("OPENAI_API_KEY looks like a placeholder. Replace it with a real OpenAI API key.")
+        errors.append("App OpenAI key looks like a placeholder. Set APP_OPENAI_API_KEY or a real OPENAI_API_KEY.")
     if not has_configured_smtp_delivery() and not has_configured_telegram_delivery():
         errors.append("Missing SMTP delivery settings and Telegram delivery fallback is unavailable")
 
@@ -197,3 +201,7 @@ def has_configured_telegram_delivery() -> bool:
         os.getenv(name, "").strip()
         for name in ("TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID")
     )
+
+
+def get_app_openai_api_key() -> str:
+    return get_first_configured_env(*APP_OPENAI_ENV_NAMES)

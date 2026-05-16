@@ -109,8 +109,9 @@ def test_run_daily_operator_briefing_summarizes_runs_and_updates() -> None:
     assert "lining up with the strongest research themes" in briefing.profitability_assessment
     assert briefing.recommended_next_step.startswith("Add complete, snooze, and reminder workflows")
     assert email.sent[0][0] == "tom@example.com"
-    assert "Daily operator briefing" in email.sent[0][1]
+    assert "Operator briefing (scheduled update)" in email.sent[0][1]
     assert "Guidance received from the agent" in email.sent[0][2]
+    assert "Trigger: scheduled update" in email.sent[0][2]
     assert "Model path: gpt-5-nano" in email.sent[0][2]
     assert "Intelligence setting: live OpenAI reasoning" in email.sent[0][2]
 

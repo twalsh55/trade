@@ -178,10 +178,14 @@ def test_build_jobs_worker_and_run_worker_from_env(monkeypatch, tmp_path) -> Non
     monkeypatch.setenv("AUTOMATION_HEARTBEAT_FILE", str(tmp_path / "heartbeat.json"))
     jobs = build_jobs_from_env()
     assert jobs[0].interval == timedelta(minutes=720)
-    assert jobs[1].interval == timedelta(hours=12)
+    assert len(jobs) == 1
 
     worker = build_worker_from_env()
     assert worker.poll_seconds == 9
+
+    monkeypatch.setenv("AUTOMATION_ENABLE_SCHEDULED_OPERATOR_BRIEFING", "true")
+    jobs = build_jobs_from_env()
+    assert jobs[1].interval == timedelta(hours=12)
 
     monkeypatch.setenv("AUTOMATION_ENABLE_SENTIMENT_JOB", "true")
     monkeypatch.setenv("AUTOMATION_SENTIMENT_INTERVAL_HOURS", "6")
@@ -218,8 +222,9 @@ def test_automation_job_runners_report_success_and_failure(monkeypatch) -> None:
     result = _run_prospect_job()
     assert result.status == "ok"
     assert "profile=crm_direction" in result.detail
+    assert "briefing=sent" in result.detail
 
-    monkeypatch.setenv("OPENAI_API_KEY", "sk-...")
+    monkeypatch.setenv("APP_OPENAI_API_KEY", "sk-...")
     monkeypatch.setattr("src.adapters.automation.runtime.run_prospecting_job", lambda: digest)
     result = _run_prospect_job()
     assert "openai_key=placeholder" in result.detail
@@ -234,12 +239,12 @@ def test_automation_job_runners_report_success_and_failure(monkeypatch) -> None:
             )
         return digest
 
-    monkeypatch.setenv("OPENAI_API_KEY", "bad-key")
+    monkeypatch.setenv("APP_OPENAI_API_KEY", "bad-key")
     monkeypatch.setattr("src.adapters.automation.runtime.run_prospecting_job", flaky_prospect)
     result = _run_prospect_job()
     assert result.status == "ok"
     assert "fallback=template" in result.detail
-    assert os.environ["OPENAI_API_KEY"] == "bad-key"
+    assert os.environ["APP_OPENAI_API_KEY"] == "bad-key"
 
     monkeypatch.setenv("AUTOMATION_ALLOW_TEMPLATE_FALLBACK", "false")
     monkeypatch.setattr(
@@ -271,9 +276,11 @@ def test_automation_job_runners_report_success_and_failure(monkeypatch) -> None:
     assert _run_sentiment_job(lambda: None).status == "ok"
     assert _run_sentiment_job(lambda: (_ for _ in ()).throw(RuntimeError("bad"))).status == "failed"
     assert _format_token_usage(None) == "template-mode"
+    monkeypatch.delenv("APP_OPENAI_API_KEY", raising=False)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.setattr("src.adapters.automation.runtime.run_prospecting_job", lambda: digest)
     assert _run_prospect_with_template_fallback() == digest
+    assert "APP_OPENAI_API_KEY" not in os.environ
 
 
 def test_run_job_with_timeout_covers_success_and_timeout() -> None:

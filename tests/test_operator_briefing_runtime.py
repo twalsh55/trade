@@ -15,6 +15,7 @@ from src.adapters.operator_briefing.runtime import (
     parse_positive_int,
     required_env,
     run_daily_operator_briefing_job,
+    run_operator_briefing_job,
 )
 from src.application.operator_briefing import ProductUpdateRecord
 from src.application.prospecting import DraftedProspectEmail, ProspectAuditEntry, ProspectingDigest
@@ -156,3 +157,29 @@ def test_run_daily_operator_briefing_job_from_env(tmp_path, monkeypatch) -> None
 
     assert briefing.prospect_run_count == 1
     assert sent[0][0] == "tom@example.com"
+    assert "Operator briefing (daily schedule)" in sent[0][1]
+
+
+def test_run_operator_briefing_job_uses_custom_trigger_label(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("PROSPECT_RUN_LOG_FILE", str(tmp_path / "prospect_runs.jsonl"))
+    monkeypatch.setenv("PRODUCT_UPDATE_LOG_FILE", str(tmp_path / "product_updates.jsonl"))
+    monkeypatch.setenv("PROSPECT_EMAIL_RECIPIENT", "tom@example.com")
+    monkeypatch.setenv("SMTP_HOST", "smtp.example.com")
+    monkeypatch.setenv("SMTP_USERNAME", "user")
+    monkeypatch.setenv("SMTP_PASSWORD", "pass")
+    monkeypatch.setenv("SMTP_FROM_EMAIL", "from@example.com")
+
+    append_prospect_digest_to_history(build_digest())
+    sent = []
+
+    def fake_send_email(self, recipient: str, subject: str, text_body: str) -> None:
+        sent.append((recipient, subject, text_body))
+
+    monkeypatch.setattr("src.adapters.notifications.smtp_email_notifier.SMTPEmailNotifier.send_email", fake_send_email)
+
+    briefing = run_operator_briefing_job(trigger_label="prospect run")
+
+    assert briefing.prospect_run_count == 1
+    assert sent[0][0] == "tom@example.com"
+    assert "Operator briefing (prospect run)" in sent[0][1]
+    assert "Trigger: prospect run" in sent[0][2]

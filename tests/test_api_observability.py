@@ -30,6 +30,7 @@ def test_build_runtime_report_defaults_to_degraded_without_auth_config(monkeypat
     monkeypatch.delenv("TELEGRAM_CHAT_ID", raising=False)
     monkeypatch.delenv("SMTP_HOST", raising=False)
     monkeypatch.delenv("SMTP_USERNAME", raising=False)
+    monkeypatch.delenv("APP_OPENAI_API_KEY", raising=False)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
 
     report = build_runtime_report()
@@ -59,7 +60,7 @@ def test_build_runtime_report_marks_configured_runtime_as_ok(monkeypatch) -> Non
     monkeypatch.setenv("TELEGRAM_CHAT_ID", "chat")
     monkeypatch.setenv("SMTP_HOST", "smtp.example.com")
     monkeypatch.setenv("SMTP_USERNAME", "mailer")
-    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.setenv("APP_OPENAI_API_KEY", "sk-test")
 
     report = build_runtime_report()
 

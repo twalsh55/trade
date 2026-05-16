@@ -208,6 +208,8 @@ Use this section to give the next session a fast, practical starting point. Refr
   - features/refinements shipped
   - profitability progress
 - Prospecting automation cadence is currently set to every 12 hours, not every hour.
+- Each successful automated prospect run should trigger an operator briefing email; the separate scheduled operator briefing job is optional rather than the default.
+- Local app agents should prefer `APP_OPENAI_API_KEY` over `OPENAI_API_KEY` so app automation can use a dedicated credential path separate from the editor/Codex environment.
 
 ### Current Deployment Status
 

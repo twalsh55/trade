@@ -210,7 +210,7 @@ What it does:
 
 - searches Reddit and Hacker News for recent workflow-pain discussions
 - scores posts with local heuristics first to avoid unnecessary model usage
-- uses OpenAI only for a small opportunity-idea drafting step when `OPENAI_API_KEY` is configured
+- uses OpenAI only for a small opportunity-idea drafting step when `APP_OPENAI_API_KEY` or `OPENAI_API_KEY` is configured
 - can run in a CRM-focused direction mode to steer product decisions for the CRM app
 - sends a plain-text email digest to `tom.mg.walsh@gmail.com` by default
 - falls back to Telegram digest delivery when SMTP is not configured but Telegram is
@@ -234,7 +234,8 @@ If SMTP is not configured but Telegram is configured, the digest is delivered to
 Optional AI settings:
 
 ```bash
-OPENAI_API_KEY=sk-...
+APP_OPENAI_API_KEY=sk-...
+OPENAI_API_KEY=sk-... # optional legacy fallback
 PROSPECT_OPENAI_MODEL=gpt-5-nano
 PROSPECT_OPENAI_MAX_OUTPUT_TOKENS=500
 ETF_SENTIMENT_OPENAI_MODEL=gpt-5-nano
@@ -257,7 +258,7 @@ ETF sentiment Telegram brief:
 - `/sentiment` runs a server-side ETF sentiment snapshot and sends the result back to the configured Telegram chat
 - `/sentiment status` reports whether the ETF sentiment agent is ready and whether it will use OpenAI or template mode
 - the snapshot now combines `yfinance` ETF proxies with lightweight public text signals from Reddit search and Google News RSS
-- when `OPENAI_API_KEY` is missing, the agent still works in template mode using those price and text inputs
+- when the app OpenAI key is missing, the agent still works in template mode using those price and text inputs
 - the prompt source lives at `prompts/ETF_SENTIMENT.md`
 
 Run it manually:
@@ -315,6 +316,8 @@ Operator briefing workflow:
 
 - log a shipped feature or refinement with `PYTHONPATH=. uv run python scripts/log_product_update.py ...`
 - send the daily operator email manually with `PYTHONPATH=. uv run python scripts/run_daily_operator_briefing.py`
+- each successful automated prospect run now sends an operator briefing email automatically
+- `APP_OPENAI_API_KEY` is the preferred local app credential when you want the app agents to use a different key from the editor/Codex environment
 - the briefing is designed to summarize:
   - what the prospect agent found
   - what product changes were made
@@ -332,6 +335,7 @@ Useful automation settings:
 ```bash
 AUTOMATION_POLL_SECONDS=30
 AUTOMATION_PROSPECT_INTERVAL_MINUTES=720
+AUTOMATION_ENABLE_SCHEDULED_OPERATOR_BRIEFING=false
 AUTOMATION_OPERATOR_BRIEFING_INTERVAL_HOURS=24
 AUTOMATION_ENABLE_SENTIMENT_JOB=false
 AUTOMATION_SENTIMENT_INTERVAL_HOURS=24
@@ -349,7 +353,10 @@ Automation behavior:
 - a heartbeat file makes health checks and watchdog recovery straightforward
 - state persists last successful run timestamps so the worker can resume cleanly after restarts
 - unattended prospect runs fall back to template mode automatically if the local OpenAI credential is invalid
+- each successful automated prospect run also sends an operator briefing email so product guidance arrives with the run itself
+- the separate scheduled operator briefing job is opt-in via `AUTOMATION_ENABLE_SCHEDULED_OPERATOR_BRIEFING=true`
 - each scheduled job gets a hard timeout so one stuck network call does not freeze the whole worker
+- `APP_OPENAI_API_KEY` is preferred over `OPENAI_API_KEY` for app-side agent runs so local automation can use a dedicated app credential
 
 ## Structure
 

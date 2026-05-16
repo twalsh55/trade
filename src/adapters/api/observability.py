@@ -4,6 +4,8 @@ import logging
 import os
 from urllib.parse import urlsplit
 
+from src.env_utils import get_first_configured_env
+
 API_LOGGER_NAME = "brivoly.api"
 REQUEST_ID_HEADER = "X-Request-ID"
 
@@ -42,7 +44,7 @@ def build_runtime_report() -> dict[str, object]:
     telegram_chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip()
     smtp_host = os.getenv("SMTP_HOST", "").strip()
     smtp_username = os.getenv("SMTP_USERNAME", "").strip()
-    openai_api_key = os.getenv("OPENAI_API_KEY", "").strip()
+    openai_api_key = get_first_configured_env("APP_OPENAI_API_KEY", "OPENAI_API_KEY")
 
     auth_configured = bool(database_url) and bool(publishable_key)
     app_base_url_valid = is_absolute_http_url(app_base_url)

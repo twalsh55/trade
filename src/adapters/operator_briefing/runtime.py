@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from dataclasses import replace
 from pathlib import Path
 
 from src.adapters.notifications.smtp_email_notifier import SMTPEmailNotifier
@@ -39,8 +40,13 @@ def build_operator_insights_repository_from_env() -> FileOperatorInsightsReposit
 
 
 def run_daily_operator_briefing_job() -> OperatorBriefing:
+    return run_operator_briefing_job(trigger_label="daily schedule")
+
+
+def run_operator_briefing_job(trigger_label: str = "scheduled update") -> OperatorBriefing:
     config = build_operator_briefing_config_from_env()
     repository = build_operator_insights_repository_from_env()
+    config = replace(config, trigger_label=trigger_label)
     return RunDailyOperatorBriefingUseCase(
         prospect_history=repository,
         product_updates=repository,

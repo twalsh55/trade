@@ -16,3 +16,11 @@ def load_env_file(path: str = ".env") -> None:
 
         key, value = line.split("=", 1)
         os.environ.setdefault(key.strip(), value.strip().strip("\"'"))
+
+
+def get_first_configured_env(*names: str) -> str:
+    for name in names:
+        value = os.getenv(name, "").strip()
+        if value:
+            return value
+    return ""
