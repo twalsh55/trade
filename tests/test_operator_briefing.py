@@ -110,10 +110,11 @@ def test_run_daily_operator_briefing_summarizes_runs_and_updates() -> None:
     assert briefing.recommended_next_step.startswith("Add complete, snooze, and reminder workflows")
     assert email.sent[0][0] == "tom@example.com"
     assert "Operator briefing (scheduled update)" in email.sent[0][1]
-    assert "Guidance received from the agent" in email.sent[0][2]
+    assert "Agent guidance:" in email.sent[0][2]
     assert "Trigger: scheduled update" in email.sent[0][2]
-    assert "Model path: gpt-5-nano" in email.sent[0][2]
-    assert "Intelligence setting: live OpenAI reasoning" in email.sent[0][2]
+    assert "model gpt-5-nano | live OpenAI reasoning" in email.sent[0][2]
+    assert "Top signals:" in email.sent[0][2]
+    assert "Shipped work:" in email.sent[0][2]
 
 
 def test_format_operator_briefing_email_handles_empty_signal() -> None:
@@ -126,11 +127,10 @@ def test_format_operator_briefing_email_handles_empty_signal() -> None:
 
     content = format_operator_briefing_email(DailyOperatorBriefingConfig(recipient_email="tom@example.com"), briefing)
 
-    assert "No repeated guidance patterns were strong enough" in content
-    assert "No strong ideas were shortlisted" in content
-    assert "No product updates were logged" in content
-    assert "Model path: template fallback" in content
-    assert "Intelligence setting: deterministic fallback, no live OpenAI reasoning" in content
+    assert "No repeated guidance patterns were strong enough to matter." in content
+    assert "No strong ideas were shortlisted." in content
+    assert "No product updates were logged." in content
+    assert "model template fallback | deterministic fallback, no live OpenAI reasoning" in content
 
 
 def test_operator_briefing_private_helpers_cover_remaining_branches() -> None:

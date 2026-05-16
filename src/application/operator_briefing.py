@@ -153,71 +153,56 @@ class RunDailyOperatorBriefingUseCase:
 
 def format_operator_briefing_email(config: DailyOperatorBriefingConfig, briefing: OperatorBriefing) -> str:
     model_path, intelligence_setting = _describe_model_usage(briefing.token_usage)
+    summary_line = (
+        f"Runs {briefing.prospect_run_count} | scanned {briefing.total_scanned_posts} | "
+        f"ideas {briefing.total_shortlisted_ideas} | model {model_path} | {intelligence_setting}"
+    )
+    if briefing.token_usage is not None:
+        usage_line = (
+            f"Token usage: {briefing.token_usage.total_tokens} total "
+            f"({briefing.token_usage.input_tokens} in / {briefing.token_usage.output_tokens} out)"
+        )
+    else:
+        usage_line = "Token usage: template mode or no OpenAI drafting recorded"
+
     lines = [
         f"Operator briefing generated at {briefing.generated_at.isoformat()}",
         f"Trigger: {config.trigger_label}",
-        f"Lookback window start: {briefing.lookback_started_at.isoformat()}",
-        f"Goal: {config.goal}",
+        summary_line,
+        usage_line,
         "",
-        "Agent interaction summary:",
-        f"- Prospect runs reviewed: {briefing.prospect_run_count}",
-        f"- Posts scanned: {briefing.total_scanned_posts}",
-        f"- Opportunity ideas shortlisted: {briefing.total_shortlisted_ideas}",
-        f"- Model path: {model_path}",
-        f"- Intelligence setting: {intelligence_setting}",
+        f"Goal: {config.goal}",
     ]
-    if briefing.token_usage is not None:
-        lines.append(
-            "- Token usage: "
-            f"{briefing.token_usage.total_tokens} total "
-            f"({briefing.token_usage.input_tokens} in / {briefing.token_usage.output_tokens} out) "
-            f"via {briefing.token_usage.model}"
-        )
-    else:
-        lines.append("- Token usage: template mode or no OpenAI drafting recorded")
 
-    lines.extend(["", "Guidance received from the agent:"])
+    lines.extend(["", "Agent guidance:"])
     if briefing.guidance_points:
-        for item in briefing.guidance_points:
-            lines.append(f"- {item.theme}: seen across {item.count} shortlisted ideas. {item.explanation}")
+        for item in briefing.guidance_points[:2]:
+            lines.append(f"- {item.theme}: {item.explanation}")
     else:
-        lines.append("- No repeated guidance patterns were strong enough to call out today.")
+        lines.append("- No repeated guidance patterns were strong enough to matter.")
 
-    lines.extend(["", "Top opportunity signals:"])
+    lines.extend(["", "Top signals:"])
     if briefing.top_ideas:
-        for index, item in enumerate(briefing.top_ideas, start=1):
-            lines.extend(
-                [
-                    f"{index}. {item.description}",
-                    f"   Source: {item.source} via '{item.matched_query}'",
-                    f"   Signal: {item.observed_signal}",
-                    f"   Why it stood out: {', '.join(item.reasons)}",
-                ]
-            )
+        for index, item in enumerate(briefing.top_ideas[:2], start=1):
+            lines.append(f"{index}. {item.description}")
+            lines.append(f"   {item.source} via '{item.matched_query}' | {item.observed_signal}")
     else:
-        lines.append("- No strong ideas were shortlisted in this window.")
+        lines.append("- No strong ideas were shortlisted.")
 
-    lines.extend(["", "Features added or refinements made:"])
+    lines.extend(["", "Shipped work:"])
     if briefing.product_updates:
-        for item in briefing.product_updates:
-            lines.extend(
-                [
-                    f"- [{item.category}] {item.title}",
-                    f"  Change: {item.summary}",
-                    f"  Agent guidance linked to it: {item.agent_guidance}",
-                    f"  Profitability angle: {item.profitability_note}",
-                ]
-            )
+        for item in briefing.product_updates[:3]:
+            lines.append(f"- [{item.category}] {item.title}: {item.summary}")
     else:
-        lines.append("- No product updates were logged in this window.")
+        lines.append("- No product updates were logged.")
 
     lines.extend(
         [
             "",
-            "How we are zeroing in on profitability:",
+            "Profitability read:",
             briefing.profitability_assessment,
             "",
-            "Recommended next move:",
+            "Next move:",
             briefing.recommended_next_step,
         ]
     )
