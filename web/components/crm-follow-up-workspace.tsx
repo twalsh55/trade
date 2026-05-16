@@ -693,6 +693,11 @@ function ImportPreviewPanel({
     );
   }
 
+  const clarificationQuestions = preview.clarification?.questions ?? [];
+  const nextClarificationQuestion =
+    clarificationQuestions.find((question) => !clarificationAnswers[question.id]) ?? clarificationQuestions[0] ?? null;
+  const answeredClarificationCount = clarificationQuestions.filter((question) => Boolean(clarificationAnswers[question.id])).length;
+
   return (
     <section className="rounded-[1.4rem] border bg-slate-950 p-6 text-slate-50 shadow-[0_24px_80px_-55px_rgba(15,23,42,0.9)]">
       <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300">Preview</p>
@@ -708,19 +713,40 @@ function ImportPreviewPanel({
           <p className="mt-2 text-sm leading-6 text-slate-200">{preview.clarification.assistant_message}</p>
           {preview.clarification.required ? (
             <p className="mt-2 text-xs text-cyan-100/80">
-              Answer these quick questions and Brivoly will re-check the sheet automatically.
+              Brivoly will walk through the remaining ambiguity one question at a time and re-check the sheet after each answer.
             </p>
           ) : null}
-          {preview.clarification.questions.length ? (
+          {nextClarificationQuestion ? (
             <div className="mt-4 space-y-4">
-              {preview.clarification.questions.map((question) => (
-                <ClarificationQuestionCard
-                  key={question.id}
-                  question={question}
-                  selectedValue={clarificationAnswers[question.id] ?? ""}
-                  onAnswer={onClarificationAnswer}
-                />
-              ))}
+              {clarificationQuestions.length > 1 ? (
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-100/80">
+                  Question {Math.min(answeredClarificationCount + 1, clarificationQuestions.length)} of {clarificationQuestions.length}
+                </p>
+              ) : null}
+              <ClarificationQuestionCard
+                question={nextClarificationQuestion}
+                selectedValue={clarificationAnswers[nextClarificationQuestion.id] ?? ""}
+                onAnswer={onClarificationAnswer}
+              />
+              {answeredClarificationCount > 0 ? (
+                <div className="rounded-xl border border-white/10 bg-slate-900/30 px-3 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Already clarified</p>
+                  <div className="mt-2 space-y-2">
+                    {clarificationQuestions
+                      .filter((question) => Boolean(clarificationAnswers[question.id]))
+                      .map((question) => {
+                        const answeredChoice = question.choices.find((choice) => choice.value === clarificationAnswers[question.id]);
+                        return (
+                          <p key={question.id} className="text-sm text-slate-300">
+                            <span className="font-medium text-white">{question.prompt}</span>
+                            {" · "}
+                            {answeredChoice?.label ?? clarificationAnswers[question.id]}
+                          </p>
+                        );
+                      })}
+                  </div>
+                </div>
+              ) : null}
             </div>
           ) : null}
         </section>

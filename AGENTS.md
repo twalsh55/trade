@@ -99,6 +99,7 @@ cd web && npm run e2e
   - duplicate detection + validation preview
   - AI header rescue for messy spreadsheets
   - interactive AI clarification questions when mapping is still ambiguous
+  - clarification is now presented one question at a time with automatic re-check after each answer
   - best-effort import preview retry and friendlier fallback messaging instead of raw request-failure text
   - commit blocked until required clarification is resolved
   - paid AI intake profile per user
