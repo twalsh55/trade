@@ -30,7 +30,9 @@ export default async function CRMPortalPage() {
             <div className="flex items-center gap-4">
               <BrandLockup size="lg" priority />
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-rose-500">CRM Portal</p>
+                <p className="bg-gradient-to-r from-[#034CFD] to-[#01113B] bg-clip-text text-xs font-semibold uppercase tracking-[0.28em] text-transparent">
+                  CRM Portal
+                </p>
                 <h1 className="mt-2 text-4xl font-semibold tracking-tight text-slate-950 md:text-5xl">
                   Relationship ops, pipeline visibility, and follow-up memory.
                 </h1>
