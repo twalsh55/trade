@@ -284,6 +284,9 @@ PROSPECT_PERIODIC_MAX_RUNS=1
 PROSPECT_PUBLIC_SEARCH_USER_AGENT=trade-prospecting-bot/0.1
 PROSPECT_ENABLE_REDDIT_SOURCE=true
 PROSPECT_ENABLE_HACKER_NEWS_SOURCE=true
+PROSPECT_ENABLE_WEB_SOURCE=true
+PROSPECT_ENABLE_INDIE_HACKERS_SOURCE=true
+PROSPECT_ENABLE_REVIEW_SOURCE=true
 PROSPECT_ENABLE_X_SOURCE=true
 PROSPECT_ENABLE_DISCORD_SOURCE=true
 PROSPECT_RUN_LOG_FILE=var/prospect_run_log.jsonl
@@ -308,6 +311,7 @@ CRM direction mode:
 
 - set `PROSPECT_PROFILE=crm_direction` to bias the agent toward lead follow-up, pipeline hygiene, client handoff, relationship memory, and adjacent CRM workflows
 - when `PROSPECT_REDDIT_SEARCH_TERMS` is empty, the runtime uses CRM-specific defaults automatically in that profile
+- public-source discovery can now pull from Reddit, Hacker News, broad web search, Indie Hackers, review sites, X, and public Discord discovery
 - the digest includes model token usage when OpenAI drafting runs
 - when `PROSPECT_TRACK_USAGE=true`, each run appends a JSONL entry to `PROSPECT_USAGE_LOG_FILE`
 - each prospecting run also appends a richer run record to `PROSPECT_RUN_LOG_FILE`

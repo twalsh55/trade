@@ -107,14 +107,21 @@ def test_build_lead_source_from_env_uses_custom_user_agent(monkeypatch) -> None:
     assert source.__class__.__name__ == "CompositeLeadSource"
     assert source.sources[0].user_agent == "custom-agent"
     assert source.sources[1].__class__.__name__ == "HackerNewsLeadSource"
-    assert source.sources[2].__class__.__name__ == "XLeadSource"
-    assert source.sources[2].user_agent == "public-agent"
-    assert source.sources[3].__class__.__name__ == "DiscordLeadSource"
+    assert source.sources[2].__class__.__name__ == "WebLeadSource"
+    assert source.sources[2].search.user_agent == "public-agent"
+    assert source.sources[3].__class__.__name__ == "IndieHackersLeadSource"
+    assert source.sources[4].__class__.__name__ == "ReviewSiteLeadSource"
+    assert source.sources[5].__class__.__name__ == "XLeadSource"
+    assert source.sources[5].user_agent == "public-agent"
+    assert source.sources[6].__class__.__name__ == "DiscordLeadSource"
 
 
 def test_build_lead_source_from_env_respects_toggles(monkeypatch) -> None:
     monkeypatch.setenv("PROSPECT_ENABLE_REDDIT_SOURCE", "false")
     monkeypatch.setenv("PROSPECT_ENABLE_HACKER_NEWS_SOURCE", "false")
+    monkeypatch.setenv("PROSPECT_ENABLE_WEB_SOURCE", "false")
+    monkeypatch.setenv("PROSPECT_ENABLE_INDIE_HACKERS_SOURCE", "false")
+    monkeypatch.setenv("PROSPECT_ENABLE_REVIEW_SOURCE", "false")
     monkeypatch.setenv("PROSPECT_ENABLE_X_SOURCE", "true")
     monkeypatch.setenv("PROSPECT_ENABLE_DISCORD_SOURCE", "false")
 

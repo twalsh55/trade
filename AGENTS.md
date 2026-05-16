@@ -190,6 +190,14 @@ Use this section to give the next session a fast, practical starting point. Refr
 
 - The prospect agent is being used as a research partner to guide CRM direction.
 - The prospecting profile is tuned toward `crm_direction`.
+- Prospect discovery now spans:
+  - Reddit
+  - Hacker News
+  - broad public web search
+  - Indie Hackers
+  - review sites like G2, Capterra, and Shopify app listings
+  - X
+  - public Discord discovery
 - Cooperative runs have repeatedly reinforced:
   - follow-up discipline
   - spreadsheet-held CRM workflows

@@ -63,6 +63,8 @@ class DuckDuckGoSiteSearch:
         ]
 
     def _build_query(self, query: str) -> str:
+        if not self.site_domains:
+            return query
         site_filters = " OR ".join(f"site:{domain}" for domain in self.site_domains)
         return f"{query} ({site_filters})"
 
@@ -133,4 +135,6 @@ def _url_matches_allowed_domains(url: str, allowed_domains: tuple[str, ...]) -> 
     host = urlparse(url).netloc.lower()
     if not host:
         return False
+    if not allowed_domains:
+        return True
     return any(host == domain or host.endswith(f".{domain}") for domain in allowed_domains)

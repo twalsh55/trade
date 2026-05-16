@@ -13,7 +13,10 @@ from src.adapters.prospecting.usage_log import ProspectUsageLog
 from src.adapters.social.composite_lead_source import CompositeLeadSource
 from src.adapters.social.discord_lead_source import DiscordLeadSource
 from src.adapters.social.hacker_news_lead_source import HackerNewsLeadSource
+from src.adapters.social.indie_hackers_lead_source import IndieHackersLeadSource
 from src.adapters.social.reddit_lead_source import RedditLeadSource
+from src.adapters.social.review_site_lead_source import ReviewSiteLeadSource
+from src.adapters.social.web_lead_source import WebLeadSource
 from src.adapters.social.x_lead_source import XLeadSource
 from src.application.ports import EmailDeliveryPort
 from src.application.prospecting import (
@@ -103,6 +106,12 @@ def build_lead_source_from_env() -> CompositeLeadSource:
         sources.append(RedditLeadSource(user_agent=os.getenv("PROSPECT_REDDIT_USER_AGENT", user_agent)))
     if os.getenv("PROSPECT_ENABLE_HACKER_NEWS_SOURCE", "true").strip().lower() != "false":
         sources.append(HackerNewsLeadSource())
+    if os.getenv("PROSPECT_ENABLE_WEB_SOURCE", "true").strip().lower() != "false":
+        sources.append(WebLeadSource(user_agent=user_agent))
+    if os.getenv("PROSPECT_ENABLE_INDIE_HACKERS_SOURCE", "true").strip().lower() != "false":
+        sources.append(IndieHackersLeadSource(user_agent=user_agent))
+    if os.getenv("PROSPECT_ENABLE_REVIEW_SOURCE", "true").strip().lower() != "false":
+        sources.append(ReviewSiteLeadSource(user_agent=user_agent))
     if os.getenv("PROSPECT_ENABLE_X_SOURCE", "true").strip().lower() != "false":
         sources.append(XLeadSource(user_agent=user_agent))
     if os.getenv("PROSPECT_ENABLE_DISCORD_SOURCE", "true").strip().lower() != "false":

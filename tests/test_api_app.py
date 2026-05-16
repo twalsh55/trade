@@ -333,6 +333,7 @@ def test_build_prospecting_status_message_reports_errors_and_modes(monkeypatch) 
     assert _build_prospecting_status_message() == "Prospecting agent is not ready:\n- Missing SMTP_HOST"
 
     monkeypatch.setattr("src.adapters.api.app.collect_prospecting_config_errors", lambda: [])
+    monkeypatch.delenv("APP_OPENAI_API_KEY", raising=False)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     assert _build_prospecting_status_message() == "Prospecting agent is ready.\nOpenAI idea drafting disabled; template opportunity ideas will be used."
 
@@ -345,6 +346,7 @@ def test_build_etf_sentiment_status_message_reports_errors_and_modes(monkeypatch
     assert _build_etf_sentiment_status_message() == "ETF sentiment agent is not ready:\n- Missing prompt"
 
     monkeypatch.setattr("src.adapters.api.app.collect_etf_sentiment_config_errors", lambda: [])
+    monkeypatch.delenv("APP_OPENAI_API_KEY", raising=False)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     assert _build_etf_sentiment_status_message() == (
         "ETF sentiment agent is ready.\nOpenAI analysis disabled; price-action template mode will be used."
@@ -434,6 +436,7 @@ def test_telegram_webhook_handles_commands_and_guards(monkeypatch) -> None:
     monkeypatch.setattr("src.adapters.api.app._run_etf_sentiment_from_telegram", lambda notifier: tasks.append("sentiment"))
     monkeypatch.setattr("src.adapters.api.app.collect_prospecting_config_errors", lambda: [])
     monkeypatch.setattr("src.adapters.api.app.collect_etf_sentiment_config_errors", lambda: [])
+    monkeypatch.delenv("APP_OPENAI_API_KEY", raising=False)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
 
     response = client.post("/api/telegram/webhook", headers={"X-Telegram-Bot-Api-Secret-Token": "secret"}, json={})
