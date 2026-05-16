@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
@@ -68,6 +69,8 @@ from src.application.use_cases import BuildCrashDashboardUseCase
 from src.domain.auth import User
 from src.domain.models import DEFAULT_UNIVERSE
 from src.env_utils import load_env_file
+
+api_logger = logging.getLogger("brivoly.api")
 
 
 @dataclass(frozen=True)
@@ -471,6 +474,7 @@ def _run_prospecting_from_telegram(notifier: TelegramNotifier) -> None:
             f"{digest.shortlisted_count} opportunity signals, and sent the digest."
         )
     except (EmailNotificationError, RedditLeadSourceError, TelegramNotificationError, ValueError, RuntimeError) as exc:
+        api_logger.exception("Prospecting run failed", exc_info=exc)
         try:
             notifier.send_message(f"Prospecting run failed: {exc}")
         except TelegramNotificationError:
@@ -494,6 +498,7 @@ def _run_etf_sentiment_from_telegram(notifier: TelegramNotifier) -> None:
     try:
         deliver_etf_sentiment_job()
     except (EmailNotificationError, RedditLeadSourceError, TelegramNotificationError, ValueError, RuntimeError) as exc:
+        api_logger.exception("ETF sentiment run failed", exc_info=exc)
         try:
             notifier.send_message(f"ETF sentiment run failed: {exc}")
         except TelegramNotificationError:
