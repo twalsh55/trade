@@ -8,6 +8,7 @@ from src.adapters.prospecting.runtime import (
     build_digest_delivery_from_env,
     build_email_notifier_from_env,
     build_lead_source_from_env,
+    build_usage_log_from_env,
     build_telegram_digest_notifier_from_env,
     collect_prospecting_config_errors,
     has_configured_smtp_delivery,
@@ -21,12 +22,25 @@ from src.adapters.prospecting.runtime import (
 def test_build_config_from_env_uses_defaults(monkeypatch) -> None:
     monkeypatch.delenv("PROSPECT_REDDIT_SEARCH_TERMS", raising=False)
     monkeypatch.delenv("APP_BASE_URL", raising=False)
+    monkeypatch.delenv("PROSPECT_PROFILE", raising=False)
 
     config = build_config_from_env()
 
     assert config.recipient_email == "tom.mg.walsh@gmail.com"
     assert config.search_terms
     assert config.app_url is None
+    assert config.profile == "general"
+
+
+def test_build_config_from_env_uses_crm_profile_defaults(monkeypatch) -> None:
+    monkeypatch.delenv("PROSPECT_REDDIT_SEARCH_TERMS", raising=False)
+    monkeypatch.setenv("PROSPECT_PROFILE", "crm_direction")
+
+    config = build_config_from_env()
+
+    assert config.profile == "crm_direction"
+    assert "lead follow up manually" in config.search_terms
+    assert "CRM product" in config.app_summary
 
 
 def test_build_email_notifier_requires_env(monkeypatch) -> None:
@@ -149,12 +163,14 @@ def test_collect_prospecting_config_errors_reports_missing_and_invalid_fields(mo
     for name in ("SMTP_HOST", "SMTP_USERNAME", "SMTP_PASSWORD", "SMTP_FROM_EMAIL", "TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID"):
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setenv("PROSPECT_MAX_MATCHES", "abc")
+    monkeypatch.setenv("PROSPECT_PERIODIC_INTERVAL_MINUTES", "bad")
     monkeypatch.setenv("SMTP_PORT", "0")
 
     errors = collect_prospecting_config_errors()
 
     assert "Missing SMTP delivery settings and Telegram delivery fallback is unavailable" in errors
     assert "PROSPECT_MAX_MATCHES must be an integer" in errors
+    assert "PROSPECT_PERIODIC_INTERVAL_MINUTES must be an integer" in errors
     assert "SMTP_PORT must be greater than zero" in errors
 
 
@@ -220,15 +236,18 @@ def test_run_prospecting_job_builds_and_executes_use_case(monkeypatch) -> None:
         (),
         {
             "generated_at": datetime(2026, 5, 14, tzinfo=UTC),
+            "profile": "general",
             "scanned_post_count": 3,
             "shortlisted_count": 1,
             "shortlisted_posts": (),
+            "token_usage": None,
         },
     )()
     monkeypatch.setattr("src.adapters.prospecting.runtime.build_config_from_env", lambda: config)
     monkeypatch.setattr("src.adapters.prospecting.runtime.build_lead_source_from_env", lambda: lead_source)
     monkeypatch.setattr("src.adapters.prospecting.runtime.build_drafter_from_env", lambda: drafter)
     monkeypatch.setattr("src.adapters.prospecting.runtime.build_digest_delivery_from_env", lambda: email_delivery)
+    monkeypatch.setattr("src.adapters.prospecting.runtime.build_usage_log_from_env", lambda: None)
 
     class FakeUseCase:
         def __init__(self, lead_source, drafter, email_delivery) -> None:  # type: ignore[no-untyped-def]
@@ -246,3 +265,54 @@ def test_run_prospecting_job_builds_and_executes_use_case(monkeypatch) -> None:
     monkeypatch.setattr("src.adapters.prospecting.runtime.RunDailyProspectingUseCase", FakeUseCase)
 
     assert run_prospecting_job() is digest
+
+
+def test_run_prospecting_job_appends_usage_log_when_configured(monkeypatch) -> None:
+    config = object()
+    digest = type(
+        "Digest",
+        (),
+        {
+            "generated_at": datetime(2026, 5, 14, tzinfo=UTC),
+            "profile": "crm_direction",
+            "scanned_post_count": 5,
+            "shortlisted_count": 2,
+            "shortlisted_posts": (),
+            "token_usage": None,
+        },
+    )()
+    monkeypatch.setattr("src.adapters.prospecting.runtime.build_config_from_env", lambda: config)
+    monkeypatch.setattr("src.adapters.prospecting.runtime.build_lead_source_from_env", lambda: object())
+    monkeypatch.setattr("src.adapters.prospecting.runtime.build_drafter_from_env", lambda: object())
+    monkeypatch.setattr("src.adapters.prospecting.runtime.build_digest_delivery_from_env", lambda: object())
+
+    class FakeUseCase:
+        def __init__(self, lead_source, drafter, email_delivery) -> None:  # type: ignore[no-untyped-def]
+            pass
+
+        def execute(self, passed_config):  # type: ignore[no-untyped-def]
+            assert passed_config is config
+            return digest
+
+    appended: list[object] = []
+
+    class FakeUsageLog:
+        def append(self, logged_digest) -> None:  # type: ignore[no-untyped-def]
+            appended.append(logged_digest)
+
+    monkeypatch.setattr("src.adapters.prospecting.runtime.RunDailyProspectingUseCase", FakeUseCase)
+    monkeypatch.setattr("src.adapters.prospecting.runtime.build_usage_log_from_env", lambda: FakeUsageLog())
+
+    assert run_prospecting_job() is digest
+    assert appended == [digest]
+
+
+def test_build_usage_log_from_env_respects_toggle_and_path(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("PROSPECT_USAGE_LOG_FILE", str(tmp_path / "usage.jsonl"))
+    monkeypatch.setenv("PROSPECT_TRACK_USAGE", "true")
+    usage_log = build_usage_log_from_env()
+    assert usage_log is not None
+    assert usage_log.path == tmp_path / "usage.jsonl"
+
+    monkeypatch.setenv("PROSPECT_TRACK_USAGE", "false")
+    assert build_usage_log_from_env() is None

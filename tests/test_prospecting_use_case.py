@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from src.application.prospecting import (
+    DEFAULT_CRM_DIRECTION_SEARCH_TERMS,
     DailyProspectingConfig,
     ProspectingDigest,
     RunDailyProspectingUseCase,
@@ -34,6 +35,9 @@ class StubDrafter:
     ) -> list[str]:
         self.calls.append((app_summary, matches, app_url))
         return [f"draft for {match.post.external_id}" for match in matches]
+
+    def get_last_usage(self):  # type: ignore[no-untyped-def]
+        return None
 
 
 class StubEmailDelivery:
@@ -171,6 +175,7 @@ def test_format_digest_email_truncates_long_body() -> None:
     post = make_post("1", "Title", "x" * 400, 14)
     digest = ProspectingDigest(
         generated_at=datetime(2026, 5, 14, 9, 30, tzinfo=UTC),
+        profile="general",
         scanned_post_count=5,
         shortlisted_count=1,
         shortlisted_posts=(
@@ -199,6 +204,7 @@ def test_format_digest_email_truncates_long_body() -> None:
                 },
             )(),
         ),
+        token_usage=None,
     )
     config = DailyProspectingConfig(recipient_email="tom.mg.walsh@gmail.com")
 
@@ -222,6 +228,7 @@ def test_format_digest_email_uses_source_label_for_shortlisted_posts() -> None:
     )
     digest = ProspectingDigest(
         generated_at=datetime(2026, 5, 14, 9, 30, tzinfo=UTC),
+        profile="general",
         scanned_post_count=1,
         shortlisted_count=1,
         shortlisted_posts=(
@@ -238,6 +245,7 @@ def test_format_digest_email_uses_source_label_for_shortlisted_posts() -> None:
             )(),
         ),
         audit_entries=(),
+        token_usage=None,
     )
 
     body = format_digest_email(DailyProspectingConfig(recipient_email="tom.mg.walsh@gmail.com"), digest)
@@ -250,6 +258,7 @@ def test_format_digest_email_includes_full_audit_when_verbose() -> None:
     post = make_post("1", "Title", "body", 14)
     digest = ProspectingDigest(
         generated_at=datetime(2026, 5, 14, 9, 30, tzinfo=UTC),
+        profile="general",
         scanned_post_count=1,
         shortlisted_count=0,
         shortlisted_posts=(),
@@ -266,6 +275,7 @@ def test_format_digest_email_includes_full_audit_when_verbose() -> None:
                 },
             )(),
         ),
+        token_usage=None,
     )
     config = DailyProspectingConfig(
         recipient_email="tom.mg.walsh@gmail.com",
@@ -311,3 +321,21 @@ def test_daily_prospecting_use_case_applies_top_five_and_min_score() -> None:
 def test_summarize_post_text_handles_empty_and_title_only_body() -> None:
     assert _summarize_post_text("Title", "   ", 50) == ""
     assert _summarize_post_text("Same title", "Same title", 50) == "Same title"
+
+
+def test_format_digest_email_includes_token_usage_when_present() -> None:
+    digest = ProspectingDigest(
+        generated_at=datetime(2026, 5, 14, 9, 30, tzinfo=UTC),
+        profile="crm_direction",
+        scanned_post_count=1,
+        shortlisted_count=0,
+        shortlisted_posts=(),
+        audit_entries=(),
+        token_usage=type("Usage", (), {"model": "gpt-5-nano", "input_tokens": 100, "output_tokens": 20, "total_tokens": 120})(),
+    )
+
+    body = format_digest_email(DailyProspectingConfig(recipient_email="tom.mg.walsh@gmail.com", profile="crm_direction"), digest)
+
+    assert "Profile: crm_direction" in body
+    assert "OpenAI token usage:" in body
+    assert "model=gpt-5-nano input=100 output=20 total=120" in body

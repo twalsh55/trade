@@ -27,9 +27,11 @@ def build_match(external_id: str) -> ProspectMatch:
 
 
 def test_template_prospect_drafter_builds_reply() -> None:
-    replies = TemplateProspectDrafter().draft_promotional_replies("summary", (build_match("1"),), "https://www.brivoly.com")
+    drafter = TemplateProspectDrafter()
+    replies = drafter.draft_promotional_replies("summary", (build_match("1"),), "https://www.brivoly.com")
     assert "Potential SaaS idea:" in replies[0]
     assert "https://www.brivoly.com" in replies[0]
+    assert drafter.get_last_usage() is None
 
 
 def test_openai_prospect_drafter_uses_api_payload(monkeypatch) -> None:
@@ -45,6 +47,11 @@ def test_openai_prospect_drafter_uses_api_payload(monkeypatch) -> None:
             200,
             request=request,
             json={
+                "usage": {
+                    "input_tokens": 120,
+                    "output_tokens": 30,
+                    "total_tokens": 150,
+                },
                 "output": [
                     {
                         "content": [
@@ -70,6 +77,49 @@ def test_openai_prospect_drafter_uses_api_payload(monkeypatch) -> None:
     assert captured["json"]["model"] == "gpt-5-nano"
     assert "opportunity discovery" in captured["json"]["instructions"]
     assert replies == ["Helpful idea"]
+
+
+def test_openai_prospect_drafter_tracks_last_usage(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "src.adapters.llm.openai_prospect_drafter.httpx.post",
+        lambda *args, **kwargs: httpx.Response(
+            200,
+            request=httpx.Request("POST", "https://api.openai.com/v1/responses"),
+            json={
+                "usage": {"input_tokens": 90, "output_tokens": 10, "total_tokens": 100},
+                "output_text": '{"drafts":[{"post_id":"1","idea":"Helpful idea"}]}',
+            },
+        ),  # type: ignore[no-untyped-def]
+    )
+
+    drafter = OpenAIProspectDrafter(api_key="secret")
+    replies = drafter.draft_promotional_replies("summary", (build_match("1"),), None)
+
+    assert replies == ["Helpful idea"]
+    usage = drafter.get_last_usage()
+    assert usage is not None
+    assert usage.total_tokens == 100
+    assert usage.model == "gpt-5-nano"
+
+
+def test_openai_prospect_drafter_ignores_invalid_usage_shape(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "src.adapters.llm.openai_prospect_drafter.httpx.post",
+        lambda *args, **kwargs: httpx.Response(
+            200,
+            request=httpx.Request("POST", "https://api.openai.com/v1/responses"),
+            json={
+                "usage": {"input_tokens": "bad", "output_tokens": 10, "total_tokens": 100},
+                "output_text": '{"drafts":[{"post_id":"1","idea":"Helpful idea"}]}',
+            },
+        ),  # type: ignore[no-untyped-def]
+    )
+
+    drafter = OpenAIProspectDrafter(api_key="secret")
+    replies = drafter.draft_promotional_replies("summary", (build_match("1"),), None)
+
+    assert replies == ["Helpful idea"]
+    assert drafter.get_last_usage() is None
 
 
 def test_openai_prospect_drafter_falls_back_when_post_missing(monkeypatch) -> None:

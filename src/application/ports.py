@@ -8,7 +8,7 @@ import pandas as pd
 
 from src.domain.auth import ExternalIdentity, User
 from src.domain.crm import LeadFollowUp
-from src.domain.prospecting import ProspectMatch, SocialPost
+from src.domain.prospecting import ProspectMatch, ProspectTokenUsage, SocialPost
 
 if TYPE_CHECKING:
     from src.application.account import AlertHistoryEntry, UserDashboardSettings
@@ -75,6 +75,9 @@ class ProspectDraftingPort(Protocol):
         app_url: str | None = None,
     ) -> list[str]:
         """Return a suggested non-posted reply for each shortlisted match."""
+
+    def get_last_usage(self) -> ProspectTokenUsage | None:
+        """Return usage information for the most recent drafting request, if available."""
 
 
 class EmailDeliveryPort(Protocol):

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from src.application.ports import EmailDeliveryPort, ProspectDraftingPort, SocialLeadSourcePort
-from src.domain.prospecting import ProspectMatch, SocialPost, score_social_post
+from src.domain.prospecting import ProspectMatch, ProspectTokenUsage, SocialPost, score_social_post
 
 DEFAULT_PROSPECT_SEARCH_TERMS = (
     "i wish there was a tool for",
@@ -13,9 +13,24 @@ DEFAULT_PROSPECT_SEARCH_TERMS = (
     "spreadsheet workflow problem",
 )
 
+DEFAULT_CRM_DIRECTION_SEARCH_TERMS = (
+    "lead follow up manually",
+    "sales pipeline spreadsheet",
+    "client handoff spreadsheet",
+    "crm for agencies spreadsheet",
+    "relationship notes follow up",
+)
+
 DEFAULT_APP_SUMMARY = (
     "You are researching boring, profitable SaaS opportunities for a solo indie hacker. "
     "Focus on painful, recurring, monetizable workflows with low operational complexity. "
+    "Do not suggest posting, replying, or promoting anything publicly."
+)
+
+DEFAULT_CRM_DIRECTION_SUMMARY = (
+    "You are researching how a solo founder should shape a CRM product. "
+    "Focus on recurring lead follow-up, pipeline hygiene, relationship memory, handoff coordination, "
+    "and admin-heavy client workflows with measurable operational ROI. "
     "Do not suggest posting, replying, or promoting anything publicly."
 )
 
@@ -41,15 +56,18 @@ class ProspectAuditEntry:
 @dataclass(frozen=True, slots=True)
 class ProspectingDigest:
     generated_at: datetime
+    profile: str
     scanned_post_count: int
     shortlisted_count: int
     shortlisted_posts: tuple[DraftedProspectEmail, ...]
     audit_entries: tuple[ProspectAuditEntry, ...]
+    token_usage: ProspectTokenUsage | None
 
 
 @dataclass(frozen=True, slots=True)
 class DailyProspectingConfig:
     recipient_email: str
+    profile: str = "general"
     app_summary: str = DEFAULT_APP_SUMMARY
     app_url: str | None = None
     search_terms: tuple[str, ...] = DEFAULT_PROSPECT_SEARCH_TERMS
@@ -138,10 +156,12 @@ class RunDailyProspectingUseCase:
         )
         digest = ProspectingDigest(
             generated_at=self.now(),
+            profile=config.profile,
             scanned_post_count=scanned_count,
             shortlisted_count=len(drafted_matches),
             shortlisted_posts=drafted_matches,
             audit_entries=tuple(audit_entries),
+            token_usage=self.drafter.get_last_usage(),
         )
         self.email_delivery.send_email(
             recipient=config.recipient_email,
@@ -155,6 +175,7 @@ def format_digest_email(config: DailyProspectingConfig, digest: ProspectingDiges
     decision_counts = _build_decision_counts(digest.audit_entries)
     lines = [
         f"Daily prospecting digest generated at {digest.generated_at.isoformat()}",
+        f"Profile: {digest.profile}",
         f"Recipient: {config.recipient_email}",
         f"Scanned posts: {digest.scanned_post_count}",
         f"Shortlisted posts: {digest.shortlisted_count}",
@@ -167,6 +188,20 @@ def format_digest_email(config: DailyProspectingConfig, digest: ProspectingDiges
         ),
         "",
     ]
+
+    if digest.token_usage is not None:
+        lines.extend(
+            [
+                "OpenAI token usage:",
+                (
+                    f"- model={digest.token_usage.model} "
+                    f"input={digest.token_usage.input_tokens} "
+                    f"output={digest.token_usage.output_tokens} "
+                    f"total={digest.token_usage.total_tokens}"
+                ),
+                "",
+            ]
+        )
 
     if config.app_url:
         lines.extend([f"Reference URL: {config.app_url}", ""])

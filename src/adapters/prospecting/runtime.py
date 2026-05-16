@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 from src.adapters.llm.openai_prospect_drafter import OpenAIProspectDrafter, TemplateProspectDrafter
 from src.adapters.notifications.composite_email_notifier import CompositeEmailNotifier
 from src.adapters.notifications.smtp_email_notifier import SMTPEmailNotifier
 from src.adapters.notifications.telegram_digest_notifier import TelegramDigestNotifier
 from src.adapters.notifications.telegram_notifier import TelegramNotifier
+from src.adapters.prospecting.usage_log import ProspectUsageLog
 from src.adapters.social.composite_lead_source import CompositeLeadSource
 from src.adapters.social.discord_lead_source import DiscordLeadSource
 from src.adapters.social.hacker_news_lead_source import HackerNewsLeadSource
@@ -15,6 +17,8 @@ from src.adapters.social.x_lead_source import XLeadSource
 from src.application.ports import EmailDeliveryPort
 from src.application.prospecting import (
     DEFAULT_APP_SUMMARY,
+    DEFAULT_CRM_DIRECTION_SEARCH_TERMS,
+    DEFAULT_CRM_DIRECTION_SUMMARY,
     DEFAULT_PROSPECT_SEARCH_TERMS,
     DailyProspectingConfig,
     ProspectingDigest,
@@ -25,11 +29,15 @@ DEFAULT_RECIPIENT = "tom.mg.walsh@gmail.com"
 
 
 def build_config_from_env() -> DailyProspectingConfig:
+    profile = os.getenv("PROSPECT_PROFILE", "general").strip().lower() or "general"
     search_terms_env = os.getenv("PROSPECT_REDDIT_SEARCH_TERMS", "").strip()
-    search_terms = tuple(item.strip() for item in search_terms_env.split(",") if item.strip()) or DEFAULT_PROSPECT_SEARCH_TERMS
+    default_search_terms = DEFAULT_CRM_DIRECTION_SEARCH_TERMS if profile == "crm_direction" else DEFAULT_PROSPECT_SEARCH_TERMS
+    default_summary = DEFAULT_CRM_DIRECTION_SUMMARY if profile == "crm_direction" else DEFAULT_APP_SUMMARY
+    search_terms = tuple(item.strip() for item in search_terms_env.split(",") if item.strip()) or default_search_terms
     return DailyProspectingConfig(
         recipient_email=os.getenv("PROSPECT_EMAIL_RECIPIENT", DEFAULT_RECIPIENT).strip() or DEFAULT_RECIPIENT,
-        app_summary=os.getenv("PROSPECT_APP_SUMMARY", DEFAULT_APP_SUMMARY),
+        profile=profile,
+        app_summary=os.getenv("PROSPECT_APP_SUMMARY", default_summary),
         app_url=os.getenv("APP_BASE_URL", "").strip() or None,
         search_terms=search_terms,
         per_term_limit=parse_positive_int("PROSPECT_REDDIT_LIMIT_PER_TERM", default=8),
@@ -107,7 +115,11 @@ def run_prospecting_job() -> ProspectingDigest:
         drafter=build_drafter_from_env(),
         email_delivery=build_digest_delivery_from_env(),
     )
-    return use_case.execute(config)
+    digest = use_case.execute(config)
+    usage_log = build_usage_log_from_env()
+    if usage_log is not None:
+        usage_log.append(digest)
+    return digest
 
 
 def collect_prospecting_config_errors() -> list[str]:
@@ -120,6 +132,8 @@ def collect_prospecting_config_errors() -> list[str]:
         "PROSPECT_MAX_MATCHES",
         "PROSPECT_MIN_SCORE",
         "PROSPECT_OPENAI_MAX_OUTPUT_TOKENS",
+        "PROSPECT_PERIODIC_INTERVAL_MINUTES",
+        "PROSPECT_PERIODIC_MAX_RUNS",
         "SMTP_PORT",
     ):
         raw_value = os.getenv(name, "").strip()
@@ -131,6 +145,14 @@ def collect_prospecting_config_errors() -> list[str]:
         except ValueError:
             errors.append(f"{name} must be an integer")
     return errors
+
+
+def build_usage_log_from_env() -> ProspectUsageLog | None:
+    enabled = os.getenv("PROSPECT_TRACK_USAGE", "true").strip().lower() != "false"
+    if not enabled:
+        return None
+    path = Path(os.getenv("PROSPECT_USAGE_LOG_FILE", "var/prospect_usage_log.jsonl").strip() or "var/prospect_usage_log.jsonl")
+    return ProspectUsageLog(path)
 
 
 def required_env(name: str) -> str:

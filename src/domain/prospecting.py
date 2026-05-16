@@ -23,6 +23,18 @@ SIGNAL_KEYWORDS = {
     "pdf": 2,
     "copy paste": 4,
     "copy/paste": 4,
+    "crm": 5,
+    "lead": 4,
+    "leads": 4,
+    "follow up": 5,
+    "follow-up": 5,
+    "pipeline": 5,
+    "prospect": 4,
+    "client": 4,
+    "customer": 3,
+    "handoff": 4,
+    "reminder": 3,
+    "notes": 3,
 }
 
 INTENT_KEYWORDS = {
@@ -41,6 +53,10 @@ INTENT_KEYWORDS = {
     "automation": 4,
     "help": 2,
     "need": 2,
+    "tracking": 4,
+    "still using": 5,
+    "who owns": 4,
+    "forgot to follow up": 6,
 }
 
 EXCLUDE_KEYWORDS = {
@@ -70,6 +86,14 @@ class ProspectMatch:
     matched_query: str
     score: int
     reasons: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class ProspectTokenUsage:
+    model: str
+    input_tokens: int
+    output_tokens: int
+    total_tokens: int
 
 
 def score_social_post(post: SocialPost, matched_query: str) -> ProspectMatch | None:

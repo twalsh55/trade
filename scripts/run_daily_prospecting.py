@@ -25,9 +25,18 @@ def main() -> int:
 
     print(
         f"Prospecting digest emailed to {config.recipient_email}. "
-        f"Scanned {digest.scanned_post_count} posts and shortlisted {digest.shortlisted_count}."
+        f"Scanned {digest.scanned_post_count} posts and shortlisted {digest.shortlisted_count}. "
+        f"Profile={digest.profile}. "
+        f"Token usage={_format_token_usage(digest)}."
     )
     return 0
+
+
+def _format_token_usage(digest) -> str:  # type: ignore[no-untyped-def]
+    usage = getattr(digest, "token_usage", None)
+    if usage is None:
+        return "template-mode"
+    return f"{usage.total_tokens} total ({usage.input_tokens} in / {usage.output_tokens} out) via {usage.model}"
 
 
 if __name__ == "__main__":

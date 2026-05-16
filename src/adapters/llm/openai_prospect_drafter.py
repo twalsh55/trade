@@ -4,7 +4,7 @@ import json
 
 import httpx
 
-from src.domain.prospecting import ProspectMatch
+from src.domain.prospecting import ProspectMatch, ProspectTokenUsage
 
 
 class OpenAIProspectDrafterError(RuntimeError):
@@ -23,6 +23,7 @@ class OpenAIProspectDrafter:
         self.model = model
         self.timeout_seconds = timeout_seconds
         self.max_output_tokens = max_output_tokens
+        self._last_usage: ProspectTokenUsage | None = None
 
     def draft_promotional_replies(
         self,
@@ -30,6 +31,7 @@ class OpenAIProspectDrafter:
         matches: tuple[ProspectMatch, ...],
         app_url: str | None = None,
     ) -> list[str]:
+        self._last_usage = None
         if not matches:
             return []
 
@@ -76,6 +78,8 @@ class OpenAIProspectDrafter:
         except (httpx.HTTPError, ValueError) as exc:
             raise OpenAIProspectDrafterError("Unable to generate opportunity ideas.") from exc
 
+        self._last_usage = _extract_usage_from_response(payload, self.model)
+
         content = _extract_text_from_response(payload)
         try:
             response_json = json.loads(content)
@@ -102,6 +106,9 @@ class OpenAIProspectDrafter:
             for match in matches
         ]
 
+    def get_last_usage(self) -> ProspectTokenUsage | None:
+        return self._last_usage
+
 
 class TemplateProspectDrafter:
     def draft_promotional_replies(
@@ -111,6 +118,9 @@ class TemplateProspectDrafter:
         app_url: str | None = None,
     ) -> list[str]:
         return [_build_template_reply(match.post.title, app_url) for match in matches]
+
+    def get_last_usage(self) -> ProspectTokenUsage | None:
+        return None
 
 
 def _build_template_reply(post_title: str, app_url: str | None) -> str:
@@ -149,3 +159,22 @@ def _extract_text_from_response(payload: dict[str, object]) -> str:
     if not content:
         raise OpenAIProspectDrafterError("OpenAI returned an invalid drafting payload.")
     return content
+
+
+def _extract_usage_from_response(payload: dict[str, object], model: str) -> ProspectTokenUsage | None:
+    usage = payload.get("usage")
+    if not isinstance(usage, dict):
+        return None
+
+    input_tokens = usage.get("input_tokens", 0)
+    output_tokens = usage.get("output_tokens", 0)
+    total_tokens = usage.get("total_tokens", 0)
+    if not all(isinstance(value, int) for value in (input_tokens, output_tokens, total_tokens)):
+        return None
+
+    return ProspectTokenUsage(
+        model=model,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        total_tokens=total_tokens,
+    )

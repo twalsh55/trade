@@ -211,10 +211,12 @@ What it does:
 - searches Reddit and Hacker News for recent workflow-pain discussions
 - scores posts with local heuristics first to avoid unnecessary model usage
 - uses OpenAI only for a small opportunity-idea drafting step when `OPENAI_API_KEY` is configured
+- can run in a CRM-focused direction mode to steer product decisions for the CRM app
 - sends a plain-text email digest to `tom.mg.walsh@gmail.com` by default
 - falls back to Telegram digest delivery when SMTP is not configured but Telegram is
 - never posts to Reddit, Hacker News, or any other social network
 - does not draft public replies or posting suggestions; it returns SaaS ideas only
+- records OpenAI token usage in the digest and can append usage entries to a local JSONL log
 
 Required email settings:
 
@@ -268,11 +270,16 @@ Useful prospecting settings:
 
 ```bash
 PROSPECT_EMAIL_RECIPIENT=tom.mg.walsh@gmail.com
-PROSPECT_REDDIT_SEARCH_TERMS=i wish there was a tool for,how are you solving this manually,spreadsheet workflow problem
+PROSPECT_PROFILE=crm_direction
+PROSPECT_REDDIT_SEARCH_TERMS=lead follow up manually,sales pipeline spreadsheet,client handoff spreadsheet,crm for agencies spreadsheet,relationship notes follow up
 PROSPECT_REDDIT_LIMIT_PER_TERM=8
 PROSPECT_MAX_MATCHES=5
 PROSPECT_MIN_SCORE=12
 PROSPECT_VERBOSE_AUDIT=false
+PROSPECT_TRACK_USAGE=true
+PROSPECT_USAGE_LOG_FILE=var/prospect_usage_log.jsonl
+PROSPECT_PERIODIC_INTERVAL_MINUTES=60
+PROSPECT_PERIODIC_MAX_RUNS=1
 PROSPECT_PUBLIC_SEARCH_USER_AGENT=trade-prospecting-bot/0.1
 PROSPECT_ENABLE_REDDIT_SOURCE=true
 PROSPECT_ENABLE_HACKER_NEWS_SOURCE=true
@@ -283,8 +290,16 @@ PROSPECT_ENABLE_DISCORD_SOURCE=true
 Scheduling:
 
 - run `uv run python scripts/run_daily_prospecting.py` once per day from a scheduler
+- for a simple in-process loop, use `uv run python scripts/run_periodic_prospecting.py`
 - on Railway, the cleanest setup is a separate scheduled worker service or cron-style job using the same repo and env vars
 - the main API service should stay focused on serving FastAPI traffic
+
+CRM direction mode:
+
+- set `PROSPECT_PROFILE=crm_direction` to bias the agent toward lead follow-up, pipeline hygiene, client handoff, relationship memory, and adjacent CRM workflows
+- when `PROSPECT_REDDIT_SEARCH_TERMS` is empty, the runtime uses CRM-specific defaults automatically in that profile
+- the digest includes model token usage when OpenAI drafting runs
+- when `PROSPECT_TRACK_USAGE=true`, each run appends a JSONL entry to `PROSPECT_USAGE_LOG_FILE`
 
 ## Structure
 

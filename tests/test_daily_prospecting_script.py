@@ -45,13 +45,25 @@ def test_main_reports_success(monkeypatch, capsys) -> None:
     monkeypatch.setattr(
         module,
         "run_prospecting_job",
-        lambda: type("Digest", (), {"scanned_post_count": 12, "shortlisted_count": 2})(),
+        lambda: type(
+            "Digest",
+            (),
+            {
+                "scanned_post_count": 12,
+                "shortlisted_count": 2,
+                "profile": "crm_direction",
+                "token_usage": type("Usage", (), {"model": "gpt-5-nano", "input_tokens": 40, "output_tokens": 10, "total_tokens": 50})(),
+            },
+        )(),
     )
 
     exit_code = module.main()
 
     assert exit_code == 0
-    assert capsys.readouterr().out.strip() == "Prospecting digest emailed to tom@example.com. Scanned 12 posts and shortlisted 2."
+    assert (
+        capsys.readouterr().out.strip()
+        == "Prospecting digest emailed to tom@example.com. Scanned 12 posts and shortlisted 2. Profile=crm_direction. Token usage=50 total (40 in / 10 out) via gpt-5-nano."
+    )
 
 
 def test_main_reports_known_failures(monkeypatch, capsys) -> None:
