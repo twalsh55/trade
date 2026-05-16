@@ -200,6 +200,7 @@ Telegram-triggered prospecting:
   - `/prospect status`
   - `/sentiment`
   - `/sentiment status`
+  - `/code`
   - `/help`
 
 ## Daily Prospecting Agent
@@ -212,6 +213,7 @@ What it does:
 - scores posts with local heuristics first to avoid unnecessary model usage
 - uses OpenAI only for a small opportunity-idea drafting step when `APP_OPENAI_API_KEY` or `OPENAI_API_KEY` is configured
 - can run in a CRM-focused direction mode to steer product decisions for the CRM app
+- `/code` runs the same cooperative prospect pass, sends the usual digest/briefing, and appends a structured build recommendation to `AUTONOMOUS_BUILD_QUEUE_FILE`
 - sends a plain-text email digest to `tom.mg.walsh@gmail.com` by default
 - falls back to Telegram digest delivery when SMTP is not configured but Telegram is
 - never posts to Reddit, Hacker News, or any other social network

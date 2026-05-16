@@ -27,6 +27,7 @@ from src.adapters.auth.runtime import (
     get_app_base_url,
     get_configured_clerk_page_url,
 )
+from src.adapters.autonomous_build.runtime import append_autonomous_build_brief
 from src.adapters.market_data.yfinance_provider import YFinanceMarketDataAdapter
 from src.adapters.notifications.smtp_email_notifier import EmailNotificationError
 from src.adapters.notifications.telegram_notifier import TelegramNotificationError, TelegramNotifier
@@ -48,6 +49,7 @@ from src.application.billing import (
     CreateCheckoutSessionUseCase,
     GetBillingOverviewUseCase,
 )
+from src.application.autonomous_build import decide_autonomous_build_brief, format_autonomous_build_brief
 from src.application.crm import GetLeadFollowUpOverviewUseCase
 from src.application.crm import AddLeadFollowUpNoteUseCase, CompleteLeadFollowUpUseCase, SnoozeLeadFollowUpUseCase
 from src.application.dashboard import (
@@ -417,13 +419,18 @@ def create_app(dependencies: ApiDependencies | None = None) -> FastAPI:
         if command.text == "/sentiment status":
             notifier.send_message(_build_etf_sentiment_status_message())
             return {"ok": True, "handled": True, "command": command.text}
+        if command.text == "/code":
+            notifier.send_message("Starting a cooperative code run now. I will send a build recommendation when it finishes.")
+            background_tasks.add_task(_run_code_from_telegram, notifier)
+            return {"ok": True, "handled": True, "command": command.text}
         if command.text == "/help":
             notifier.send_message(
                 "Supported commands:\n"
                 "/prospect - run the prospecting agent\n"
                 "/prospect status - show whether the prospecting agent is configured\n"
                 "/sentiment - run the ETF sentiment agent\n"
-                "/sentiment status - show whether the ETF sentiment agent is configured"
+                "/sentiment status - show whether the ETF sentiment agent is configured\n"
+                "/code - run the prospect agent and queue a build recommendation"
             )
             return {"ok": True, "handled": True, "command": command.text}
         return {"ok": True, "handled": False}
@@ -591,6 +598,22 @@ def _run_etf_sentiment_from_telegram(notifier: TelegramNotifier) -> None:
         api_logger.exception("ETF sentiment run failed", exc_info=exc)
         try:
             notifier.send_message(f"ETF sentiment run failed: {exc}")
+        except TelegramNotificationError:
+            return
+
+
+def _run_code_from_telegram(notifier: TelegramNotifier) -> None:
+    try:
+        digest = run_prospecting_job()
+        brief = decide_autonomous_build_brief(digest)
+        queue_path = append_autonomous_build_brief(brief)
+        notifier.send_message(
+            f"{format_autonomous_build_brief(brief)}\nQueue file: {queue_path}"
+        )
+    except (EmailNotificationError, RedditLeadSourceError, TelegramNotificationError, ValueError, RuntimeError) as exc:
+        api_logger.exception("Cooperative code run failed", exc_info=exc)
+        try:
+            notifier.send_message(f"Cooperative code run failed: {exc}")
         except TelegramNotificationError:
             return
 

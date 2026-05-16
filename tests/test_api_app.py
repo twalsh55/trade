@@ -16,6 +16,7 @@ from src.adapters.api.app import (
     _build_prospecting_status_message,
     _extract_telegram_command,
     _normalize_universe,
+    _run_code_from_telegram,
     _run_etf_sentiment_from_telegram,
     _run_prospecting_from_telegram,
     create_app,
@@ -425,6 +426,38 @@ def test_run_etf_sentiment_from_telegram_sends_success_and_failure_updates(monke
     _run_etf_sentiment_from_telegram(FailingNotifier())  # type: ignore[arg-type]
 
 
+def test_run_code_from_telegram_sends_decision_and_failure_updates(monkeypatch, tmp_path) -> None:
+    sent: list[str] = []
+
+    class FakeNotifier:
+        def send_message(self, text: str) -> None:
+            sent.append(text)
+
+    digest = object()
+    brief = object()
+    monkeypatch.setattr("src.adapters.api.app.run_prospecting_job", lambda: digest)
+    monkeypatch.setattr("src.adapters.api.app.decide_autonomous_build_brief", lambda payload: brief if payload is digest else None)
+    monkeypatch.setattr("src.adapters.api.app.append_autonomous_build_brief", lambda payload: tmp_path / "queue.jsonl")
+    monkeypatch.setattr("src.adapters.api.app.format_autonomous_build_brief", lambda payload: "Code cooperation result\nDecision: build now")
+
+    _run_code_from_telegram(FakeNotifier())  # type: ignore[arg-type]
+    assert "Decision: build now" in sent[-1]
+    assert "Queue file:" in sent[-1]
+
+    monkeypatch.setattr("src.adapters.api.app.run_prospecting_job", lambda: (_ for _ in ()).throw(ValueError("broken")))
+    _run_code_from_telegram(FakeNotifier())  # type: ignore[arg-type]
+    assert sent[-1] == "Cooperative code run failed: broken"
+
+    class FailingNotifier:
+        def send_message(self, text: str) -> None:
+            raise __import__("src.adapters.notifications.telegram_notifier", fromlist=["TelegramNotificationError"]).TelegramNotificationError(
+                "down"
+            )
+
+    monkeypatch.setattr("src.adapters.api.app.run_prospecting_job", lambda: (_ for _ in ()).throw(ValueError("broken")))
+    _run_code_from_telegram(FailingNotifier())  # type: ignore[arg-type]
+
+
 def test_telegram_webhook_handles_commands_and_guards(monkeypatch) -> None:
     client = make_client(user=make_user())
     sent: list[str] = []
@@ -444,6 +477,7 @@ def test_telegram_webhook_handles_commands_and_guards(monkeypatch) -> None:
     monkeypatch.setattr("src.adapters.api.app.TelegramNotifier", FakeNotifier)
     monkeypatch.setattr("src.adapters.api.app._run_prospecting_from_telegram", lambda notifier: tasks.append("ran"))
     monkeypatch.setattr("src.adapters.api.app._run_etf_sentiment_from_telegram", lambda notifier: tasks.append("sentiment"))
+    monkeypatch.setattr("src.adapters.api.app._run_code_from_telegram", lambda notifier: tasks.append("code"))
     monkeypatch.setattr("src.adapters.api.app.collect_prospecting_config_errors", lambda: [])
     monkeypatch.setattr("src.adapters.api.app.collect_etf_sentiment_config_errors", lambda: [])
     monkeypatch.delenv("APP_OPENAI_API_KEY", raising=False)
@@ -503,10 +537,20 @@ def test_telegram_webhook_handles_commands_and_guards(monkeypatch) -> None:
     response = client.post(
         "/api/telegram/webhook",
         headers={"X-Telegram-Bot-Api-Secret-Token": "secret"},
+        json={"message": {"text": "/code", "chat": {"id": 123}}},
+    )
+    assert response.json() == {"ok": True, "handled": True, "command": "/code"}
+    assert sent[-1] == "Starting a cooperative code run now. I will send a build recommendation when it finishes."
+    assert tasks == ["ran", "sentiment", "code"]
+
+    response = client.post(
+        "/api/telegram/webhook",
+        headers={"X-Telegram-Bot-Api-Secret-Token": "secret"},
         json={"message": {"text": "/help", "chat": {"id": 123}}},
     )
     assert response.json() == {"ok": True, "handled": True, "command": "/help"}
     assert "Supported commands:" in sent[-1]
+    assert "/code - run the prospect agent and queue a build recommendation" in sent[-1]
 
     response = client.post(
         "/api/telegram/webhook",
