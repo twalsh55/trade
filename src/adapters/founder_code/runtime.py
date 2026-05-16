@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
+import subprocess
 from datetime import datetime
 from pathlib import Path
 
@@ -123,6 +125,103 @@ def stage_founder_code_requests_from_inbox() -> int:
     return len(pending_requests)
 
 
+def launch_next_pending_founder_code_request() -> str:
+    pending_path = Path(
+        os.getenv("AUTONOMOUS_CODE_PENDING_FILE", "var/founder_code_pending.jsonl").strip()
+        or "var/founder_code_pending.jsonl"
+    )
+    if not pending_path.exists():
+        return "no_pending_file"
+
+    pid_path = Path(
+        os.getenv("AUTONOMOUS_CODE_EXECUTOR_PID_FILE", "var/founder_code_executor.pid").strip()
+        or "var/founder_code_executor.pid"
+    )
+    active_path = Path(
+        os.getenv("AUTONOMOUS_CODE_ACTIVE_FILE", "var/founder_code_active.json").strip()
+        or "var/founder_code_active.json"
+    )
+    cursor_path = Path(
+        os.getenv("AUTONOMOUS_CODE_EXECUTION_CURSOR_FILE", "var/founder_code_execution_cursor.txt").strip()
+        or "var/founder_code_execution_cursor.txt"
+    )
+    if _is_executor_running(pid_path):
+        return "already_running"
+
+    last_seen_id = _read_last_seen_request_id(cursor_path)
+    pending_requests = _collect_requests_after_cursor(pending_path, last_seen_id)
+    if not pending_requests:
+        return "no_new_requests"
+
+    next_request = pending_requests[0]
+    request_id = str(next_request["id"])
+    codex_bin = shutil.which("codex")
+    if not codex_bin:
+        raise RuntimeError("Codex CLI is not installed or not on PATH.")
+
+    workspace_root = Path(
+        os.getenv("AUTONOMOUS_CODE_WORKSPACE_ROOT", os.getcwd()).strip()
+        or os.getcwd()
+    )
+    run_dir = Path(
+        os.getenv("AUTONOMOUS_CODE_RUN_DIR", "var/founder_code_runs").strip()
+        or "var/founder_code_runs"
+    )
+    run_dir.mkdir(parents=True, exist_ok=True)
+    output_path = run_dir / f"{request_id}.last_message.txt"
+    log_path = run_dir / f"{request_id}.log"
+
+    prompt = _build_codex_exec_prompt(next_request)
+    command = [
+        codex_bin,
+        "exec",
+        "-C",
+        str(workspace_root),
+        "-a",
+        "never",
+        "-s",
+        "danger-full-access",
+        "-o",
+        str(output_path),
+        prompt,
+    ]
+
+    with log_path.open("a", encoding="utf-8") as log_handle:
+        process = subprocess.Popen(  # noqa: S603
+            command,
+            cwd=workspace_root,
+            stdout=log_handle,
+            stderr=subprocess.STDOUT,
+            stdin=subprocess.DEVNULL,
+            start_new_session=True,
+            text=True,
+        )
+
+    pid_path.parent.mkdir(parents=True, exist_ok=True)
+    pid_path.write_text(str(process.pid), encoding="utf-8")
+    active_path.parent.mkdir(parents=True, exist_ok=True)
+    active_path.write_text(
+        json.dumps(
+            {
+                "id": request_id,
+                "source_chat_id": next_request.get("source_chat_id"),
+                "command_text": next_request.get("command_text"),
+                "guidance": next_request.get("guidance"),
+                "pid": process.pid,
+                "started_at": datetime.now().isoformat(),
+                "log_path": str(log_path),
+                "output_path": str(output_path),
+            },
+            sort_keys=True,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    cursor_path.parent.mkdir(parents=True, exist_ok=True)
+    cursor_path.write_text(request_id, encoding="utf-8")
+    return f"launched={request_id} pid={process.pid}"
+
+
 def parse_positive_int(name: str, default: int) -> int:
     raw_value = os.getenv(name, "").strip()
     if not raw_value:
@@ -176,3 +275,34 @@ def _collect_requests_after_cursor(inbox_path: Path, last_seen_id: str | None) -
     if last_seen_id is not None and not seen_cursor:
         return parsed_items
     return items
+
+
+def _is_executor_running(pid_path: Path) -> bool:
+    pid_value = _read_last_seen_request_id(pid_path)
+    if pid_value is None:
+        return False
+    try:
+        pid = int(pid_value)
+    except ValueError:
+        return False
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        return False
+    return True
+
+
+def _build_codex_exec_prompt(request: dict[str, object]) -> str:
+    guidance = str(request.get("guidance") or request.get("command_text") or "").strip()
+    command_text = str(request.get("command_text") or "").strip()
+    source_chat_id = str(request.get("source_chat_id") or "").strip()
+    return (
+        "Remote founder instruction received through the local automation bridge.\n"
+        f"Source: {source_chat_id or 'unknown'}\n"
+        f"Command: {command_text or '(missing)'}\n"
+        f"Guidance: {guidance or '(missing)'}\n\n"
+        "Work in the current repository and follow AGENTS.md. "
+        "Implement the requested change if it does not harm the current goal of building a narrow, profitable CRM wedge. "
+        "Run relevant tests, commit and push coherent change sets, and deploy when appropriate. "
+        "If the request conflicts with the product goal or cannot be completed safely, explain that clearly instead of forcing a change."
+    )

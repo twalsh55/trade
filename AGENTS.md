@@ -229,6 +229,7 @@ Use this section to give the next session a fast, practical starting point. Refr
 - The newest bridge layer is a founder-code sync job: Railway stores both `/code` requests and prospect-agent build prompts, and the local automation worker can poll them into `var/founder_code_inbox.jsonl` when the sync env vars are configured.
 - This bridge has now been proven end to end with a live production `/prospect` run; the first mirrored `agent:prospect` prompt recommended `CSV and Google Sheets import`.
 - The local worker now also stages newly synced remote instructions into `var/founder_code_pending.jsonl` and writes the newest one to `var/founder_code_latest.json`, so remote requests are surfaced automatically instead of waiting for manual inbox inspection.
+- The local worker can now optionally launch one headless `codex exec` run at a time from that pending queue, tracked via `var/founder_code_active.json` and `var/founder_code_executor.pid`, so remote requests can become live autonomous work on this machine.
 
 ### Current Deployment Status
 

@@ -12,7 +12,11 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from src.adapters.notifications.smtp_email_notifier import EmailNotificationError
-from src.adapters.founder_code.runtime import stage_founder_code_requests_from_inbox, sync_founder_code_requests_from_api
+from src.adapters.founder_code.runtime import (
+    launch_next_pending_founder_code_request,
+    stage_founder_code_requests_from_inbox,
+    sync_founder_code_requests_from_api,
+)
 from src.adapters.llm.openai_prospect_drafter import OpenAIProspectDrafterError
 from src.adapters.operator_briefing.runtime import run_daily_operator_briefing_job
 from src.adapters.prospecting.runtime import get_app_openai_api_key, is_placeholder_openai_key, parse_positive_int, run_prospecting_job
@@ -139,6 +143,14 @@ def build_jobs_from_env() -> tuple[AutomationJob, ...]:
                 ),
             )
         )
+    if os.getenv("AUTOMATION_ENABLE_FOUNDER_CODE_EXECUTOR", "false").strip().lower() == "true":
+        jobs.append(
+            AutomationJob(
+                name="founder_code_execute",
+                interval=timedelta(seconds=parse_positive_int("AUTOMATION_FOUNDER_CODE_EXECUTOR_INTERVAL_SECONDS", default=30)),
+                runner=lambda: _run_job_with_timeout("founder_code_execute", _run_founder_code_execute_job, timeout_seconds),
+            )
+        )
     return tuple(jobs)
 
 
@@ -162,6 +174,7 @@ def collect_automation_config_errors() -> list[str]:
         "AUTOMATION_OPERATOR_BRIEFING_INTERVAL_HOURS",
         "AUTOMATION_SENTIMENT_INTERVAL_HOURS",
         "AUTOMATION_JOB_TIMEOUT_SECONDS",
+        "AUTOMATION_FOUNDER_CODE_EXECUTOR_INTERVAL_SECONDS",
     ):
         raw_value = os.getenv(name, "").strip()
         if not raw_value:
@@ -255,6 +268,14 @@ def _run_founder_code_consume_job() -> AutomationJobResult:
     except (ValueError, RuntimeError, json.JSONDecodeError) as exc:
         return AutomationJobResult(status="failed", detail=str(exc))
     return AutomationJobResult(status="ok", detail=f"staged={staged_count}")
+
+
+def _run_founder_code_execute_job() -> AutomationJobResult:
+    try:
+        detail = launch_next_pending_founder_code_request()
+    except RuntimeError as exc:
+        return AutomationJobResult(status="failed", detail=str(exc))
+    return AutomationJobResult(status="ok", detail=detail)
 
 
 def _run_sentiment_job(runner) -> AutomationJobResult:  # type: ignore[no-untyped-def]

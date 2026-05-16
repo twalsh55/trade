@@ -14,6 +14,7 @@ from src.adapters.automation.runtime import (
     LocalAutomationWorker,
     _format_token_usage,
     _run_founder_code_consume_job,
+    _run_founder_code_execute_job,
     _run_founder_code_sync_job,
     _run_job_with_timeout,
     _run_operator_briefing_job,
@@ -206,6 +207,12 @@ def test_build_jobs_worker_and_run_worker_from_env(monkeypatch, tmp_path) -> Non
     assert jobs[4].name == "sentiment_daily"
     assert jobs[4].interval == timedelta(hours=6)
 
+    monkeypatch.setenv("AUTOMATION_ENABLE_FOUNDER_CODE_EXECUTOR", "true")
+    monkeypatch.setenv("AUTOMATION_FOUNDER_CODE_EXECUTOR_INTERVAL_SECONDS", "30")
+    jobs = build_jobs_from_env()
+    assert jobs[5].name == "founder_code_execute"
+    assert jobs[5].interval == timedelta(seconds=30)
+
     class FakeWorker:
         def run_forever(self, max_iterations=None):
             return 7
@@ -291,6 +298,15 @@ def test_automation_job_runners_report_success_and_failure(monkeypatch) -> None:
         lambda: (_ for _ in ()).throw(RuntimeError("bad inbox")),
     )
     assert _run_founder_code_consume_job().status == "failed"
+
+    monkeypatch.setattr("src.adapters.automation.runtime.launch_next_pending_founder_code_request", lambda: "launched=123 pid=456")
+    assert _run_founder_code_execute_job().detail == "launched=123 pid=456"
+
+    monkeypatch.setattr(
+        "src.adapters.automation.runtime.launch_next_pending_founder_code_request",
+        lambda: (_ for _ in ()).throw(RuntimeError("codex missing")),
+    )
+    assert _run_founder_code_execute_job().status == "failed"
 
     briefing = type("Briefing", (), {"prospect_run_count": 2, "total_shortlisted_ideas": 5, "product_updates": (1, 2)})()
     monkeypatch.setattr("src.adapters.automation.runtime.run_daily_operator_briefing_job", lambda: briefing)

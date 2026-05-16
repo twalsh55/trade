@@ -11,6 +11,7 @@ from psycopg import OperationalError
 from src.adapters.founder_code import runtime as runtime_module
 from src.adapters.founder_code.runtime import (
     build_founder_code_request_repository,
+    launch_next_pending_founder_code_request,
     parse_positive_int,
     stage_founder_code_requests_from_inbox,
     sync_founder_code_requests_from_api,
@@ -349,6 +350,94 @@ def test_stage_founder_code_requests_from_inbox_handles_missing_inbox_and_sparse
 
     assert stage_founder_code_requests_from_inbox() == 1
     assert json.loads(pending_path.read_text(encoding="utf-8").strip())["id"] == "22"
+
+
+def test_launch_next_pending_founder_code_request_launches_one_job(tmp_path, monkeypatch) -> None:
+    pending_path = tmp_path / "pending.jsonl"
+    pending_path.write_text(
+        json.dumps(
+            {
+                "id": "44",
+                "command_text": "/code fix login",
+                "guidance": "fix login",
+                "source_chat_id": "123",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("AUTONOMOUS_CODE_PENDING_FILE", str(pending_path))
+    monkeypatch.setenv("AUTONOMOUS_CODE_EXECUTION_CURSOR_FILE", str(tmp_path / "exec-cursor.txt"))
+    monkeypatch.setenv("AUTONOMOUS_CODE_EXECUTOR_PID_FILE", str(tmp_path / "executor.pid"))
+    monkeypatch.setenv("AUTONOMOUS_CODE_ACTIVE_FILE", str(tmp_path / "active.json"))
+    monkeypatch.setenv("AUTONOMOUS_CODE_RUN_DIR", str(tmp_path / "runs"))
+    monkeypatch.setenv("AUTONOMOUS_CODE_WORKSPACE_ROOT", str(tmp_path))
+    monkeypatch.setattr(runtime_module.shutil, "which", lambda name: "/usr/bin/codex")
+    monkeypatch.setattr(runtime_module, "_is_executor_running", lambda path: False)
+
+    captured: dict[str, object] = {}
+
+    class FakeProcess:
+        pid = 9876
+
+    def fake_popen(command, cwd, stdout, stderr, stdin, start_new_session, text):  # type: ignore[no-untyped-def]
+        captured["command"] = command
+        captured["cwd"] = cwd
+        return FakeProcess()
+
+    monkeypatch.setattr(runtime_module.subprocess, "Popen", fake_popen)
+
+    result = launch_next_pending_founder_code_request()
+
+    assert result == "launched=44 pid=9876"
+    assert captured["command"][0] == "/usr/bin/codex"
+    assert (tmp_path / "executor.pid").read_text(encoding="utf-8") == "9876"
+    assert json.loads((tmp_path / "active.json").read_text(encoding="utf-8"))["id"] == "44"
+    assert (tmp_path / "exec-cursor.txt").read_text(encoding="utf-8") == "44"
+
+
+def test_launch_next_pending_founder_code_request_handles_idle_and_running_states(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("AUTONOMOUS_CODE_PENDING_FILE", str(tmp_path / "missing.jsonl"))
+    assert launch_next_pending_founder_code_request() == "no_pending_file"
+
+    pending_path = tmp_path / "pending.jsonl"
+    pending_path.write_text("", encoding="utf-8")
+    monkeypatch.setenv("AUTONOMOUS_CODE_PENDING_FILE", str(pending_path))
+    monkeypatch.setenv("AUTONOMOUS_CODE_EXECUTION_CURSOR_FILE", str(tmp_path / "exec-cursor.txt"))
+    monkeypatch.setenv("AUTONOMOUS_CODE_EXECUTOR_PID_FILE", str(tmp_path / "executor.pid"))
+    monkeypatch.setattr(runtime_module, "_is_executor_running", lambda path: True)
+    assert launch_next_pending_founder_code_request() == "already_running"
+
+    monkeypatch.setattr(runtime_module, "_is_executor_running", lambda path: False)
+    assert launch_next_pending_founder_code_request() == "no_new_requests"
+
+
+def test_launch_next_pending_founder_code_request_requires_codex_binary(tmp_path, monkeypatch) -> None:
+    pending_path = tmp_path / "pending.jsonl"
+    pending_path.write_text(json.dumps({"id": "55", "command_text": "/code fix", "source_chat_id": "123"}) + "\n", encoding="utf-8")
+    monkeypatch.setenv("AUTONOMOUS_CODE_PENDING_FILE", str(pending_path))
+    monkeypatch.setenv("AUTONOMOUS_CODE_EXECUTION_CURSOR_FILE", str(tmp_path / "exec-cursor.txt"))
+    monkeypatch.setenv("AUTONOMOUS_CODE_EXECUTOR_PID_FILE", str(tmp_path / "executor.pid"))
+    monkeypatch.setattr(runtime_module, "_is_executor_running", lambda path: False)
+    monkeypatch.setattr(runtime_module.shutil, "which", lambda name: None)
+
+    with pytest.raises(RuntimeError, match="Codex CLI is not installed"):
+        launch_next_pending_founder_code_request()
+
+
+def test_is_executor_running_handles_missing_invalid_and_dead_pid(tmp_path, monkeypatch) -> None:
+    pid_path = tmp_path / "executor.pid"
+    assert runtime_module._is_executor_running(pid_path) is False
+
+    pid_path.write_text("abc", encoding="utf-8")
+    assert runtime_module._is_executor_running(pid_path) is False
+
+    pid_path.write_text("12345", encoding="utf-8")
+    monkeypatch.setattr(runtime_module.os, "kill", lambda pid, signal: (_ for _ in ()).throw(OSError("dead")))
+    assert runtime_module._is_executor_running(pid_path) is False
+
+    monkeypatch.setattr(runtime_module.os, "kill", lambda pid, signal: None)
+    assert runtime_module._is_executor_running(pid_path) is True
 
 
 def test_sync_founder_code_requests_from_api_raises_for_http_or_bad_payload(tmp_path, monkeypatch) -> None:

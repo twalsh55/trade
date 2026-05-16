@@ -307,6 +307,11 @@ AUTONOMOUS_CODE_CURSOR_FILE=var/founder_code_cursor.txt
 AUTONOMOUS_CODE_PENDING_FILE=var/founder_code_pending.jsonl
 AUTONOMOUS_CODE_PENDING_CURSOR_FILE=var/founder_code_pending_cursor.txt
 AUTONOMOUS_CODE_LATEST_FILE=var/founder_code_latest.json
+AUTONOMOUS_CODE_ACTIVE_FILE=var/founder_code_active.json
+AUTONOMOUS_CODE_EXECUTOR_PID_FILE=var/founder_code_executor.pid
+AUTONOMOUS_CODE_EXECUTION_CURSOR_FILE=var/founder_code_execution_cursor.txt
+AUTONOMOUS_CODE_RUN_DIR=var/founder_code_runs
+AUTONOMOUS_CODE_WORKSPACE_ROOT=/home/tom/dev/trade
 AUTONOMOUS_CODE_SYNC_LIMIT=25
 ```
 
@@ -355,6 +360,8 @@ AUTOMATION_POLL_SECONDS=30
 AUTOMATION_PROSPECT_INTERVAL_MINUTES=720
 AUTOMATION_ENABLE_FOUNDER_CODE_SYNC=false
 AUTOMATION_FOUNDER_CODE_SYNC_INTERVAL_SECONDS=60
+AUTOMATION_ENABLE_FOUNDER_CODE_EXECUTOR=false
+AUTOMATION_FOUNDER_CODE_EXECUTOR_INTERVAL_SECONDS=30
 AUTOMATION_ENABLE_SCHEDULED_OPERATOR_BRIEFING=false
 AUTOMATION_OPERATOR_BRIEFING_INTERVAL_HOURS=24
 AUTOMATION_ENABLE_SENTIMENT_JOB=false
@@ -374,6 +381,7 @@ Automation behavior:
 - state persists last successful run timestamps so the worker can resume cleanly after restarts
 - when `AUTOMATION_ENABLE_FOUNDER_CODE_SYNC=true`, the worker polls the production API for stored `/code` requests and appends them to `AUTONOMOUS_CODE_INBOX_FILE`
 - the worker also stages newly synced items into `AUTONOMOUS_CODE_PENDING_FILE` and keeps the newest staged instruction in `AUTONOMOUS_CODE_LATEST_FILE`
+- when `AUTOMATION_ENABLE_FOUNDER_CODE_EXECUTOR=true`, the worker can also launch one headless `codex exec` run at a time from the pending queue, tracking the active run in `AUTONOMOUS_CODE_ACTIVE_FILE`
 - the same sync path also brings down strong prospect-agent build recommendations, tagged with `source_chat_id=agent:prospect`
 - unattended prospect runs fall back to template mode automatically if the local OpenAI credential is invalid
 - each successful automated prospect run also sends an operator briefing email so product guidance arrives with the run itself
