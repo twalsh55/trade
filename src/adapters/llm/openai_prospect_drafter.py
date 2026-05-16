@@ -121,9 +121,17 @@ class OpenAIProspectDrafter:
                     confidence=confidence.strip().lower() or "medium",
                     noise_flags=normalized_noise_flags,
                 )
+            elif isinstance(post_id, str):
+                normalized_assessment = assessment.strip().lower() or "weak_signal"
+                replies_by_id[post_id] = ProspectDraft(
+                    idea="",
+                    assessment="reject" if normalized_assessment == "reject" else normalized_assessment,
+                    confidence=confidence.strip().lower() or "medium",
+                    noise_flags=normalized_noise_flags or ("missing_idea",),
+                )
 
         return [
-            replies_by_id.get(match.post.external_id) or _build_template_reply(match.post.title, app_url)
+            replies_by_id.get(match.post.external_id) or _build_model_omission_rejection()
             for match in matches
         ]
 
@@ -155,6 +163,15 @@ def _build_template_reply(post_title: str, app_url: str | None) -> ProspectDraft
         assessment="needs_review",
         confidence="low",
         noise_flags=("template_fallback",),
+    )
+
+
+def _build_model_omission_rejection() -> ProspectDraft:
+    return ProspectDraft(
+        idea="",
+        assessment="reject",
+        confidence="low",
+        noise_flags=("model_omitted_item",),
     )
 
 

@@ -170,14 +170,14 @@ def test_local_automation_status_script_reports_health(monkeypatch, capsys) -> N
 
 
 def test_build_jobs_worker_and_run_worker_from_env(monkeypatch, tmp_path) -> None:
-    monkeypatch.setenv("AUTOMATION_PROSPECT_INTERVAL_MINUTES", "15")
+    monkeypatch.setenv("AUTOMATION_PROSPECT_INTERVAL_MINUTES", "720")
     monkeypatch.setenv("AUTOMATION_OPERATOR_BRIEFING_INTERVAL_HOURS", "12")
     monkeypatch.setenv("AUTOMATION_POLL_SECONDS", "9")
     monkeypatch.setenv("AUTOMATION_JOB_TIMEOUT_SECONDS", "45")
     monkeypatch.setenv("AUTOMATION_STATE_FILE", str(tmp_path / "state.json"))
     monkeypatch.setenv("AUTOMATION_HEARTBEAT_FILE", str(tmp_path / "heartbeat.json"))
     jobs = build_jobs_from_env()
-    assert jobs[0].interval == timedelta(minutes=15)
+    assert jobs[0].interval == timedelta(minutes=720)
     assert jobs[1].interval == timedelta(hours=12)
 
     worker = build_worker_from_env()

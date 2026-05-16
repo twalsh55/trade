@@ -131,7 +131,7 @@ def test_openai_prospect_drafter_ignores_invalid_usage_shape(monkeypatch) -> Non
     assert drafter.get_last_usage() is None
 
 
-def test_openai_prospect_drafter_falls_back_when_post_missing(monkeypatch) -> None:
+def test_openai_prospect_drafter_rejects_when_post_missing(monkeypatch) -> None:
     monkeypatch.setattr(
         "src.adapters.llm.openai_prospect_drafter.httpx.post",
         lambda *args, **kwargs: httpx.Response(
@@ -143,7 +143,14 @@ def test_openai_prospect_drafter_falls_back_when_post_missing(monkeypatch) -> No
 
     replies = OpenAIProspectDrafter(api_key="secret").draft_promotional_replies("summary", (build_match("1"),), None)
 
-    assert "Potential SaaS idea:" in replies[0].idea
+    assert replies == [
+        ProspectDraft(
+            idea="",
+            assessment="reject",
+            confidence="low",
+            noise_flags=("model_omitted_item",),
+        )
+    ]
 
 
 def test_openai_prospect_drafter_returns_empty_list_when_no_matches() -> None:
@@ -234,6 +241,28 @@ def test_openai_prospect_drafter_accepts_legacy_reply_field(monkeypatch) -> None
             assessment="weak_signal",
             confidence="medium",
             noise_flags=(),
+        )
+    ]
+
+
+def test_openai_prospect_drafter_accepts_reject_without_idea(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "src.adapters.llm.openai_prospect_drafter.httpx.post",
+        lambda *args, **kwargs: httpx.Response(
+            200,
+            request=httpx.Request("POST", "https://api.openai.com/v1/responses"),
+            json={"output_text": '{"drafts":[{"post_id":"1","assessment":"reject","confidence":"high","noise_flags":["launch_noise"]}]}'},
+        ),  # type: ignore[no-untyped-def]
+    )
+
+    replies = OpenAIProspectDrafter(api_key="secret").draft_promotional_replies("summary", (build_match("1"),), None)
+
+    assert replies == [
+        ProspectDraft(
+            idea="",
+            assessment="reject",
+            confidence="high",
+            noise_flags=("launch_noise",),
         )
     ]
 

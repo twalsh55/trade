@@ -96,7 +96,7 @@ def build_jobs_from_env() -> tuple[AutomationJob, ...]:
     jobs = [
         AutomationJob(
             name="prospect_hourly",
-            interval=timedelta(minutes=parse_positive_int("AUTOMATION_PROSPECT_INTERVAL_MINUTES", default=60)),
+            interval=timedelta(minutes=parse_positive_int("AUTOMATION_PROSPECT_INTERVAL_MINUTES", default=720)),
             runner=lambda: _run_job_with_timeout("prospect_hourly", _run_prospect_job, timeout_seconds),
         ),
         AutomationJob(
