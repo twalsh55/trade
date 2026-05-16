@@ -45,6 +45,14 @@ def test_build_config_from_env_uses_crm_profile_defaults(monkeypatch) -> None:
     assert "CRM product" in config.app_summary
 
 
+def test_build_config_from_env_appends_founder_guidance(monkeypatch) -> None:
+    monkeypatch.setenv("PROSPECT_PROFILE", "crm_direction")
+
+    config = build_config_from_env("fix a bug with login")
+
+    assert "Founder guidance: fix a bug with login." in config.app_summary
+
+
 def test_build_email_notifier_requires_env(monkeypatch) -> None:
     monkeypatch.delenv("SMTP_HOST", raising=False)
 
@@ -273,7 +281,11 @@ def test_run_prospecting_job_builds_and_executes_use_case(monkeypatch) -> None:
             "token_usage": None,
         },
     )()
-    monkeypatch.setattr("src.adapters.prospecting.runtime.build_config_from_env", lambda: config)
+    seen_guidance: list[str | None] = []
+    monkeypatch.setattr(
+        "src.adapters.prospecting.runtime.build_config_from_env",
+        lambda founder_guidance=None: seen_guidance.append(founder_guidance) or config,
+    )
     monkeypatch.setattr("src.adapters.prospecting.runtime.build_lead_source_from_env", lambda: lead_source)
     monkeypatch.setattr("src.adapters.prospecting.runtime.build_drafter_from_env", lambda: drafter)
     monkeypatch.setattr("src.adapters.prospecting.runtime.build_digest_delivery_from_env", lambda: email_delivery)
@@ -296,7 +308,8 @@ def test_run_prospecting_job_builds_and_executes_use_case(monkeypatch) -> None:
 
     monkeypatch.setattr("src.adapters.prospecting.runtime.RunDailyProspectingUseCase", FakeUseCase)
 
-    assert run_prospecting_job() is digest
+    assert run_prospecting_job("fix login") is digest
+    assert seen_guidance == ["fix login"]
     assert briefing_triggers == ["prospect run"]
 
 
@@ -314,7 +327,7 @@ def test_run_prospecting_job_appends_usage_log_when_configured(monkeypatch) -> N
             "token_usage": None,
         },
     )()
-    monkeypatch.setattr("src.adapters.prospecting.runtime.build_config_from_env", lambda: config)
+    monkeypatch.setattr("src.adapters.prospecting.runtime.build_config_from_env", lambda founder_guidance=None: config)
     monkeypatch.setattr("src.adapters.prospecting.runtime.build_lead_source_from_env", lambda: object())
     monkeypatch.setattr("src.adapters.prospecting.runtime.build_drafter_from_env", lambda: object())
     monkeypatch.setattr("src.adapters.prospecting.runtime.build_digest_delivery_from_env", lambda: object())
@@ -356,7 +369,7 @@ def test_run_prospecting_job_can_disable_operator_briefing(monkeypatch) -> None:
         },
     )()
     monkeypatch.setenv("PROSPECT_SEND_OPERATOR_BRIEFING", "false")
-    monkeypatch.setattr("src.adapters.prospecting.runtime.build_config_from_env", lambda: config)
+    monkeypatch.setattr("src.adapters.prospecting.runtime.build_config_from_env", lambda founder_guidance=None: config)
     monkeypatch.setattr("src.adapters.prospecting.runtime.build_lead_source_from_env", lambda: object())
     monkeypatch.setattr("src.adapters.prospecting.runtime.build_drafter_from_env", lambda: object())
     monkeypatch.setattr("src.adapters.prospecting.runtime.build_digest_delivery_from_env", lambda: object())

@@ -331,11 +331,20 @@ def test_extract_telegram_command_parses_supported_message_shapes() -> None:
     assert _extract_telegram_command({}) is None
     assert _extract_telegram_command({"message": "bad"}) is None
     assert _extract_telegram_command({"message": {"text": 1, "chat": {}}}) is None
+    assert _extract_telegram_command({"message": {"text": "hello", "chat": {"id": 123}}}) is None
     assert _extract_telegram_command({"message": {"text": "/prospect", "chat": "bad"}}) is None
     assert _extract_telegram_command({"message": {"text": "/prospect", "chat": {"id": None}}}) is None
     assert _extract_telegram_command({"message": {"text": "/prospect@mybot", "chat": {"id": 123}}}) == _TelegramCommand(
         chat_id="123",
+        name="/prospect",
+        argument=None,
         text="/prospect",
+    )
+    assert _extract_telegram_command({"message": {"text": "/code fix a bug with login", "chat": {"id": 123}}}) == _TelegramCommand(
+        chat_id="123",
+        name="/code",
+        argument="fix a bug with login",
+        text="/code fix a bug with login",
     )
 
 
@@ -435,16 +444,21 @@ def test_run_code_from_telegram_sends_decision_and_failure_updates(monkeypatch, 
 
     digest = object()
     brief = object()
-    monkeypatch.setattr("src.adapters.api.app.run_prospecting_job", lambda: digest)
-    monkeypatch.setattr("src.adapters.api.app.decide_autonomous_build_brief", lambda payload: brief if payload is digest else None)
+    seen_guidance: list[str | None] = []
+    monkeypatch.setattr("src.adapters.api.app.run_prospecting_job", lambda founder_guidance=None: seen_guidance.append(founder_guidance) or digest)
+    monkeypatch.setattr(
+        "src.adapters.api.app.decide_autonomous_build_brief",
+        lambda payload, founder_guidance=None: brief if payload is digest and founder_guidance == "fix a bug with login" else None,
+    )
     monkeypatch.setattr("src.adapters.api.app.append_autonomous_build_brief", lambda payload: tmp_path / "queue.jsonl")
     monkeypatch.setattr("src.adapters.api.app.format_autonomous_build_brief", lambda payload: "Code cooperation result\nDecision: build now")
 
-    _run_code_from_telegram(FakeNotifier())  # type: ignore[arg-type]
+    _run_code_from_telegram(FakeNotifier(), "fix a bug with login")  # type: ignore[arg-type]
     assert "Decision: build now" in sent[-1]
     assert "Queue file:" in sent[-1]
+    assert seen_guidance == ["fix a bug with login"]
 
-    monkeypatch.setattr("src.adapters.api.app.run_prospecting_job", lambda: (_ for _ in ()).throw(ValueError("broken")))
+    monkeypatch.setattr("src.adapters.api.app.run_prospecting_job", lambda founder_guidance=None: (_ for _ in ()).throw(ValueError("broken")))
     _run_code_from_telegram(FakeNotifier())  # type: ignore[arg-type]
     assert sent[-1] == "Cooperative code run failed: broken"
 
@@ -454,7 +468,7 @@ def test_run_code_from_telegram_sends_decision_and_failure_updates(monkeypatch, 
                 "down"
             )
 
-    monkeypatch.setattr("src.adapters.api.app.run_prospecting_job", lambda: (_ for _ in ()).throw(ValueError("broken")))
+    monkeypatch.setattr("src.adapters.api.app.run_prospecting_job", lambda founder_guidance=None: (_ for _ in ()).throw(ValueError("broken")))
     _run_code_from_telegram(FailingNotifier())  # type: ignore[arg-type]
 
 
@@ -477,7 +491,7 @@ def test_telegram_webhook_handles_commands_and_guards(monkeypatch) -> None:
     monkeypatch.setattr("src.adapters.api.app.TelegramNotifier", FakeNotifier)
     monkeypatch.setattr("src.adapters.api.app._run_prospecting_from_telegram", lambda notifier: tasks.append("ran"))
     monkeypatch.setattr("src.adapters.api.app._run_etf_sentiment_from_telegram", lambda notifier: tasks.append("sentiment"))
-    monkeypatch.setattr("src.adapters.api.app._run_code_from_telegram", lambda notifier: tasks.append("code"))
+    monkeypatch.setattr("src.adapters.api.app._run_code_from_telegram", lambda notifier, founder_guidance=None: tasks.append("code"))
     monkeypatch.setattr("src.adapters.api.app.collect_prospecting_config_errors", lambda: [])
     monkeypatch.setattr("src.adapters.api.app.collect_etf_sentiment_config_errors", lambda: [])
     monkeypatch.delenv("APP_OPENAI_API_KEY", raising=False)
@@ -546,11 +560,24 @@ def test_telegram_webhook_handles_commands_and_guards(monkeypatch) -> None:
     response = client.post(
         "/api/telegram/webhook",
         headers={"X-Telegram-Bot-Api-Secret-Token": "secret"},
+        json={"message": {"text": "/code fix a bug with login", "chat": {"id": 123}}},
+    )
+    assert response.json() == {"ok": True, "handled": True, "command": "/code"}
+    assert sent[-1] == (
+        "Starting a cooperative code run now. I will send a build recommendation when it finishes."
+        " Founder guidance received: fix a bug with login."
+    )
+    assert tasks == ["ran", "sentiment", "code", "code"]
+
+    response = client.post(
+        "/api/telegram/webhook",
+        headers={"X-Telegram-Bot-Api-Secret-Token": "secret"},
         json={"message": {"text": "/help", "chat": {"id": 123}}},
     )
     assert response.json() == {"ok": True, "handled": True, "command": "/help"}
     assert "Supported commands:" in sent[-1]
     assert "/code - run the prospect agent and queue a build recommendation" in sent[-1]
+    assert "/code <guidance> - treat the text as founder direction unless it would harm the product goal" in sent[-1]
 
     response = client.post(
         "/api/telegram/webhook",

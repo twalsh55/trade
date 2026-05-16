@@ -99,6 +99,7 @@ def test_decide_autonomous_build_brief_holds_when_no_strong_signal_exists() -> N
     assert brief.should_build is False
     assert brief.feature_name is None
     assert brief.confidence == "low"
+    assert brief.founder_guidance is None
 
 
 def test_format_autonomous_build_brief_includes_outline_and_usage() -> None:
@@ -208,3 +209,59 @@ def test_decide_autonomous_build_brief_uses_follow_up_fallback_branch() -> None:
 
     assert brief.feature_name == "Follow-up workflow refinement"
     assert "follow-up discipline" in brief.rationale
+
+
+def test_decide_autonomous_build_brief_honors_founder_guidance_when_on_goal() -> None:
+    digest = ProspectingDigest(
+        generated_at=datetime(2026, 5, 16, 18, 0, tzinfo=UTC),
+        profile="crm_direction",
+        scanned_post_count=12,
+        shortlisted_count=1,
+        shortlisted_posts=(),
+        audit_entries=(),
+        token_usage=None,
+    )
+
+    brief = decide_autonomous_build_brief(digest, founder_guidance="fix a bug with login")
+
+    assert brief.should_build is True
+    assert brief.feature_name == "fix a bug with login"
+    assert brief.founder_guidance == "fix a bug with login"
+    assert "Founder-directed build brief" in brief.summary
+    assert "Founder guidance: fix a bug with login" in format_autonomous_build_brief(brief)
+
+
+def test_decide_autonomous_build_brief_holds_harmful_founder_guidance() -> None:
+    digest = ProspectingDigest(
+        generated_at=datetime(2026, 5, 16, 18, 0, tzinfo=UTC),
+        profile="crm_direction",
+        scanned_post_count=12,
+        shortlisted_count=0,
+        shortlisted_posts=(),
+        audit_entries=(),
+        token_usage=None,
+    )
+
+    brief = decide_autonomous_build_brief(digest, founder_guidance="build a viral meme crypto app")
+
+    assert brief.should_build is False
+    assert brief.founder_guidance == "build a viral meme crypto app"
+    assert "conflicts with the product goal" in brief.summary
+
+
+def test_decide_autonomous_build_brief_truncates_long_guidance_name() -> None:
+    digest = ProspectingDigest(
+        generated_at=datetime(2026, 5, 16, 18, 0, tzinfo=UTC),
+        profile="crm_direction",
+        scanned_post_count=0,
+        shortlisted_count=0,
+        shortlisted_posts=(),
+        audit_entries=(),
+        token_usage=None,
+    )
+
+    guidance = "x" * 120
+    brief = decide_autonomous_build_brief(digest, founder_guidance=guidance)
+
+    assert brief.feature_name is not None
+    assert brief.feature_name.endswith("...")

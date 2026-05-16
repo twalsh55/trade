@@ -405,34 +405,39 @@ def create_app(dependencies: ApiDependencies | None = None) -> FastAPI:
             return {"ok": True, "handled": False}
 
         notifier = _build_telegram_notifier()
-        if command.text == "/prospect":
+        if command.name == "/prospect" and command.argument is None:
             notifier.send_message("Starting the daily prospecting run now. I will send a follow-up when it finishes.")
             background_tasks.add_task(_run_prospecting_from_telegram, notifier)
-            return {"ok": True, "handled": True, "command": command.text}
+            return {"ok": True, "handled": True, "command": command.name}
         if command.text == "/prospect status":
             notifier.send_message(_build_prospecting_status_message())
             return {"ok": True, "handled": True, "command": command.text}
-        if command.text == "/sentiment":
+        if command.name == "/sentiment" and command.argument is None:
             notifier.send_message("Starting the ETF sentiment run now. I will send a follow-up when it finishes.")
             background_tasks.add_task(_run_etf_sentiment_from_telegram, notifier)
-            return {"ok": True, "handled": True, "command": command.text}
+            return {"ok": True, "handled": True, "command": command.name}
         if command.text == "/sentiment status":
             notifier.send_message(_build_etf_sentiment_status_message())
             return {"ok": True, "handled": True, "command": command.text}
-        if command.text == "/code":
-            notifier.send_message("Starting a cooperative code run now. I will send a build recommendation when it finishes.")
-            background_tasks.add_task(_run_code_from_telegram, notifier)
-            return {"ok": True, "handled": True, "command": command.text}
-        if command.text == "/help":
+        if command.name == "/code":
+            guidance_notice = f" Founder guidance received: {command.argument}." if command.argument else ""
+            notifier.send_message(
+                "Starting a cooperative code run now. I will send a build recommendation when it finishes."
+                f"{guidance_notice}"
+            )
+            background_tasks.add_task(_run_code_from_telegram, notifier, command.argument)
+            return {"ok": True, "handled": True, "command": command.name}
+        if command.name == "/help" and command.argument is None:
             notifier.send_message(
                 "Supported commands:\n"
                 "/prospect - run the prospecting agent\n"
                 "/prospect status - show whether the prospecting agent is configured\n"
                 "/sentiment - run the ETF sentiment agent\n"
                 "/sentiment status - show whether the ETF sentiment agent is configured\n"
-                "/code - run the prospect agent and queue a build recommendation"
+                "/code - run the prospect agent and queue a build recommendation\n"
+                "/code <guidance> - treat the text as founder direction unless it would harm the product goal"
             )
-            return {"ok": True, "handled": True, "command": command.text}
+            return {"ok": True, "handled": True, "command": command.name}
         return {"ok": True, "handled": False}
 
     @app.post("/api/internal/operator-briefing")
@@ -504,6 +509,8 @@ def _build_default_dashboard_settings(user_id: UUID) -> UserDashboardSettings:
 @dataclass(frozen=True)
 class _TelegramCommand:
     chat_id: str
+    name: str
+    argument: str | None
     text: str
 
 
@@ -521,8 +528,14 @@ def _extract_telegram_command(payload: dict[str, object]) -> _TelegramCommand | 
     if chat_id is None:
         return None
 
-    normalized_text = text.strip().split("@", 1)[0]
-    return _TelegramCommand(chat_id=str(chat_id), text=normalized_text)
+    raw_text = text.strip()
+    if not raw_text.startswith("/"):
+        return None
+    first_token, _, remainder = raw_text.partition(" ")
+    normalized_name = first_token.split("@", 1)[0]
+    argument = remainder.strip() or None
+    normalized_text = normalized_name if argument is None else f"{normalized_name} {argument}"
+    return _TelegramCommand(chat_id=str(chat_id), name=normalized_name, argument=argument, text=normalized_text)
 
 
 def _validate_telegram_webhook_secret(provided_secret: str | None) -> None:
@@ -602,10 +615,10 @@ def _run_etf_sentiment_from_telegram(notifier: TelegramNotifier) -> None:
             return
 
 
-def _run_code_from_telegram(notifier: TelegramNotifier) -> None:
+def _run_code_from_telegram(notifier: TelegramNotifier, founder_guidance: str | None = None) -> None:
     try:
-        digest = run_prospecting_job()
-        brief = decide_autonomous_build_brief(digest)
+        digest = run_prospecting_job(founder_guidance)
+        brief = decide_autonomous_build_brief(digest, founder_guidance=founder_guidance)
         queue_path = append_autonomous_build_brief(brief)
         notifier.send_message(
             f"{format_autonomous_build_brief(brief)}\nQueue file: {queue_path}"

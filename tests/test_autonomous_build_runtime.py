@@ -22,6 +22,7 @@ def test_append_autonomous_build_brief_writes_jsonl(tmp_path, monkeypatch) -> No
     brief = AutonomousBuildBrief(
         created_at=datetime(2026, 5, 16, 19, 0, tzinfo=UTC),
         profile="crm_direction",
+        founder_guidance="fix a bug with login",
         should_build=True,
         feature_name="CSV and Google Sheets import",
         summary="Build import.",
@@ -37,6 +38,7 @@ def test_append_autonomous_build_brief_writes_jsonl(tmp_path, monkeypatch) -> No
 
     assert path == queue_path
     payload = json.loads(queue_path.read_text(encoding="utf-8").strip())
+    assert payload["founder_guidance"] == "fix a bug with login"
     assert payload["feature_name"] == "CSV and Google Sheets import"
     assert payload["implementation_outline"] == ["Parse CSV", "Dedupe rows"]
     assert payload["token_usage"]["total_tokens"] == 1200

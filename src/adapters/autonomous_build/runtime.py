@@ -13,6 +13,7 @@ def append_autonomous_build_brief(brief: AutonomousBuildBrief) -> Path:
     payload = {
         "created_at": brief.created_at.isoformat(),
         "profile": brief.profile,
+        "founder_guidance": brief.founder_guidance,
         "should_build": brief.should_build,
         "feature_name": brief.feature_name,
         "summary": brief.summary,

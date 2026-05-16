@@ -208,6 +208,7 @@ Use this section to give the next session a fast, practical starting point. Refr
 - The strongest recurring adjacent idea is later `message / DM capture` into CRM, but that is still secondary to the core follow-up workflow.
 - The sentiment agent is live separately for ETF analysis and is not the main product direction.
 - Telegram now has a `/code` command that runs the cooperative prospect pass, makes a build/no-build judgment, and appends a structured recommendation to `var/autonomous_build_queue.jsonl` by default.
+- `/code <guidance>` should treat the trailing text as explicit founder direction unless it clearly harms the current goal of building a narrow, profitable CRM wedge.
 
 ### Current Automation Progress
 

@@ -39,16 +39,23 @@ def is_placeholder_openai_key(api_key: str) -> bool:
     return normalized in {"sk-...", "sk-placeholder", "your-openai-api-key"} or len(normalized) < 20
 
 
-def build_config_from_env() -> DailyProspectingConfig:
+def build_config_from_env(founder_guidance: str | None = None) -> DailyProspectingConfig:
     profile = os.getenv("PROSPECT_PROFILE", "general").strip().lower() or "general"
     search_terms_env = os.getenv("PROSPECT_REDDIT_SEARCH_TERMS", "").strip()
     default_search_terms = DEFAULT_CRM_DIRECTION_SEARCH_TERMS if profile == "crm_direction" else DEFAULT_PROSPECT_SEARCH_TERMS
     default_summary = DEFAULT_CRM_DIRECTION_SUMMARY if profile == "crm_direction" else DEFAULT_APP_SUMMARY
     search_terms = tuple(item.strip() for item in search_terms_env.split(",") if item.strip()) or default_search_terms
+    app_summary = os.getenv("PROSPECT_APP_SUMMARY", default_summary)
+    normalized_guidance = (founder_guidance or "").strip()
+    if normalized_guidance:
+        app_summary = (
+            f"{app_summary}\nFounder guidance: {normalized_guidance}. "
+            "Treat this as a strong directional constraint unless it conflicts with the narrow profitable CRM goal."
+        )
     return DailyProspectingConfig(
         recipient_email=os.getenv("PROSPECT_EMAIL_RECIPIENT", DEFAULT_RECIPIENT).strip() or DEFAULT_RECIPIENT,
         profile=profile,
-        app_summary=os.getenv("PROSPECT_APP_SUMMARY", default_summary),
+        app_summary=app_summary,
         app_url=os.getenv("APP_BASE_URL", "").strip() or None,
         search_terms=search_terms,
         per_term_limit=parse_positive_int("PROSPECT_REDDIT_LIMIT_PER_TERM", default=8),
@@ -125,8 +132,8 @@ def build_telegram_digest_notifier_from_env() -> TelegramDigestNotifier:
     return TelegramDigestNotifier(TelegramNotifier(bot_token=bot_token, chat_id=chat_id))
 
 
-def run_prospecting_job() -> ProspectingDigest:
-    config = build_config_from_env()
+def run_prospecting_job(founder_guidance: str | None = None) -> ProspectingDigest:
+    config = build_config_from_env(founder_guidance)
     use_case = RunDailyProspectingUseCase(
         lead_source=build_lead_source_from_env(),
         drafter=build_drafter_from_env(),

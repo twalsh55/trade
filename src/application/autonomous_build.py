@@ -12,6 +12,7 @@ from src.domain.prospecting import ProspectTokenUsage
 class AutonomousBuildBrief:
     created_at: datetime
     profile: str
+    founder_guidance: str | None
     should_build: bool
     feature_name: str | None
     summary: str
@@ -26,8 +27,52 @@ class AutonomousBuildBrief:
 def decide_autonomous_build_brief(
     digest: ProspectingDigest,
     *,
+    founder_guidance: str | None = None,
     now: Callable[[], datetime] = lambda: datetime.now(tz=UTC),
 ) -> AutonomousBuildBrief:
+    normalized_guidance = (founder_guidance or "").strip()
+    if normalized_guidance:
+        if _guidance_conflicts_with_goal(normalized_guidance):
+            return AutonomousBuildBrief(
+                created_at=now(),
+                profile=digest.profile,
+                founder_guidance=normalized_guidance,
+                should_build=False,
+                feature_name=None,
+                summary="Founder guidance was not queued because it conflicts with the product goal.",
+                rationale=(
+                    "The request appears to pull toward hype, trading, virality, or other off-wedge work that would "
+                    "harm the current plan to build a narrow, profitable follow-up-first CRM."
+                ),
+                implementation_outline=(),
+                evidence_titles=tuple(item.post.title for item in digest.shortlisted_posts[:2]),
+                source_mix=tuple(item.post.source for item in digest.shortlisted_posts[:2]),
+                confidence="high",
+                token_usage=digest.token_usage,
+            )
+
+        return AutonomousBuildBrief(
+            created_at=now(),
+            profile=digest.profile,
+            founder_guidance=normalized_guidance,
+            should_build=True,
+            feature_name=_normalize_guidance_feature_name(normalized_guidance),
+            summary=f"Founder-directed build brief: {normalized_guidance}.",
+            rationale=(
+                "This came directly from the founder through `/code`, so it should override exploratory prioritization "
+                "unless it harms the current CRM direction. Prospect evidence from this run is still attached for context."
+            ),
+            implementation_outline=(
+                "Define the smallest acceptance criteria that satisfy the founder guidance.",
+                f"Implement the narrowest useful change for: {normalized_guidance}.",
+                "Add regression coverage and deploy once the behavior is verified.",
+            ),
+            evidence_titles=tuple(item.post.title for item in digest.shortlisted_posts[:3]),
+            source_mix=tuple(dict.fromkeys(item.post.source for item in digest.shortlisted_posts[:3])),
+            confidence="high",
+            token_usage=digest.token_usage,
+        )
+
     candidates = tuple(
         item
         for item in digest.shortlisted_posts
@@ -37,6 +82,7 @@ def decide_autonomous_build_brief(
         return AutonomousBuildBrief(
             created_at=now(),
             profile=digest.profile,
+            founder_guidance=None,
             should_build=False,
             feature_name=None,
             summary="No feature should be auto-queued from this run.",
@@ -64,6 +110,7 @@ def decide_autonomous_build_brief(
     return AutonomousBuildBrief(
         created_at=now(),
         profile=digest.profile,
+        founder_guidance=None,
         should_build=True,
         feature_name=feature_name,
         summary=summary,
@@ -83,6 +130,8 @@ def format_autonomous_build_brief(brief: AutonomousBuildBrief) -> str:
         f"Profile: {brief.profile}",
         f"Confidence: {brief.confidence}",
     ]
+    if brief.founder_guidance:
+        lines.append(f"Founder guidance: {brief.founder_guidance}")
     if brief.feature_name:
         lines.append(f"Feature: {brief.feature_name}")
     lines.extend(
@@ -167,3 +216,27 @@ def _combined_candidate_text(item: DraftedProspectEmail) -> str:
             " ".join(item.reasons).lower(),
         ]
     )
+
+
+def _guidance_conflicts_with_goal(founder_guidance: str) -> bool:
+    text = founder_guidance.lower()
+    harmful_markers = (
+        "viral",
+        "virality",
+        "meme",
+        "crypto",
+        "day trading",
+        "gambling",
+        "consumer social",
+        "social network",
+        "hypergrowth",
+        "pump",
+    )
+    return any(marker in text for marker in harmful_markers)
+
+
+def _normalize_guidance_feature_name(founder_guidance: str) -> str:
+    trimmed = founder_guidance.strip()
+    if len(trimmed) <= 80:
+        return trimmed
+    return trimmed[:77].rstrip() + "..."
