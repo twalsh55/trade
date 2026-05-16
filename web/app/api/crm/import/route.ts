@@ -35,7 +35,7 @@ async function buildImportPayload(request: NextRequest) {
 
   if (sourceType === "csv") {
     const file = formData.get("file");
-    if (!isTextReadableUpload(file)) {
+    if (!hasTextReader(file)) {
       throw new Error("Choose a CSV file before importing.");
     }
     return {
@@ -54,6 +54,6 @@ async function buildImportPayload(request: NextRequest) {
   };
 }
 
-function isTextReadableUpload(value: FormDataEntryValue | null): value is Blob {
+function hasTextReader(value: FormDataEntryValue | null): value is File {
   return typeof value === "object" && value !== null && typeof value.text === "function";
 }
