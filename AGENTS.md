@@ -191,6 +191,7 @@ Use this section to give the next session a fast, practical starting point. Refr
   - messy header normalization and duplicate detection before import
   - guided import mapping with inline remapping before commit
   - AI-assisted header rescue when no recognizable CRM headers are found in a spreadsheet
+  - interactive AI clarification questions during import when mapping confidence is still weak
   - imported owner visibility in the queue and memory panel
   - a paid-only AI Intake Profile foundation in CRM
   - per-user AI intake prompts stored with account settings
@@ -280,6 +281,10 @@ Use this section to give the next session a fast, practical starting point. Refr
   - when import preview cannot recognize CRM headers, paid AI assistance can infer likely CRM field mappings from messy headers and sample rows
   - manual field-mapping overrides still win over AI suggestions
   - already-good imports skip the AI path entirely
+- The latest CRM AI-intake UX refinement is interactive clarification:
+  - when AI can draft a mapping but still sees ambiguity, the import preview now returns a short assistant message plus 1-3 multiple-choice clarification questions
+  - answering a clarification reruns preview automatically so the user gives minimal input instead of hand-editing every column
+  - commit is blocked while required clarification is still unresolved
 - The latest CRM reliability refinement is hardened spreadsheet parsing:
   - messy CSV exports with problematic line endings no longer crash preview or commit
   - native Excel uploads now normalize into the same preview/import flow

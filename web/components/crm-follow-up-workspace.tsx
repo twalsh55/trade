@@ -10,6 +10,7 @@ import type {
   BillingOverview,
   CRMFollowUpOverview,
   CRMImportHeaderMapping,
+  CRMImportClarificationQuestion,
   CRMImportPreview,
   CRMImportPreviewRow,
   CRMLeadFollowUp,
@@ -40,6 +41,7 @@ export function CRMFollowUpWorkspace({
   const [sheetUrl, setSheetUrl] = useState("");
   const [importPreview, setImportPreview] = useState<CRMImportPreview | null>(null);
   const [importFieldMapping, setImportFieldMapping] = useState<Record<string, string>>({});
+  const [clarificationAnswers, setClarificationAnswers] = useState<Record<string, string>>({});
   const [isImportMappingDirty, setIsImportMappingDirty] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [importStatus, setImportStatus] = useState<string | null>(null);
@@ -104,11 +106,15 @@ export function CRMFollowUpWorkspace({
     );
   }
 
-  function buildImportFormData() {
+  function buildImportFormData(answersOverride?: Record<string, string>) {
     const formData = new FormData();
     formData.set("source_type", sourceType);
     if (Object.keys(importFieldMapping).length) {
       formData.set("field_mapping", JSON.stringify(importFieldMapping));
+    }
+    const effectiveClarificationAnswers = answersOverride ?? clarificationAnswers;
+    if (Object.keys(effectiveClarificationAnswers).length) {
+      formData.set("clarification_answers", JSON.stringify(effectiveClarificationAnswers));
     }
     if (sourceType === "file_upload") {
       if (!selectedFile) {
@@ -127,14 +133,14 @@ export function CRMFollowUpWorkspace({
     return formData;
   }
 
-  function requestImportPreview() {
+  function requestImportPreview(answersOverride?: Record<string, string>) {
     setImportError(null);
     setImportStatus(null);
     startImportTransition(async () => {
       try {
         const response = await fetch("/api/crm/import/preview", {
           method: "POST",
-          body: buildImportFormData(),
+          body: buildImportFormData(answersOverride),
         });
         const data = (await response.json().catch(() => null)) as CRMImportPreview | { error?: string } | null;
         if (!response.ok || !data || !("rows" in data)) {
@@ -148,8 +154,22 @@ export function CRMFollowUpWorkspace({
               .map((item) => [item.original_header, item.mapped_field as string]),
           ),
         );
+        setClarificationAnswers((current) => {
+          const activeQuestionIds = new Set((data.clarification?.questions ?? []).map((item) => item.id));
+          if (!activeQuestionIds.size) {
+            return {};
+          }
+          const nextAnswers = answersOverride ?? current;
+          return Object.fromEntries(
+            Object.entries(nextAnswers).filter(([key]) => activeQuestionIds.has(key)),
+          );
+        });
         setIsImportMappingDirty(false);
-        setImportStatus(`Preview ready for ${data.importable_rows} importable row${data.importable_rows === 1 ? "" : "s"}.`);
+        setImportStatus(
+          data.clarification?.required
+            ? "AI found a workable draft, but it still needs a couple of quick answers before import is safe."
+            : `Preview ready for ${data.importable_rows} importable row${data.importable_rows === 1 ? "" : "s"}.`,
+        );
       } catch (previewError) {
         setImportPreview(null);
         setImportError(previewError instanceof Error ? previewError.message : "Unable to preview import.");
@@ -177,6 +197,7 @@ export function CRMFollowUpWorkspace({
         setSelectedLeadId(data.overview.items[0]?.id ?? null);
         setImportPreview(null);
         setImportFieldMapping({});
+        setClarificationAnswers({});
         setIsImportMappingDirty(false);
         setImportStatus(
           `Imported ${data.imported_count} row${data.imported_count === 1 ? "" : "s"}, skipped ${data.skipped_duplicates} duplicates, and skipped ${data.skipped_invalid} invalid row${data.skipped_invalid === 1 ? "" : "s"}.`,
@@ -200,6 +221,15 @@ export function CRMFollowUpWorkspace({
     }));
     setImportStatus(null);
     setIsImportMappingDirty(true);
+  }
+
+  function answerClarificationQuestion(questionId: string, value: string) {
+    const nextAnswers = {
+      ...clarificationAnswers,
+      [questionId]: value,
+    };
+    setClarificationAnswers(nextAnswers);
+    requestImportPreview(nextAnswers);
   }
 
   function saveAiImportSettings() {
@@ -263,10 +293,32 @@ export function CRMFollowUpWorkspace({
             </p>
 
             <div className="mt-5 flex flex-wrap gap-3">
-              <Button variant={sourceType === "file_upload" ? "default" : "outline"} onClick={() => setSourceType("file_upload")}>
+              <Button
+                variant={sourceType === "file_upload" ? "default" : "outline"}
+                onClick={() => {
+                  setSourceType("file_upload");
+                  setImportPreview(null);
+                  setImportFieldMapping({});
+                  setClarificationAnswers({});
+                  setIsImportMappingDirty(false);
+                  setImportStatus(null);
+                  setImportError(null);
+                }}
+              >
                 Spreadsheet file
               </Button>
-              <Button variant={sourceType === "google_sheets" ? "default" : "outline"} onClick={() => setSourceType("google_sheets")}>
+              <Button
+                variant={sourceType === "google_sheets" ? "default" : "outline"}
+                onClick={() => {
+                  setSourceType("google_sheets");
+                  setImportPreview(null);
+                  setImportFieldMapping({});
+                  setClarificationAnswers({});
+                  setIsImportMappingDirty(false);
+                  setImportStatus(null);
+                  setImportError(null);
+                }}
+              >
                 Google Sheets
               </Button>
             </div>
@@ -284,6 +336,7 @@ export function CRMFollowUpWorkspace({
                     setSelectedFile(event.target.files?.[0] ?? null);
                     setImportPreview(null);
                     setImportFieldMapping({});
+                    setClarificationAnswers({});
                     setIsImportMappingDirty(false);
                     setImportStatus(null);
                     setImportError(null);
@@ -308,6 +361,7 @@ export function CRMFollowUpWorkspace({
                     setSheetUrl(event.target.value);
                     setImportPreview(null);
                     setImportFieldMapping({});
+                    setClarificationAnswers({});
                     setIsImportMappingDirty(false);
                     setImportStatus(null);
                     setImportError(null);
@@ -320,12 +374,18 @@ export function CRMFollowUpWorkspace({
             )}
 
             <div className="mt-5 flex flex-wrap gap-3">
-              <Button disabled={isImportPending} onClick={requestImportPreview}>
+              <Button disabled={isImportPending} onClick={() => requestImportPreview()}>
                 {isImportPending ? "Checking..." : importPreview ? "Refresh preview" : "Preview import"}
               </Button>
               <Button
                 variant="outline"
-                disabled={isImportPending || !importPreview || importPreview.importable_rows === 0 || isImportMappingDirty}
+                disabled={
+                  isImportPending ||
+                  !importPreview ||
+                  importPreview.importable_rows === 0 ||
+                  isImportMappingDirty ||
+                  Boolean(importPreview.clarification?.required)
+                }
                 onClick={commitImport}
               >
                 {isImportPending ? "Importing..." : "Import rows"}
@@ -344,8 +404,10 @@ export function CRMFollowUpWorkspace({
           <ImportPreviewPanel
             preview={importPreview}
             importFieldMapping={importFieldMapping}
+            clarificationAnswers={clarificationAnswers}
             isImportMappingDirty={isImportMappingDirty}
             onFieldMappingChange={updateImportFieldMapping}
+            onClarificationAnswer={answerClarificationQuestion}
           />
         </div>
       </section>
@@ -589,13 +651,17 @@ function AIIntakePanel({
 function ImportPreviewPanel({
   preview,
   importFieldMapping,
+  clarificationAnswers,
   isImportMappingDirty,
   onFieldMappingChange,
+  onClarificationAnswer,
 }: {
   preview: CRMImportPreview | null;
   importFieldMapping: Record<string, string>;
+  clarificationAnswers: Record<string, string>;
   isImportMappingDirty: boolean;
   onFieldMappingChange: (header: string, field: string) => void;
+  onClarificationAnswer: (questionId: string, value: string) => void;
 }) {
   if (!preview) {
     return (
@@ -618,6 +684,29 @@ function ImportPreviewPanel({
         <CompactMetric label="Importable" value={String(preview.importable_rows)} />
         <CompactMetric label="Skipped" value={String(preview.duplicate_rows + preview.invalid_rows)} />
       </div>
+      {preview.clarification ? (
+        <section className={`mt-5 rounded-[1.2rem] border p-4 ${preview.clarification.required ? "border-cyan-300/40 bg-cyan-400/10" : "border-white/10 bg-white/5"}`}>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-200">AI clarification</p>
+          <p className="mt-2 text-sm leading-6 text-slate-200">{preview.clarification.assistant_message}</p>
+          {preview.clarification.required ? (
+            <p className="mt-2 text-xs text-cyan-100/80">
+              Answer these quick questions and Brivoly will re-check the sheet automatically.
+            </p>
+          ) : null}
+          {preview.clarification.questions.length ? (
+            <div className="mt-4 space-y-4">
+              {preview.clarification.questions.map((question) => (
+                <ClarificationQuestionCard
+                  key={question.id}
+                  question={question}
+                  selectedValue={clarificationAnswers[question.id] ?? ""}
+                  onAnswer={onClarificationAnswer}
+                />
+              ))}
+            </div>
+          ) : null}
+        </section>
+      ) : null}
       <section className="mt-5 rounded-[1.2rem] border border-white/10 bg-white/5 p-4">
         <div className="flex items-center justify-between gap-4">
           <div>
@@ -688,6 +777,41 @@ function ImportMappingRow({
           ))}
         </select>
       </label>
+    </div>
+  );
+}
+
+function ClarificationQuestionCard({
+  question,
+  selectedValue,
+  onAnswer,
+}: {
+  question: CRMImportClarificationQuestion;
+  selectedValue: string;
+  onAnswer: (questionId: string, value: string) => void;
+}) {
+  return (
+    <div className="rounded-xl border border-white/10 bg-slate-900/40 px-3 py-3">
+      <p className="text-sm font-medium text-white">{question.prompt}</p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {question.choices.map((choice) => {
+          const selected = choice.value === selectedValue;
+          return (
+            <button
+              key={choice.value}
+              type="button"
+              onClick={() => onAnswer(question.id, choice.value)}
+              className={`rounded-full border px-3 py-2 text-sm transition ${
+                selected
+                  ? "border-cyan-300 bg-cyan-200 text-slate-950"
+                  : "border-slate-700 bg-slate-950 text-slate-100 hover:border-slate-500"
+              }`}
+            >
+              {choice.label}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

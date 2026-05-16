@@ -30,6 +30,7 @@ async function buildImportPayload(request: NextRequest) {
   const formData = await request.formData();
   const sourceType = formData.get("source_type");
   const fieldMapping = parseFieldMapping(formData.get("field_mapping"));
+  const clarificationAnswers = parseClarificationAnswers(formData.get("clarification_answers"));
   if (sourceType !== "file_upload" && sourceType !== "google_sheets") {
     throw new Error("Choose a spreadsheet file or Google Sheets before previewing.");
   }
@@ -46,6 +47,7 @@ async function buildImportPayload(request: NextRequest) {
         file_name: fileName,
         file_content_base64: toBase64(await file.arrayBuffer()),
         field_mapping: fieldMapping,
+        clarification_answers: clarificationAnswers,
       };
     }
     if (fileName.toLowerCase().endsWith(".csv")) {
@@ -53,6 +55,7 @@ async function buildImportPayload(request: NextRequest) {
         source_type: "csv" as const,
         csv_content: await file.text(),
         field_mapping: fieldMapping,
+        clarification_answers: clarificationAnswers,
       };
     }
     if (!fileName.toLowerCase().endsWith(".xlsx") && !fileName.toLowerCase().endsWith(".xls")) {
@@ -63,6 +66,7 @@ async function buildImportPayload(request: NextRequest) {
       file_name: fileName,
       file_content_base64: toBase64(await file.arrayBuffer()),
       field_mapping: fieldMapping,
+      clarification_answers: clarificationAnswers,
     };
   }
 
@@ -74,6 +78,7 @@ async function buildImportPayload(request: NextRequest) {
     source_type: "google_sheets" as const,
     sheet_url: sheetUrl,
     field_mapping: fieldMapping,
+    clarification_answers: clarificationAnswers,
   };
 }
 
@@ -97,6 +102,27 @@ function parseFieldMapping(value: FormDataEntryValue | null): Record<string, str
   }
   return Object.fromEntries(
     Object.entries(parsed as Record<string, unknown>).map(([key, field]) => [key, typeof field === "string" ? field : null]),
+  );
+}
+
+function parseClarificationAnswers(value: FormDataEntryValue | null): Record<string, string> | undefined {
+  const raw = String(value || "").trim();
+  if (!raw) {
+    return undefined;
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error("AI clarification answers are invalid.");
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("AI clarification answers are invalid.");
+  }
+  return Object.fromEntries(
+    Object.entries(parsed as Record<string, unknown>).flatMap(([key, field]) =>
+      typeof field === "string" && field.trim() ? [[key, field.trim()]] : [],
+    ),
   );
 }
 

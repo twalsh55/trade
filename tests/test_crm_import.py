@@ -26,6 +26,9 @@ from src.application.crm_import import (
     _parse_datetime,
 )
 from src.domain.crm import LeadImportHeaderMapping
+from src.domain.crm import LeadImportClarification
+from src.domain.crm import LeadImportClarificationOption
+from src.domain.crm import LeadImportClarificationQuestion
 from src.domain.crm import LeadImportPreviewRow
 from src.domain.auth import User
 
@@ -121,16 +124,27 @@ def test_preview_lead_import_can_use_ai_assistance_for_messy_headers() -> None:
     repository = InMemoryLeadFollowUpRepository(now=lambda: now)
 
     class FakeAssist:
-        def suggest_field_mapping(self, prompt, preferred_formats, source_label, headers, sample_rows):  # type: ignore[no-untyped-def]
+        def suggest_field_mapping(  # type: ignore[no-untyped-def]
+            self,
+            prompt,
+            preferred_formats,
+            source_label,
+            headers,
+            sample_rows,
+            clarification_answers=None,
+        ):
             assert headers == ["Person", "Organisation", "Touchpoint", "Blob"]
             assert sample_rows[0]["Person"] == "Taylor Brooks"
             assert source_label == "CSV upload"
-            return {
-                "Person": "lead_name",
-                "Organisation": "company_name",
-                "Touchpoint": "next_follow_up_at",
-                "Blob": "notes",
-            }
+            return (
+                {
+                    "Person": "lead_name",
+                    "Organisation": "company_name",
+                    "Touchpoint": "next_follow_up_at",
+                    "Blob": "notes",
+                },
+                None,
+            )
 
     preview = PreviewLeadImportWithAssistanceUseCase(
         repository=repository,
@@ -198,12 +212,15 @@ def test_preview_lead_import_with_assistance_keeps_manual_overrides_over_ai() ->
 
     class FakeAssist:
         def suggest_field_mapping(self, *args, **kwargs):  # type: ignore[no-untyped-def]
-            return {
-                "Person": "lead_name",
-                "Organisation": "company_name",
-                "Followup": "next_follow_up_at",
-                "Context": "notes",
-            }
+            return (
+                {
+                    "Person": "lead_name",
+                    "Organisation": "company_name",
+                    "Followup": "next_follow_up_at",
+                    "Context": "notes",
+                },
+                None,
+            )
 
     preview = PreviewLeadImportWithAssistanceUseCase(
         repository=repository,
@@ -221,6 +238,53 @@ def test_preview_lead_import_with_assistance_keeps_manual_overrides_over_ai() ->
 
     context_mapping = next(item for item in preview.header_mappings if item.original_header == "Context")
     assert context_mapping.mapped_field is None
+
+
+def test_preview_lead_import_with_assistance_can_return_clarification_questions() -> None:
+    now = datetime(2024, 5, 6, 12, 30, tzinfo=UTC)
+    repository = InMemoryLeadFollowUpRepository(now=lambda: now)
+
+    class FakeAssist:
+        def suggest_field_mapping(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+            return (
+                {
+                    "Person": "lead_name",
+                    "Organisation": "company_name",
+                    "Touchpoint": "next_follow_up_at",
+                    "Context": "notes",
+                },
+                LeadImportClarification(
+                    assistant_message="I can finish the import once I know whether Touchpoint means the next follow-up date or the last contact date.",
+                    required=True,
+                    questions=(
+                        LeadImportClarificationQuestion(
+                            id="touchpoint-meaning",
+                            prompt="What does the Touchpoint column represent?",
+                            choices=(
+                                LeadImportClarificationOption(value="next-follow-up", label="Next follow-up date"),
+                                LeadImportClarificationOption(value="last-contacted", label="Last contacted date"),
+                            ),
+                        ),
+                    ),
+                ),
+            )
+
+    preview = PreviewLeadImportWithAssistanceUseCase(
+        repository=repository,
+        now=lambda: now,
+        spreadsheet_assist=FakeAssist(),
+    ).execute(
+        make_user(),
+        "Person,Organisation,Touchpoint,Context\nTaylor Brooks,Summit Forge,2024-05-09,Imported from a messy client sheet\n",
+        "csv",
+        "CSV upload",
+        prompt="prompt",
+        preferred_formats=["csv"],
+    )
+
+    assert preview.clarification is not None
+    assert preview.clarification.required is True
+    assert preview.clarification.questions[0].id == "touchpoint-meaning"
 
 
 def test_preview_lead_import_rejects_invalid_manual_field_mapping() -> None:

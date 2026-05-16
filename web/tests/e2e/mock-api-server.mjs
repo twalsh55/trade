@@ -352,6 +352,7 @@ const server = http.createServer(async (request, response) => {
       importable_rows: 1,
       duplicate_rows: 1,
       invalid_rows: 0,
+      clarification: null,
       issues: [
         {
           row_number: 3,

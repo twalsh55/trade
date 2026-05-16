@@ -1681,17 +1681,28 @@ def test_crm_import_preview_and_commit_endpoints_support_csv_and_google_sheets(m
     assert image_preview.json()["rows"][0]["notes"] == "Imported from note image"
 
     class FakeSpreadsheetAssist:
-        def suggest_field_mapping(self, prompt: str, preferred_formats: list[str], source_label: str, headers: list[str], sample_rows: list[dict[str, str]]) -> dict[str, str | None]:
+        def suggest_field_mapping(
+            self,
+            prompt: str,
+            preferred_formats: list[str],
+            source_label: str,
+            headers: list[str],
+            sample_rows: list[dict[str, str]],
+            clarification_answers: dict[str, str] | None = None,
+        ) -> tuple[dict[str, str | None], object | None]:
             assert "follow-up-critical CRM fields" in prompt
             assert source_label == "CSV upload"
             assert headers == ["Person", "Organisation", "Followup", "Context"]
             assert sample_rows[0]["Person"] == "Taylor Brooks"
-            return {
-                "Person": "lead_name",
-                "Organisation": "company_name",
-                "Followup": "next_follow_up_at",
-                "Context": "notes",
-            }
+            return (
+                {
+                    "Person": "lead_name",
+                    "Organisation": "company_name",
+                    "Followup": "next_follow_up_at",
+                    "Context": "notes",
+                },
+                None,
+            )
 
     monkeypatch.setattr(api_app_module, "build_crm_spreadsheet_assist_agent_from_env", lambda: FakeSpreadsheetAssist())
     ai_mapped_preview = client.post(
@@ -1705,6 +1716,71 @@ def test_crm_import_preview_and_commit_endpoints_support_csv_and_google_sheets(m
     assert ai_mapped_preview.status_code == 200
     assert ai_mapped_preview.json()["importable_rows"] == 1
     assert ai_mapped_preview.json()["header_mappings"][0]["mapped_field"] == "lead_name"
+
+    class FakeClarifyingSpreadsheetAssist:
+        def suggest_field_mapping(
+            self,
+            prompt: str,
+            preferred_formats: list[str],
+            source_label: str,
+            headers: list[str],
+            sample_rows: list[dict[str, str]],
+            clarification_answers: dict[str, str] | None = None,
+        ) -> tuple[dict[str, str | None], object | None]:
+            assert clarification_answers == {"touchpoint": "next-follow-up"}
+            from src.domain.crm import (
+                LeadImportClarification,
+                LeadImportClarificationOption,
+                LeadImportClarificationQuestion,
+            )
+
+            return (
+                {
+                    "Person": "lead_name",
+                    "Organisation": "company_name",
+                    "Followup": "next_follow_up_at",
+                    "Context": "notes",
+                },
+                LeadImportClarification(
+                    assistant_message="I just need one confirmation.",
+                    required=True,
+                    questions=(
+                        LeadImportClarificationQuestion(
+                            id="touchpoint",
+                            prompt="Does Followup mean the next follow-up date?",
+                            choices=(
+                                LeadImportClarificationOption(value="next-follow-up", label="Yes, next follow-up"),
+                                LeadImportClarificationOption(value="last-contacted", label="No, last contacted"),
+                            ),
+                        ),
+                    ),
+                ),
+            )
+
+    monkeypatch.setattr(api_app_module, "build_crm_spreadsheet_assist_agent_from_env", lambda: FakeClarifyingSpreadsheetAssist())
+    clarifying_preview = client.post(
+        "/api/crm/import/preview",
+        headers={"Authorization": "Bearer session-token"},
+        json={
+            "source_type": "csv",
+            "csv_content": "Person,Organisation,Followup,Context\nTaylor Brooks,Summit Forge,2024-05-09,Imported from a messy client sheet\n",
+            "clarification_answers": {"touchpoint": "next-follow-up"},
+        },
+    )
+    assert clarifying_preview.status_code == 200
+    assert clarifying_preview.json()["clarification"]["required"] is True
+    assert clarifying_preview.json()["clarification"]["questions"][0]["id"] == "touchpoint"
+    blocked_commit = client.post(
+        "/api/crm/import",
+        headers={"Authorization": "Bearer session-token"},
+        json={
+            "source_type": "csv",
+            "csv_content": "Person,Organisation,Followup,Context\nTaylor Brooks,Summit Forge,2024-05-09,Imported from a messy client sheet\n",
+            "clarification_answers": {"touchpoint": "next-follow-up"},
+        },
+    )
+    assert blocked_commit.status_code == 422
+    assert "still needs one or two quick answers" in blocked_commit.json()["detail"]
 
 
 def test_crm_import_endpoints_return_validation_errors_for_bad_sources(monkeypatch) -> None:

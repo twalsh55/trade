@@ -11,6 +11,9 @@ from src.domain.auth import User
 from src.domain.crm import (
     LeadFollowUp,
     LeadFollowUpOverview,
+    LeadImportClarification,
+    LeadImportClarificationOption,
+    LeadImportClarificationQuestion,
     LeadImportCommitResult,
     LeadImportHeaderMapping,
     LeadImportIssue,
@@ -194,6 +197,26 @@ class LeadImportHeaderMappingDTO:
 
 
 @dataclass(frozen=True)
+class LeadImportClarificationOptionDTO:
+    value: str
+    label: str
+
+
+@dataclass(frozen=True)
+class LeadImportClarificationQuestionDTO:
+    id: str
+    prompt: str
+    choices: list[LeadImportClarificationOptionDTO]
+
+
+@dataclass(frozen=True)
+class LeadImportClarificationDTO:
+    assistant_message: str
+    required: bool
+    questions: list[LeadImportClarificationQuestionDTO]
+
+
+@dataclass(frozen=True)
 class LeadImportPreviewDTO:
     source_type: str
     source_label: str
@@ -206,6 +229,7 @@ class LeadImportPreviewDTO:
     invalid_rows: int
     rows: list[LeadImportPreviewRowDTO]
     issues: list[LeadImportIssueDTO]
+    clarification: LeadImportClarificationDTO | None
 
 
 @dataclass(frozen=True)
@@ -397,6 +421,7 @@ def build_lead_import_preview_dto(preview: LeadImportPreview) -> LeadImportPrevi
         invalid_rows=preview.invalid_rows,
         rows=[build_lead_import_preview_row_dto(row) for row in preview.rows],
         issues=[build_lead_import_issue_dto(issue) for issue in preview.issues],
+        clarification=build_lead_import_clarification_dto(preview.clarification),
     )
 
 
@@ -428,6 +453,37 @@ def build_lead_import_issue_dto(issue: LeadImportIssue) -> LeadImportIssueDTO:
         severity=issue.severity,
         field=issue.field,
         message=issue.message,
+    )
+
+
+def build_lead_import_clarification_dto(
+    clarification: LeadImportClarification | None,
+) -> LeadImportClarificationDTO | None:
+    if clarification is None:
+        return None
+    return LeadImportClarificationDTO(
+        assistant_message=clarification.assistant_message,
+        required=clarification.required,
+        questions=[build_lead_import_clarification_question_dto(item) for item in clarification.questions],
+    )
+
+
+def build_lead_import_clarification_question_dto(
+    question: LeadImportClarificationQuestion,
+) -> LeadImportClarificationQuestionDTO:
+    return LeadImportClarificationQuestionDTO(
+        id=question.id,
+        prompt=question.prompt,
+        choices=[build_lead_import_clarification_option_dto(item) for item in question.choices],
+    )
+
+
+def build_lead_import_clarification_option_dto(
+    option: LeadImportClarificationOption,
+) -> LeadImportClarificationOptionDTO:
+    return LeadImportClarificationOptionDTO(
+        value=option.value,
+        label=option.label,
     )
 
 

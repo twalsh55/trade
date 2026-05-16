@@ -134,6 +134,23 @@ export type CRMImportHeaderMapping = {
   mapped_field: string | null;
 };
 
+export type CRMImportClarificationChoice = {
+  value: string;
+  label: string;
+};
+
+export type CRMImportClarificationQuestion = {
+  id: string;
+  prompt: string;
+  choices: CRMImportClarificationChoice[];
+};
+
+export type CRMImportClarification = {
+  assistant_message: string;
+  required: boolean;
+  questions: CRMImportClarificationQuestion[];
+};
+
 export type CRMImportPreview = {
   source_type: "csv" | "excel" | "image" | "google_sheets";
   source_label: string;
@@ -146,6 +163,7 @@ export type CRMImportPreview = {
   invalid_rows: number;
   rows: CRMImportPreviewRow[];
   issues: CRMImportIssue[];
+  clarification: CRMImportClarification | null;
 };
 
 export type CRMImportResult = {

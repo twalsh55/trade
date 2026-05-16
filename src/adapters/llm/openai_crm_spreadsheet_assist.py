@@ -5,6 +5,11 @@ import json
 import httpx
 
 from src.application.crm_import import CANONICAL_IMPORT_FIELDS
+from src.domain.crm import (
+    LeadImportClarification,
+    LeadImportClarificationOption,
+    LeadImportClarificationQuestion,
+)
 
 
 class OpenAICRMSpreadsheetAssistError(RuntimeError):
@@ -31,7 +36,8 @@ class OpenAICRMSpreadsheetAssistAgent:
         source_label: str,
         headers: list[str],
         sample_rows: list[dict[str, str]],
-    ) -> dict[str, str | None]:
+        clarification_answers: dict[str, str] | None = None,
+    ) -> tuple[dict[str, str | None], LeadImportClarification | None]:
         if not headers:
             raise OpenAICRMSpreadsheetAssistError("Spreadsheet headers are required.")
 
@@ -39,12 +45,18 @@ class OpenAICRMSpreadsheetAssistAgent:
         instructions = (
             "You rescue messy CRM spreadsheet imports by mapping unknown headers to canonical CRM fields. "
             "Return JSON only in the form "
-            '{"field_mapping":{"Original Header":"lead_name","Other Header":null}}. '
+            '{"field_mapping":{"Original Header":"lead_name","Other Header":null},'
+            '"assistant_message":"short guidance",'
+            '"questions":[{"id":"q1","prompt":"short question","choices":[{"value":"x","label":"X"}]}]}. '
             "Only use these canonical fields: "
             f"{allowed_fields}. "
             "Use null when a header should stay unmapped. "
             "Infer from both the header names and the sample row values. "
             "Be conservative and avoid guessing when evidence is weak. "
+            "Ask at most 3 clarification questions, only when they would materially improve mapping quality. "
+            "Questions must be concise and easy for a user to answer with one tap. "
+            "Prefer multiple-choice questions with 2-4 clear options. "
+            "If you already have enough information, return an empty questions array. "
             f"User-specific intake prompt: {prompt.strip() or 'Focus on follow-up-critical CRM fields.'} "
             f"User's common formats: {', '.join(preferred_formats) if preferred_formats else 'not provided'}."
         )
@@ -62,6 +74,7 @@ class OpenAICRMSpreadsheetAssistAgent:
                                     "source_label": source_label,
                                     "headers": headers,
                                     "sample_rows": sample_rows,
+                                    "clarification_answers": clarification_answers or {},
                                 }
                             ),
                         }
@@ -95,6 +108,10 @@ class OpenAICRMSpreadsheetAssistAgent:
         raw_mapping = parsed.get("field_mapping")
         if not isinstance(raw_mapping, dict):
             raise OpenAICRMSpreadsheetAssistError("AI spreadsheet assistance returned an invalid payload.")
+        assistant_message = parsed.get("assistant_message")
+        if assistant_message is not None and not isinstance(assistant_message, str):
+            raise OpenAICRMSpreadsheetAssistError("AI spreadsheet assistance returned an invalid payload.")
+        clarification = _parse_clarification(parsed.get("questions"), assistant_message)
 
         normalized: dict[str, str | None] = {}
         for header in headers:
@@ -108,7 +125,7 @@ class OpenAICRMSpreadsheetAssistAgent:
             if mapped and mapped not in CANONICAL_IMPORT_FIELDS:
                 raise OpenAICRMSpreadsheetAssistError("AI spreadsheet assistance returned an unsupported field mapping.")
             normalized[header] = mapped or None
-        return normalized
+        return normalized, clarification
 
 
 def _extract_text_from_response(payload: dict[str, object]) -> str:
@@ -138,3 +155,63 @@ def _extract_text_from_response(payload: dict[str, object]) -> str:
     if not content:
         raise OpenAICRMSpreadsheetAssistError("AI spreadsheet assistance returned an invalid payload.")
     return content
+
+
+def _parse_clarification(
+    raw_questions: object,
+    assistant_message: str | None,
+) -> LeadImportClarification | None:
+    if raw_questions is None:
+        if assistant_message:
+            return LeadImportClarification(
+                assistant_message=assistant_message.strip(),
+                required=False,
+                questions=(),
+            )
+        return None
+    if not isinstance(raw_questions, list):
+        raise OpenAICRMSpreadsheetAssistError("AI spreadsheet assistance returned an invalid payload.")
+
+    questions: list[LeadImportClarificationQuestion] = []
+    for item in raw_questions:
+        if not isinstance(item, dict):
+            raise OpenAICRMSpreadsheetAssistError("AI spreadsheet assistance returned an invalid payload.")
+        question_id = item.get("id")
+        prompt = item.get("prompt")
+        choices = item.get("choices")
+        if not isinstance(question_id, str) or not question_id.strip():
+            raise OpenAICRMSpreadsheetAssistError("AI spreadsheet assistance returned an invalid payload.")
+        if not isinstance(prompt, str) or not prompt.strip():
+            raise OpenAICRMSpreadsheetAssistError("AI spreadsheet assistance returned an invalid payload.")
+        if not isinstance(choices, list) or len(choices) < 2:
+            raise OpenAICRMSpreadsheetAssistError("AI spreadsheet assistance returned an invalid payload.")
+        normalized_choices: list[LeadImportClarificationOption] = []
+        for choice in choices:
+            if not isinstance(choice, dict):
+                raise OpenAICRMSpreadsheetAssistError("AI spreadsheet assistance returned an invalid payload.")
+            value = choice.get("value")
+            label = choice.get("label")
+            if not isinstance(value, str) or not value.strip():
+                raise OpenAICRMSpreadsheetAssistError("AI spreadsheet assistance returned an invalid payload.")
+            if not isinstance(label, str) or not label.strip():
+                raise OpenAICRMSpreadsheetAssistError("AI spreadsheet assistance returned an invalid payload.")
+            normalized_choices.append(
+                LeadImportClarificationOption(
+                    value=value.strip(),
+                    label=label.strip(),
+                )
+            )
+        questions.append(
+            LeadImportClarificationQuestion(
+                id=question_id.strip(),
+                prompt=prompt.strip(),
+                choices=tuple(normalized_choices),
+            )
+        )
+
+    message = (assistant_message or "I can finish the import once a couple of ambiguities are clarified.").strip()
+    return LeadImportClarification(
+        assistant_message=message,
+        required=bool(questions),
+        questions=tuple(questions),
+    )

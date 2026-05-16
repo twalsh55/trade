@@ -75,6 +75,26 @@ class LeadImportHeaderMapping:
 
 
 @dataclass(frozen=True)
+class LeadImportClarificationOption:
+    value: str
+    label: str
+
+
+@dataclass(frozen=True)
+class LeadImportClarificationQuestion:
+    id: str
+    prompt: str
+    choices: tuple[LeadImportClarificationOption, ...]
+
+
+@dataclass(frozen=True)
+class LeadImportClarification:
+    assistant_message: str
+    required: bool
+    questions: tuple[LeadImportClarificationQuestion, ...]
+
+
+@dataclass(frozen=True)
 class LeadImportPreview:
     source_type: str
     source_label: str
@@ -87,6 +107,7 @@ class LeadImportPreview:
     invalid_rows: int
     rows: list[LeadImportPreviewRow]
     issues: list[LeadImportIssue]
+    clarification: LeadImportClarification | None = None
 
 
 @dataclass(frozen=True)

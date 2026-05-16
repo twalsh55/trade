@@ -7,7 +7,7 @@ from uuid import UUID
 import pandas as pd
 
 from src.domain.auth import ExternalIdentity, User
-from src.domain.crm import LeadFollowUp
+from src.domain.crm import LeadFollowUp, LeadImportClarification
 from src.domain.prospecting import ProspectDraft, ProspectMatch, ProspectTokenUsage, SocialPost
 
 if TYPE_CHECKING:
@@ -98,8 +98,9 @@ class CRMSpreadsheetAssistPort(Protocol):
         source_label: str,
         headers: list[str],
         sample_rows: list[dict[str, str]],
-    ) -> dict[str, str | None]:
-        """Suggest canonical CRM field mappings for messy spreadsheet headers."""
+        clarification_answers: dict[str, str] | None = None,
+    ) -> tuple[dict[str, str | None], LeadImportClarification | None]:
+        """Suggest CRM field mappings and optional clarification prompts for messy spreadsheet headers."""
 
 
 class SocialLeadSourcePort(Protocol):

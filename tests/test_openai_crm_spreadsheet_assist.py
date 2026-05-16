@@ -6,6 +6,8 @@ import pytest
 from src.adapters.llm.openai_crm_spreadsheet_assist import (
     OpenAICRMSpreadsheetAssistAgent,
     OpenAICRMSpreadsheetAssistError,
+    _extract_text_from_response,
+    _parse_clarification,
 )
 
 
@@ -27,7 +29,7 @@ def test_openai_crm_spreadsheet_assist_uses_api_and_returns_mapping(monkeypatch)
 
     monkeypatch.setattr("src.adapters.llm.openai_crm_spreadsheet_assist.httpx.post", fake_post)
 
-    mapping = OpenAICRMSpreadsheetAssistAgent(api_key="secret").suggest_field_mapping(
+    mapping, clarification = OpenAICRMSpreadsheetAssistAgent(api_key="secret").suggest_field_mapping(
         prompt="Focus on owner and next follow-up.",
         preferred_formats=["csv"],
         source_label="CSV upload",
@@ -40,6 +42,7 @@ def test_openai_crm_spreadsheet_assist_uses_api_and_returns_mapping(monkeypatch)
     assert captured["json"]["model"] == "gpt-4.1-mini"
     assert mapping["Person"] == "lead_name"
     assert mapping["Context"] == "notes"
+    assert clarification is None
 
 
 def test_openai_crm_spreadsheet_assist_rejects_missing_headers_and_transport_failures(monkeypatch) -> None:
@@ -75,6 +78,20 @@ def test_openai_crm_spreadsheet_assist_validates_response_shapes(monkeypatch) ->
             httpx.Response(
                 200,
                 request=httpx.Request("POST", "https://api.openai.com/v1/responses"),
+                json={
+                    "output_text": '{"field_mapping":{"Person":"lead_name","Organisation":null},"assistant_message":"I can finish this once I know what the date column means.","questions":[{"id":"date-purpose","prompt":"What does the Touchpoint column represent?","choices":[{"value":"follow-up-date","label":"Next follow-up date"},{"value":"last-contact-date","label":"Last contact date"}]}]}'
+                },
+            ),
+            httpx.Response(
+                200,
+                request=httpx.Request("POST", "https://api.openai.com/v1/responses"),
+                json={
+                    "output_text": '{"field_mapping":{"Person":"lead_name"},"assistant_message":"I handled the ambiguous columns automatically.","questions":null}'
+                },
+            ),
+            httpx.Response(
+                200,
+                request=httpx.Request("POST", "https://api.openai.com/v1/responses"),
                 json={"output_text": "not-json"},
             ),
             httpx.Response(
@@ -95,6 +112,51 @@ def test_openai_crm_spreadsheet_assist_validates_response_shapes(monkeypatch) ->
             httpx.Response(
                 200,
                 request=httpx.Request("POST", "https://api.openai.com/v1/responses"),
+                json={"output_text": '{"field_mapping":{"Person":"lead_name"},"assistant_message":123}'},
+            ),
+            httpx.Response(
+                200,
+                request=httpx.Request("POST", "https://api.openai.com/v1/responses"),
+                json={"output_text": '{"field_mapping":{"Person":"lead_name"},"questions":"bad"}'},
+            ),
+            httpx.Response(
+                200,
+                request=httpx.Request("POST", "https://api.openai.com/v1/responses"),
+                json={"output_text": '{"field_mapping":{"Person":"lead_name"},"questions":["bad"]}'},
+            ),
+            httpx.Response(
+                200,
+                request=httpx.Request("POST", "https://api.openai.com/v1/responses"),
+                json={"output_text": '{"field_mapping":{"Person":"lead_name"},"questions":[{"id":"","prompt":"test","choices":[{"value":"a","label":"A"},{"value":"b","label":"B"}]}]}'},
+            ),
+            httpx.Response(
+                200,
+                request=httpx.Request("POST", "https://api.openai.com/v1/responses"),
+                json={"output_text": '{"field_mapping":{"Person":"lead_name"},"questions":[{"id":"q1","prompt":"","choices":[{"value":"a","label":"A"},{"value":"b","label":"B"}]}]}'},
+            ),
+            httpx.Response(
+                200,
+                request=httpx.Request("POST", "https://api.openai.com/v1/responses"),
+                json={"output_text": '{"field_mapping":{"Person":"lead_name"},"questions":[{"id":"q1","prompt":"test","choices":[{"value":"a","label":"A"}]}]}'},
+            ),
+            httpx.Response(
+                200,
+                request=httpx.Request("POST", "https://api.openai.com/v1/responses"),
+                json={"output_text": '{"field_mapping":{"Person":"lead_name"},"questions":[{"id":"q1","prompt":"test","choices":["bad",{"value":"b","label":"B"}]}]}'},
+            ),
+            httpx.Response(
+                200,
+                request=httpx.Request("POST", "https://api.openai.com/v1/responses"),
+                json={"output_text": '{"field_mapping":{"Person":"lead_name"},"questions":[{"id":"q1","prompt":"test","choices":[{"value":"","label":"A"},{"value":"b","label":"B"}]}]}'},
+            ),
+            httpx.Response(
+                200,
+                request=httpx.Request("POST", "https://api.openai.com/v1/responses"),
+                json={"output_text": '{"field_mapping":{"Person":"lead_name"},"questions":[{"id":"q1","prompt":"test","choices":[{"value":"a","label":""},{"value":"b","label":"B"}]}]}'},
+            ),
+            httpx.Response(
+                200,
+                request=httpx.Request("POST", "https://api.openai.com/v1/responses"),
                 json={"output": "bad"},
             ),
             httpx.Response(
@@ -108,9 +170,33 @@ def test_openai_crm_spreadsheet_assist_validates_response_shapes(monkeypatch) ->
     monkeypatch.setattr("src.adapters.llm.openai_crm_spreadsheet_assist.httpx.post", lambda *args, **kwargs: next(responses))
     agent = OpenAICRMSpreadsheetAssistAgent(api_key="secret")
 
-    mapping = agent.suggest_field_mapping("prompt", [], "CSV upload", ["Person", "Organisation"], [{"Person": "Taylor"}])
+    mapping, clarification = agent.suggest_field_mapping("prompt", [], "CSV upload", ["Person", "Organisation"], [{"Person": "Taylor"}])
     assert mapping["Person"] == "lead_name"
     assert mapping["Organisation"] is None
+    assert clarification is None
+
+    mapping, clarification = agent.suggest_field_mapping(
+        "prompt",
+        [],
+        "CSV upload",
+        ["Person", "Organisation"],
+        [{"Person": "Taylor"}],
+    )
+    assert mapping["Person"] == "lead_name"
+    assert clarification is not None
+    assert clarification.required is True
+    assert clarification.questions[0].id == "date-purpose"
+
+    mapping, clarification = agent.suggest_field_mapping(
+        "prompt",
+        [],
+        "CSV upload",
+        ["Person"],
+        [{"Person": "Taylor"}],
+    )
+    assert mapping["Person"] == "lead_name"
+    assert clarification is not None
+    assert clarification.required is False
 
     with pytest.raises(OpenAICRMSpreadsheetAssistError, match="invalid payload"):
         agent.suggest_field_mapping("prompt", [], "CSV upload", ["Person"], [{"Person": "Taylor"}])
@@ -124,8 +210,57 @@ def test_openai_crm_spreadsheet_assist_validates_response_shapes(monkeypatch) ->
     with pytest.raises(OpenAICRMSpreadsheetAssistError, match="invalid payload"):
         agent.suggest_field_mapping("prompt", [], "CSV upload", ["Person"], [{"Person": "Taylor"}])
 
-    with pytest.raises(OpenAICRMSpreadsheetAssistError, match="invalid payload"):
-        agent.suggest_field_mapping("prompt", [], "CSV upload", ["Person"], [{"Person": "Taylor"}])
+
+def test_openai_crm_spreadsheet_assist_internal_parsers_cover_sparse_payloads(monkeypatch) -> None:
+    assert _extract_text_from_response({"output": [{"content": [{"text": " hello "}]}]}) == "hello"
 
     with pytest.raises(OpenAICRMSpreadsheetAssistError, match="invalid payload"):
-        agent.suggest_field_mapping("prompt", [], "CSV upload", ["Person"], [{"Person": "Taylor"}])
+        _extract_text_from_response({"output": "bad"})
+
+    with pytest.raises(OpenAICRMSpreadsheetAssistError, match="invalid payload"):
+        _extract_text_from_response({"output": ["bad", {"content": "bad"}, {"content": ["bad", {"no_text": "x"}]}]})
+
+    clarification = _parse_clarification(None, "Need nothing else.")
+    assert clarification is not None
+    assert clarification.required is False
+
+    with pytest.raises(OpenAICRMSpreadsheetAssistError, match="invalid payload"):
+        _parse_clarification("bad", "message")
+
+    with pytest.raises(OpenAICRMSpreadsheetAssistError, match="invalid payload"):
+        _parse_clarification([123], "message")
+
+    with pytest.raises(OpenAICRMSpreadsheetAssistError, match="invalid payload"):
+        _parse_clarification([{"id": "", "prompt": "Test", "choices": [{"value": "a", "label": "A"}, {"value": "b", "label": "B"}]}], "message")
+
+    with pytest.raises(OpenAICRMSpreadsheetAssistError, match="invalid payload"):
+        _parse_clarification([{"id": "q1", "prompt": "", "choices": [{"value": "a", "label": "A"}, {"value": "b", "label": "B"}]}], "message")
+
+    with pytest.raises(OpenAICRMSpreadsheetAssistError, match="invalid payload"):
+        _parse_clarification([{"id": "q1", "prompt": "Test", "choices": [{"value": "a", "label": "A"}]}], "message")
+
+    with pytest.raises(OpenAICRMSpreadsheetAssistError, match="invalid payload"):
+        _parse_clarification([{"id": "q1", "prompt": "Test", "choices": ["bad", {"value": "b", "label": "B"}]}], "message")
+
+    with pytest.raises(OpenAICRMSpreadsheetAssistError, match="invalid payload"):
+        _parse_clarification([{"id": "q1", "prompt": "Test", "choices": [{"value": "", "label": "A"}, {"value": "b", "label": "B"}]}], "message")
+
+    with pytest.raises(OpenAICRMSpreadsheetAssistError, match="invalid payload"):
+        _parse_clarification([{"id": "q1", "prompt": "Test", "choices": [{"value": "a", "label": ""}, {"value": "b", "label": "B"}]}], "message")
+
+    with pytest.raises(OpenAICRMSpreadsheetAssistError, match="invalid payload"):
+        monkeypatch.setattr(
+            "src.adapters.llm.openai_crm_spreadsheet_assist.httpx.post",
+            lambda *args, **kwargs: httpx.Response(
+                200,
+                request=httpx.Request("POST", "https://api.openai.com/v1/responses"),
+                json={"output_text": '{"field_mapping":{"Person":"lead_name"},"assistant_message":123}'},
+            ),
+        )
+        OpenAICRMSpreadsheetAssistAgent(api_key="secret").suggest_field_mapping(
+            "prompt",
+            [],
+            "CSV upload",
+            ["Person"],
+            [{"Person": "Taylor"}],
+        )

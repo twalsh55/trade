@@ -167,6 +167,7 @@ export async function previewCrmImport(
     file_name?: string;
     file_content_base64?: string;
     field_mapping?: Record<string, string | null>;
+    clarification_answers?: Record<string, string>;
   },
   options: ApiRequestOptions = {},
 ): Promise<CRMImportPreview> {
@@ -188,6 +189,7 @@ export async function commitCrmImport(
     file_name?: string;
     file_content_base64?: string;
     field_mapping?: Record<string, string | null>;
+    clarification_answers?: Record<string, string>;
   },
   options: ApiRequestOptions = {},
 ): Promise<CRMImportResult> {

@@ -13,6 +13,7 @@ from src.domain.auth import User
 from src.domain.crm import (
     LeadFollowUp,
     LeadFollowUpOverview,
+    LeadImportClarification,
     LeadImportCommitResult,
     LeadImportHeaderMapping,
     LeadImportIssue,
@@ -158,6 +159,7 @@ class PreviewLeadImportWithAssistanceUseCase:
         prompt: str,
         preferred_formats: list[str],
         field_mapping_overrides: dict[str, str | None] | None = None,
+        clarification_answers: dict[str, str] | None = None,
     ) -> LeadImportPreview:
         existing_items = self.repository.list_lead_follow_ups(user)
         try:
@@ -170,17 +172,21 @@ class PreviewLeadImportWithAssistanceUseCase:
                 return preview
 
         headers, sample_rows = _extract_headers_and_sample_rows(csv_content)
-        suggested_mapping = self.spreadsheet_assist.suggest_field_mapping(
+        suggested_mapping, clarification = self.spreadsheet_assist.suggest_field_mapping(
             prompt=prompt,
             preferred_formats=preferred_formats,
             source_label=source_label,
             headers=headers,
             sample_rows=sample_rows,
+            clarification_answers=clarification_answers,
         )
         merged_overrides = dict(suggested_mapping)
         if field_mapping_overrides:
             merged_overrides.update(field_mapping_overrides)
-        return _build_preview(csv_content, source_type, source_label, existing_items, merged_overrides)
+        preview = _build_preview(csv_content, source_type, source_label, existing_items, merged_overrides)
+        if clarification:
+            return replace(preview, clarification=clarification)
+        return preview
 
 
 class CommitLeadImportUseCase:

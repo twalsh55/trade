@@ -146,6 +146,7 @@ class LeadImportPayload(BaseModel):
     file_name: str | None = None
     file_content_base64: str | None = None
     field_mapping: dict[str, str | None] | None = None
+    clarification_answers: dict[str, str] | None = None
 
 
 class FounderCodeRequestDTO(BaseModel):
@@ -364,6 +365,7 @@ def create_app(dependencies: ApiDependencies | None = None) -> FastAPI:
                 source_type=source_type,
                 source_label=source_label,
                 field_mapping=payload.field_mapping,
+                clarification_answers=payload.clarification_answers,
                 settings=settings,
                 deps=deps,
             )
@@ -381,6 +383,24 @@ def create_app(dependencies: ApiDependencies | None = None) -> FastAPI:
         repository = deps.lead_follow_up_repository_factory()
         try:
             csv_content, source_label, source_type = _resolve_crm_import_source(payload, user, deps)
+            settings = GetUserDashboardSettingsUseCase(
+                repository=deps.personalization_repository_factory(),
+                default_factory=_build_default_dashboard_settings,
+            ).execute(user)
+            preview = _preview_crm_import_with_optional_ai_assistance(
+                user=user,
+                repository=repository,
+                now=deps.now,
+                csv_content=csv_content,
+                source_type=source_type,
+                source_label=source_label,
+                field_mapping=payload.field_mapping,
+                clarification_answers=payload.clarification_answers,
+                settings=settings,
+                deps=deps,
+            )
+            if preview.clarification and preview.clarification.required:
+                raise ValueError("AI still needs one or two quick answers before this import is safe to commit.")
             result = CommitLeadImportUseCase(repository=repository, now=deps.now).execute(
                 user,
                 csv_content,
@@ -1044,6 +1064,7 @@ def _preview_crm_import_with_optional_ai_assistance(
     source_type: str,
     source_label: str,
     field_mapping: dict[str, str | None] | None,
+    clarification_answers: dict[str, str] | None,
     settings: UserDashboardSettings,
     deps: ApiDependencies,
 ):
@@ -1066,20 +1087,22 @@ def _preview_crm_import_with_optional_ai_assistance(
         has_follow_up = "next_follow_up_at" in mapped_fields
         if has_identity and has_follow_up:
             return preview
-        _ensure_advanced_ai_intake_access(user, deps)
-        return PreviewLeadImportWithAssistanceUseCase(
-            repository=repository,
-            now=now,
-            spreadsheet_assist=build_crm_spreadsheet_assist_agent_from_env(),
-        ).execute(
-            user,
-            csv_content,
-            source_type,
-            source_label,
-            prompt=settings.crm_ai_prompt,
-            preferred_formats=settings.crm_preferred_import_formats,
-            field_mapping_overrides=field_mapping,
-        )
+
+    _ensure_advanced_ai_intake_access(user, deps)
+    return PreviewLeadImportWithAssistanceUseCase(
+        repository=repository,
+        now=now,
+        spreadsheet_assist=build_crm_spreadsheet_assist_agent_from_env(),
+    ).execute(
+        user,
+        csv_content,
+        source_type,
+        source_label,
+        prompt=settings.crm_ai_prompt,
+        preferred_formats=settings.crm_preferred_import_formats,
+        field_mapping_overrides=field_mapping,
+        clarification_answers=clarification_answers,
+    )
 
 
 def _ensure_advanced_ai_intake_access(user: User, deps: ApiDependencies) -> None:
