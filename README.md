@@ -294,6 +294,7 @@ PROSPECT_ENABLE_INDIE_HACKERS_SOURCE=true
 PROSPECT_ENABLE_REVIEW_SOURCE=true
 PROSPECT_ENABLE_X_SOURCE=true
 PROSPECT_ENABLE_DISCORD_SOURCE=true
+PROSPECT_QUEUE_AGENT_RECOMMENDATIONS=true
 PROSPECT_RUN_LOG_FILE=var/prospect_run_log.jsonl
 PRODUCT_UPDATE_LOG_FILE=product_updates.jsonl
 OPERATOR_BRIEFING_RECIPIENT=tom.mg.walsh@gmail.com
@@ -324,6 +325,7 @@ CRM direction mode:
 - the digest includes model token usage when OpenAI drafting runs
 - when `PROSPECT_TRACK_USAGE=true`, each run appends a JSONL entry to `PROSPECT_USAGE_LOG_FILE`
 - each prospecting run also appends a richer run record to `PROSPECT_RUN_LOG_FILE`
+- when `PROSPECT_QUEUE_AGENT_RECOMMENDATIONS=true` and `DATABASE_URL` is configured, strong unguided prospect recommendations are also stored in the durable founder-code queue so the always-on local machine can mirror them into `AUTONOMOUS_CODE_INBOX_FILE`
 
 Operator briefing workflow:
 
@@ -368,6 +370,7 @@ Automation behavior:
 - a heartbeat file makes health checks and watchdog recovery straightforward
 - state persists last successful run timestamps so the worker can resume cleanly after restarts
 - when `AUTOMATION_ENABLE_FOUNDER_CODE_SYNC=true`, the worker polls the production API for stored `/code` requests and appends them to `AUTONOMOUS_CODE_INBOX_FILE`
+- the same sync path also brings down strong prospect-agent build recommendations, tagged with `source_chat_id=agent:prospect`
 - unattended prospect runs fall back to template mode automatically if the local OpenAI credential is invalid
 - each successful automated prospect run also sends an operator briefing email so product guidance arrives with the run itself
 - the separate scheduled operator briefing job is opt-in via `AUTOMATION_ENABLE_SCHEDULED_OPERATOR_BRIEFING=true`

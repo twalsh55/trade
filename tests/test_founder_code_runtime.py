@@ -9,7 +9,7 @@ import pytest
 from psycopg import OperationalError
 
 from src.adapters.founder_code import runtime as runtime_module
-from src.adapters.founder_code.runtime import build_founder_code_request_repository, sync_founder_code_requests_from_api
+from src.adapters.founder_code.runtime import build_founder_code_request_repository, parse_positive_int, sync_founder_code_requests_from_api
 from src.adapters.persistence import postgres_founder_code_request_repository as repo_module
 from src.adapters.persistence.postgres_founder_code_request_repository import (
     PostgresFounderCodeRequestRepository,
@@ -260,6 +260,11 @@ def test_sync_founder_code_requests_from_api_handles_empty_and_invalid_states(tm
     monkeypatch.setenv("AUTONOMOUS_CODE_SYNC_LIMIT", "0")
     with pytest.raises(ValueError, match="AUTONOMOUS_CODE_SYNC_LIMIT must be greater than zero."):
         sync_founder_code_requests_from_api()
+
+
+def test_founder_code_parse_positive_int_uses_default_and_validates(monkeypatch) -> None:
+    monkeypatch.delenv("AUTONOMOUS_CODE_SYNC_LIMIT", raising=False)
+    assert parse_positive_int("AUTONOMOUS_CODE_SYNC_LIMIT", default=25) == 25
 
 
 def test_sync_founder_code_requests_from_api_raises_for_http_or_bad_payload(tmp_path, monkeypatch) -> None:

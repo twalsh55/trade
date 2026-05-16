@@ -4,6 +4,7 @@ import logging
 import os
 from pathlib import Path
 
+from src.adapters.founder_code.runtime import build_founder_code_request_repository
 from src.adapters.llm.openai_prospect_drafter import OpenAIProspectDrafter, TemplateProspectDrafter
 from src.adapters.notifications.composite_email_notifier import CompositeEmailNotifier
 from src.adapters.notifications.smtp_email_notifier import SMTPEmailNotifier
@@ -21,6 +22,8 @@ from src.adapters.social.review_site_lead_source import ReviewSiteLeadSource
 from src.adapters.social.web_lead_source import WebLeadSource
 from src.adapters.social.x_lead_source import XLeadSource
 from src.application.ports import EmailDeliveryPort
+from src.application.autonomous_build import AutonomousBuildBrief, decide_autonomous_build_brief, format_autonomous_build_brief
+from src.application.founder_code import QueueFounderCodeRequestUseCase
 from src.application.prospecting import (
     DEFAULT_APP_SUMMARY,
     DEFAULT_CRM_DIRECTION_SEARCH_TERMS,
@@ -147,6 +150,7 @@ def run_prospecting_job(founder_guidance: str | None = None) -> ProspectingDiges
     if usage_log is not None:
         usage_log.append(digest)
     append_prospect_digest_to_history(digest)
+    _queue_agent_build_recommendation_if_enabled(digest, founder_guidance=founder_guidance)
     if os.getenv("PROSPECT_SEND_OPERATOR_BRIEFING", "true").strip().lower() != "false":
         try:
             run_operator_briefing_job(trigger_label="prospect run")
@@ -227,3 +231,39 @@ def has_configured_telegram_delivery() -> bool:
 
 def get_app_openai_api_key() -> str:
     return get_first_configured_env(*APP_OPENAI_ENV_NAMES)
+
+
+def _queue_agent_build_recommendation_if_enabled(
+    digest: ProspectingDigest,
+    *,
+    founder_guidance: str | None,
+) -> None:
+    if os.getenv("PROSPECT_QUEUE_AGENT_RECOMMENDATIONS", "true").strip().lower() == "false":
+        return
+    if (founder_guidance or "").strip():
+        return
+    if not os.getenv("DATABASE_URL", "").strip():
+        return
+
+    brief = decide_autonomous_build_brief(digest)
+    if not brief.should_build:
+        return
+
+    try:
+        repository = build_founder_code_request_repository()
+        QueueFounderCodeRequestUseCase(repository).execute(
+            chat_id="agent:prospect",
+            command_text=_build_agent_command_text(brief),
+            guidance=_build_agent_guidance(brief),
+        )
+    except RuntimeError as exc:
+        prospecting_logger.warning("Unable to queue agent build recommendation", exc_info=exc)
+
+
+def _build_agent_command_text(brief: AutonomousBuildBrief) -> str:
+    feature_name = (brief.feature_name or "follow-up workflow refinement").strip()
+    return f"/agent {feature_name}"
+
+
+def _build_agent_guidance(brief: AutonomousBuildBrief) -> str:
+    return format_autonomous_build_brief(brief)

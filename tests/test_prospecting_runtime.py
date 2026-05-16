@@ -291,6 +291,7 @@ def test_run_prospecting_job_builds_and_executes_use_case(monkeypatch) -> None:
     monkeypatch.setattr("src.adapters.prospecting.runtime.build_drafter_from_env", lambda: drafter)
     monkeypatch.setattr("src.adapters.prospecting.runtime.build_digest_delivery_from_env", lambda: email_delivery)
     monkeypatch.setattr("src.adapters.prospecting.runtime.build_usage_log_from_env", lambda: None)
+    monkeypatch.setattr("src.adapters.prospecting.runtime._queue_agent_build_recommendation_if_enabled", lambda digest, founder_guidance=None: None)
     briefing_triggers: list[str] = []
     monkeypatch.setattr("src.adapters.prospecting.runtime.run_operator_briefing_job", lambda trigger_label="scheduled update": briefing_triggers.append(trigger_label))
 
@@ -333,6 +334,7 @@ def test_run_prospecting_job_appends_usage_log_when_configured(monkeypatch) -> N
     monkeypatch.setattr("src.adapters.prospecting.runtime.build_drafter_from_env", lambda: object())
     monkeypatch.setattr("src.adapters.prospecting.runtime.build_digest_delivery_from_env", lambda: object())
     monkeypatch.setattr("src.adapters.prospecting.runtime.run_operator_briefing_job", lambda trigger_label="scheduled update": None)
+    monkeypatch.setattr("src.adapters.prospecting.runtime._queue_agent_build_recommendation_if_enabled", lambda digest, founder_guidance=None: None)
 
     class FakeUseCase:
         def __init__(self, lead_source, drafter, email_delivery) -> None:  # type: ignore[no-untyped-def]
@@ -375,6 +377,7 @@ def test_run_prospecting_job_can_disable_operator_briefing(monkeypatch) -> None:
     monkeypatch.setattr("src.adapters.prospecting.runtime.build_drafter_from_env", lambda: object())
     monkeypatch.setattr("src.adapters.prospecting.runtime.build_digest_delivery_from_env", lambda: object())
     monkeypatch.setattr("src.adapters.prospecting.runtime.build_usage_log_from_env", lambda: None)
+    monkeypatch.setattr("src.adapters.prospecting.runtime._queue_agent_build_recommendation_if_enabled", lambda digest, founder_guidance=None: None)
     briefing_triggers: list[str] = []
     monkeypatch.setattr("src.adapters.prospecting.runtime.run_operator_briefing_job", lambda trigger_label="scheduled update": briefing_triggers.append(trigger_label))
 
@@ -411,6 +414,7 @@ def test_run_prospecting_job_tolerates_operator_briefing_email_failure(monkeypat
     monkeypatch.setattr("src.adapters.prospecting.runtime.build_drafter_from_env", lambda: object())
     monkeypatch.setattr("src.adapters.prospecting.runtime.build_digest_delivery_from_env", lambda: object())
     monkeypatch.setattr("src.adapters.prospecting.runtime.build_usage_log_from_env", lambda: None)
+    monkeypatch.setattr("src.adapters.prospecting.runtime._queue_agent_build_recommendation_if_enabled", lambda digest, founder_guidance=None: None)
     monkeypatch.setattr(
         "src.adapters.prospecting.runtime.run_operator_briefing_job",
         lambda trigger_label="scheduled update": (_ for _ in ()).throw(EmailNotificationError("smtp down")),
@@ -427,6 +431,107 @@ def test_run_prospecting_job_tolerates_operator_briefing_email_failure(monkeypat
     monkeypatch.setattr("src.adapters.prospecting.runtime.RunDailyProspectingUseCase", FakeUseCase)
 
     assert run_prospecting_job() is digest
+
+
+def test_queue_agent_build_recommendation_enqueues_strong_recommendation(monkeypatch) -> None:
+    digest = object()
+    created: list[tuple[str, str, str | None]] = []
+    monkeypatch.setenv("DATABASE_URL", "postgres://example")
+
+    class FakeRepository:
+        def create_request(self, source_chat_id: str, command_text: str, guidance: str | None, created_at: datetime):
+            created.append((source_chat_id, command_text, guidance))
+            return object()
+
+    brief = type(
+        "Brief",
+        (),
+        {
+            "should_build": True,
+            "feature_name": "CSV and Google Sheets import",
+        },
+    )()
+    monkeypatch.setattr("src.adapters.prospecting.runtime.decide_autonomous_build_brief", lambda passed_digest: brief)
+    monkeypatch.setattr("src.adapters.prospecting.runtime.build_founder_code_request_repository", lambda: FakeRepository())
+    monkeypatch.setattr("src.adapters.prospecting.runtime.format_autonomous_build_brief", lambda passed_brief: "build now")
+
+    from src.adapters.prospecting.runtime import _queue_agent_build_recommendation_if_enabled
+
+    _queue_agent_build_recommendation_if_enabled(digest, founder_guidance=None)
+
+    assert created == [("agent:prospect", "/agent CSV and Google Sheets import", "build now")]
+
+
+def test_queue_agent_build_recommendation_skips_guided_or_hold_runs(monkeypatch) -> None:
+    digest = object()
+    called: list[str] = []
+    monkeypatch.setenv("DATABASE_URL", "postgres://example")
+    brief = type(
+        "Brief",
+        (),
+        {
+            "should_build": False,
+            "feature_name": None,
+        },
+    )()
+    monkeypatch.setattr("src.adapters.prospecting.runtime.decide_autonomous_build_brief", lambda passed_digest: called.append("brief") or brief)
+    monkeypatch.setattr("src.adapters.prospecting.runtime.build_founder_code_request_repository", lambda: (_ for _ in ()).throw(AssertionError("should not build repository")))
+
+    from src.adapters.prospecting.runtime import _queue_agent_build_recommendation_if_enabled
+
+    _queue_agent_build_recommendation_if_enabled(digest, founder_guidance="fix login")
+    assert called == []
+
+    _queue_agent_build_recommendation_if_enabled(digest, founder_guidance=None)
+    assert called == ["brief"]
+
+
+def test_queue_agent_build_recommendation_tolerates_queue_failure(monkeypatch) -> None:
+    digest = object()
+    monkeypatch.setenv("DATABASE_URL", "postgres://example")
+    brief = type(
+        "Brief",
+        (),
+        {
+            "should_build": True,
+            "feature_name": "Inbox and DM capture",
+        },
+    )()
+    monkeypatch.setattr("src.adapters.prospecting.runtime.decide_autonomous_build_brief", lambda passed_digest: brief)
+    monkeypatch.setattr(
+        "src.adapters.prospecting.runtime.build_founder_code_request_repository",
+        lambda: (_ for _ in ()).throw(RuntimeError("db down")),
+    )
+    monkeypatch.setattr("src.adapters.prospecting.runtime.format_autonomous_build_brief", lambda passed_brief: "build now")
+
+    from src.adapters.prospecting.runtime import _queue_agent_build_recommendation_if_enabled
+
+    _queue_agent_build_recommendation_if_enabled(digest, founder_guidance=None)
+
+
+def test_queue_agent_build_recommendation_skips_without_database(monkeypatch) -> None:
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.setattr(
+        "src.adapters.prospecting.runtime.decide_autonomous_build_brief",
+        lambda passed_digest: (_ for _ in ()).throw(AssertionError("should not decide without a durable queue")),
+    )
+
+    from src.adapters.prospecting.runtime import _queue_agent_build_recommendation_if_enabled
+
+    _queue_agent_build_recommendation_if_enabled(object(), founder_guidance=None)
+
+
+def test_queue_agent_build_recommendation_respects_disable_toggle(monkeypatch) -> None:
+    monkeypatch.setenv("PROSPECT_QUEUE_AGENT_RECOMMENDATIONS", "false")
+    monkeypatch.setenv("DATABASE_URL", "postgres://example")
+    monkeypatch.setattr(
+        "src.adapters.prospecting.runtime.decide_autonomous_build_brief",
+        lambda passed_digest: (_ for _ in ()).throw(AssertionError("should not decide when disabled")),
+    )
+
+    from src.adapters.prospecting.runtime import _queue_agent_build_recommendation_if_enabled
+
+    _queue_agent_build_recommendation_if_enabled(object(), founder_guidance=None)
 
 
 def test_build_usage_log_from_env_respects_toggle_and_path(monkeypatch, tmp_path) -> None:
