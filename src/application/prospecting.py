@@ -177,7 +177,7 @@ def format_digest_email(config: DailyProspectingConfig, digest: ProspectingDiges
         excerpt = _summarize_post_text(item.post.title, item.post.body, max_length=180)
         lines.extend(
             [
-                f"{index}. Reddit post",
+                f"{index}. {item.post.source} post",
                 f"Title: {item.post.title}",
                 f"Author: {item.post.author}",
                 f"Posted at: {item.post.created_at.isoformat()}",

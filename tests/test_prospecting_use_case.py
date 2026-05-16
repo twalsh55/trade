@@ -206,6 +206,41 @@ def test_format_digest_email_truncates_long_body() -> None:
     assert "Audit detail mode: concise" in body
 
 
+def test_format_digest_email_uses_source_label_for_shortlisted_posts() -> None:
+    post = SocialPost(
+        source="hackernews",
+        external_id="1",
+        title="Title",
+        body="body",
+        author="poster",
+        permalink="https://example.com/1",
+        created_at=datetime(2026, 5, 14, tzinfo=UTC),
+    )
+    digest = ProspectingDigest(
+        generated_at=datetime(2026, 5, 14, 9, 30, tzinfo=UTC),
+        scanned_post_count=1,
+        shortlisted_count=1,
+        shortlisted_posts=(
+            type(
+                "DraftedItem",
+                (),
+                {
+                    "post": post,
+                    "matched_query": "query",
+                    "score": 12,
+                    "reasons": ("mentions crash",),
+                    "suggested_reply": "reply",
+                },
+            )(),
+        ),
+        audit_entries=(),
+    )
+
+    body = format_digest_email(DailyProspectingConfig(recipient_email="tom.mg.walsh@gmail.com"), digest)
+
+    assert "1. hackernews post" in body
+
+
 def test_format_digest_email_includes_full_audit_when_verbose() -> None:
     post = make_post("1", "Title", "body", 14)
     digest = ProspectingDigest(
