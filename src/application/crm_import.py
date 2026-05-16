@@ -8,7 +8,7 @@ from datetime import UTC, datetime, time
 from typing import Callable
 from urllib.parse import quote_plus
 
-from src.application.ports import LeadFollowUpRepositoryPort
+from src.application.ports import CRMImageIntakePort, LeadFollowUpRepositoryPort
 from src.domain.auth import User
 from src.domain.crm import (
     LeadFollowUp,
@@ -168,6 +168,25 @@ class CommitLeadImportUseCase:
             skipped_duplicates=preview.duplicate_rows,
             skipped_invalid=preview.invalid_rows,
             overview=overview,
+        )
+
+
+class GenerateLeadImportFromImageUseCase:
+    def __init__(self, image_intake: CRMImageIntakePort) -> None:
+        self.image_intake = image_intake
+
+    def execute(
+        self,
+        prompt: str,
+        preferred_formats: list[str],
+        file_name: str,
+        file_bytes: bytes,
+    ) -> str:
+        return self.image_intake.extract_spreadsheet_rows_from_image(
+            prompt=prompt,
+            preferred_formats=preferred_formats,
+            file_name=file_name,
+            file_bytes=file_bytes,
         )
 
 
@@ -387,7 +406,14 @@ def _build_suggested_field_map(headers: list[str]) -> dict[str, str]:
     field_map: dict[str, str] = {}
     for header in headers:
         slug = _slug_header(header)
-        canonical = next((name for name, aliases in HEADER_ALIASES.items() if slug in {_slug_header(alias) for alias in aliases}), None)
+        canonical = next(
+            (
+                name
+                for name, aliases in HEADER_ALIASES.items()
+                if slug == _slug_header(name) or slug in {_slug_header(alias) for alias in aliases}
+            ),
+            None,
+        )
         if canonical is not None:
             field_map[header] = canonical
     return field_map

@@ -40,6 +40,14 @@ async function buildImportPayload(request: NextRequest) {
       throw new Error("Choose a spreadsheet file before previewing.");
     }
     const fileName = file.name || "spreadsheet";
+    if (isImageFile(fileName)) {
+      return {
+        source_type: "image" as const,
+        file_name: fileName,
+        file_content_base64: toBase64(await file.arrayBuffer()),
+        field_mapping: fieldMapping,
+      };
+    }
     if (fileName.toLowerCase().endsWith(".csv")) {
       return {
         source_type: "csv" as const,
@@ -94,4 +102,9 @@ function parseFieldMapping(value: FormDataEntryValue | null): Record<string, str
 
 function toBase64(buffer: ArrayBuffer): string {
   return Buffer.from(buffer).toString("base64");
+}
+
+function isImageFile(fileName: string): boolean {
+  const normalized = fileName.toLowerCase();
+  return normalized.endsWith(".png") || normalized.endsWith(".jpg") || normalized.endsWith(".jpeg") || normalized.endsWith(".webp");
 }

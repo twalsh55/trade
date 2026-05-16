@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac
+import json
 import logging
 import os
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from time import perf_counter
 from typing import Callable
+from urllib import request
 from uuid import UUID
 from uuid import uuid4
 
@@ -34,9 +39,10 @@ from src.adapters.notifications.smtp_email_notifier import EmailNotificationErro
 from src.adapters.notifications.telegram_notifier import TelegramNotificationError, TelegramNotifier
 from src.adapters.operator_briefing.runtime import collect_operator_briefing_config_errors, run_daily_operator_briefing_job
 from src.adapters.crm.google_sheets import fetch_google_sheets_csv
+from src.adapters.crm.runtime import build_crm_image_intake_agent_from_env
 from src.adapters.crm.spreadsheet_files import convert_excel_bytes_to_csv, decode_base64_file_content
 from src.adapters.crm.runtime import build_lead_follow_up_repository
-from src.adapters.persistence.runtime import build_personalization_repository
+from src.adapters.persistence.runtime import build_personalization_repository, build_user_repository
 from src.adapters.prospecting.runtime import collect_prospecting_config_errors, run_prospecting_job
 from src.adapters.sentiment.runtime import collect_etf_sentiment_config_errors, deliver_etf_sentiment_job, run_etf_sentiment_job
 from src.adapters.social.reddit_lead_source import RedditLeadSourceError
@@ -56,7 +62,7 @@ from src.application.autonomous_build import decide_autonomous_build_brief, form
 from src.application.founder_code import ListFounderCodeRequestsUseCase, QueueFounderCodeRequestUseCase
 from src.application.crm import GetLeadFollowUpOverviewUseCase
 from src.application.crm import AddLeadFollowUpNoteUseCase, CompleteLeadFollowUpUseCase, SnoozeLeadFollowUpUseCase
-from src.application.crm_import import CommitLeadImportUseCase, PreviewLeadImportUseCase
+from src.application.crm_import import CommitLeadImportUseCase, GenerateLeadImportFromImageUseCase, PreviewLeadImportUseCase
 from src.application.dashboard import (
     DEFAULT_BENCHMARK,
     DEFAULT_LONG_YIELD_SYMBOL,
@@ -94,6 +100,7 @@ class ApiDependencies:
     personalization_repository_factory: Callable[[], object]
     lead_follow_up_repository_factory: Callable[[], object]
     billing_port_factory: Callable[[], object | None]
+    user_repository_factory: Callable[[], object | None]
     now: Callable[[], datetime]
 
 
@@ -121,7 +128,7 @@ class LeadFollowUpActionPayload(BaseModel):
 
 
 class LeadImportPayload(BaseModel):
-    source_type: str = Field(pattern="^(csv|excel|google_sheets)$")
+    source_type: str = Field(pattern="^(csv|excel|image|google_sheets)$")
     csv_content: str | None = Field(default=None, min_length=1)
     sheet_url: str | None = None
     file_name: str | None = None
@@ -137,6 +144,13 @@ class FounderCodeRequestDTO(BaseModel):
     guidance: str | None
 
 
+class CRMRemoteIntakeDTO(BaseModel):
+    telegram_available: bool
+    intake_channel: str | None
+    intake_caption: str | None
+    instructions: str
+
+
 def create_app(dependencies: ApiDependencies | None = None) -> FastAPI:
     load_env_file()
     logger = configure_api_logger()
@@ -146,6 +160,7 @@ def create_app(dependencies: ApiDependencies | None = None) -> FastAPI:
         personalization_repository_factory=build_personalization_repository,
         lead_follow_up_repository_factory=build_lead_follow_up_repository,
         billing_port_factory=build_billing_adapter,
+        user_repository_factory=build_user_repository,
         now=lambda: datetime.now(tz=UTC),
     )
     app = FastAPI(title="Brivoly API", version="0.1.0")
@@ -317,11 +332,11 @@ def create_app(dependencies: ApiDependencies | None = None) -> FastAPI:
         user = _require_authenticated_user(deps, authorization, session_cookie)
         repository = deps.lead_follow_up_repository_factory()
         try:
-            csv_content, source_label = _resolve_crm_import_source(payload)
+            csv_content, source_label, source_type = _resolve_crm_import_source(payload, user, deps)
             preview = PreviewLeadImportUseCase(repository=repository, now=deps.now).execute(
                 user,
                 csv_content,
-                payload.source_type,
+                source_type,
                 source_label,
                 payload.field_mapping,
             )
@@ -338,17 +353,43 @@ def create_app(dependencies: ApiDependencies | None = None) -> FastAPI:
         user = _require_authenticated_user(deps, authorization, session_cookie)
         repository = deps.lead_follow_up_repository_factory()
         try:
-            csv_content, source_label = _resolve_crm_import_source(payload)
+            csv_content, source_label, source_type = _resolve_crm_import_source(payload, user, deps)
             result = CommitLeadImportUseCase(repository=repository, now=deps.now).execute(
                 user,
                 csv_content,
-                payload.source_type,
+                source_type,
                 source_label,
                 payload.field_mapping,
             )
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         return dto_to_dict(build_lead_import_commit_result_dto(result))
+
+    @app.get("/api/crm/intake-channel")
+    def crm_intake_channel(
+        authorization: str | None = Header(default=None),
+        session_cookie: str | None = Cookie(default=None, alias=CLERK_SESSION_COOKIE),
+    ) -> dict[str, object]:
+        user = _require_authenticated_user(deps, authorization, session_cookie)
+        secret = _get_crm_intake_secret()
+        if not secret:
+            dto = CRMRemoteIntakeDTO(
+                telegram_available=False,
+                intake_channel=None,
+                intake_caption=None,
+                instructions="Remote note capture is unavailable until CRM_INTAKE_SECRET and the Telegram bot are configured.",
+            )
+            return dto.model_dump()
+        dto = CRMRemoteIntakeDTO(
+            telegram_available=bool(os.getenv("TELEGRAM_BOT_TOKEN", "").strip()),
+            intake_channel="telegram",
+            intake_caption=f"/intake {_build_crm_intake_token(user.id, secret)}",
+            instructions=(
+                "Send a note photo or screenshot to the Brivoly Telegram bot with this caption. "
+                "Brivoly will import it into your CRM queue using your saved AI Intake Profile."
+            ),
+        )
+        return dto.model_dump()
 
     @app.get("/api/account/billing")
     def billing_overview(
@@ -466,6 +507,12 @@ def create_app(dependencies: ApiDependencies | None = None) -> FastAPI:
         telegram_secret: str | None = Header(default=None, alias="X-Telegram-Bot-Api-Secret-Token"),
     ) -> dict[str, object]:
         _validate_telegram_webhook_secret(telegram_secret)
+        intake = _extract_telegram_image_intake(payload)
+        if intake is not None:
+            notifier = _build_telegram_notifier(chat_id=intake.chat_id)
+            notifier.send_message("Received your note image. Brivoly is importing it into your CRM now.")
+            background_tasks.add_task(_run_telegram_crm_image_intake, notifier, intake, deps)
+            return {"ok": True, "handled": True, "command": intake.command_name}
         command = _extract_telegram_command(payload)
         if command is None:
             return {"ok": True, "handled": False}
@@ -610,6 +657,15 @@ class _TelegramCommand:
     text: str
 
 
+@dataclass(frozen=True)
+class _TelegramImageIntake:
+    chat_id: str
+    command_name: str
+    intake_token: str
+    file_id: str
+    file_name: str
+
+
 def _extract_telegram_command(payload: dict[str, object]) -> _TelegramCommand | None:
     message = payload.get("message")
     if not isinstance(message, dict):
@@ -634,6 +690,50 @@ def _extract_telegram_command(payload: dict[str, object]) -> _TelegramCommand | 
     return _TelegramCommand(chat_id=str(chat_id), name=normalized_name, argument=argument, text=normalized_text)
 
 
+def _extract_telegram_image_intake(payload: dict[str, object]) -> _TelegramImageIntake | None:
+    message = payload.get("message")
+    if not isinstance(message, dict):
+        return None
+    chat = message.get("chat")
+    if not isinstance(chat, dict) or chat.get("id") is None:
+        return None
+    caption = message.get("caption")
+    if not isinstance(caption, str):
+        return None
+    raw_caption = caption.strip()
+    if not raw_caption.startswith("/intake"):
+        return None
+    first_token, _, remainder = raw_caption.partition(" ")
+    intake_token = remainder.strip()
+    if not intake_token:
+        return None
+    command_name = first_token.split("@", 1)[0]
+    photo = message.get("photo")
+    if isinstance(photo, list) and photo:
+        last_photo = photo[-1]
+        if isinstance(last_photo, dict) and isinstance(last_photo.get("file_id"), str):
+            return _TelegramImageIntake(
+                chat_id=str(chat["id"]),
+                command_name=command_name,
+                intake_token=intake_token,
+                file_id=last_photo["file_id"],
+                file_name="telegram-photo.jpg",
+            )
+    document = message.get("document")
+    if isinstance(document, dict) and isinstance(document.get("file_id"), str):
+        mime_type = str(document.get("mime_type") or "")
+        file_name = str(document.get("file_name") or "telegram-note")
+        if mime_type.startswith("image/") or file_name.lower().endswith((".png", ".jpg", ".jpeg", ".webp")):
+            return _TelegramImageIntake(
+                chat_id=str(chat["id"]),
+                command_name=command_name,
+                intake_token=intake_token,
+                file_id=document["file_id"],
+                file_name=file_name,
+            )
+    return None
+
+
 def _validate_telegram_webhook_secret(provided_secret: str | None) -> None:
     expected_secret = os.getenv("TELEGRAM_WEBHOOK_SECRET", "").strip()
     if expected_secret and provided_secret != expected_secret:
@@ -651,12 +751,12 @@ def _validate_internal_cron_secret(provided_secret: str | None) -> None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid internal cron secret.")
 
 
-def _build_telegram_notifier() -> TelegramNotifier:
+def _build_telegram_notifier(chat_id: str | None = None) -> TelegramNotifier:
     bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
-    chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip()
-    if not bot_token or not chat_id:
+    configured_chat_id = chat_id or os.getenv("TELEGRAM_CHAT_ID", "").strip()
+    if not bot_token or not configured_chat_id:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Telegram bot is not configured.")
-    return TelegramNotifier(bot_token=bot_token, chat_id=chat_id)
+    return TelegramNotifier(bot_token=bot_token, chat_id=configured_chat_id)
 
 
 def _queue_founder_code_request(command: _TelegramCommand) -> None:
@@ -738,11 +838,132 @@ def _run_code_from_telegram(notifier: TelegramNotifier, founder_guidance: str | 
             return
 
 
-def _resolve_crm_import_source(payload: LeadImportPayload) -> tuple[str, str]:
+def _get_crm_intake_secret() -> str:
+    return (
+        os.getenv("CRM_INTAKE_SECRET", "").strip()
+        or os.getenv("INTERNAL_CRON_SECRET", "").strip()
+        or os.getenv("TELEGRAM_WEBHOOK_SECRET", "").strip()
+    )
+
+
+def _build_crm_intake_token(user_id: UUID, secret: str) -> str:
+    user_text = str(user_id)
+    signature = hmac.new(secret.encode("utf-8"), user_text.encode("utf-8"), hashlib.sha256).hexdigest()[:24]
+    payload = json.dumps({"user_id": user_text, "signature": signature}, separators=(",", ":")).encode("utf-8")
+    return base64.urlsafe_b64encode(payload).decode("ascii").rstrip("=")
+
+
+def _parse_crm_intake_token(token: str, secret: str) -> UUID:
+    padded = token + "=" * (-len(token) % 4)
+    try:
+        payload = base64.urlsafe_b64decode(padded.encode("ascii"))
+        parsed = json.loads(payload.decode("utf-8"))
+    except (ValueError, json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise ValueError("The CRM intake code is invalid.") from exc
+    if not isinstance(parsed, dict):
+        raise ValueError("The CRM intake code is invalid.")
+    user_id_text = parsed.get("user_id")
+    signature = parsed.get("signature")
+    if not isinstance(user_id_text, str) or not isinstance(signature, str):
+        raise ValueError("The CRM intake code is invalid.")
+    expected_signature = hmac.new(secret.encode("utf-8"), user_id_text.encode("utf-8"), hashlib.sha256).hexdigest()[:24]
+    if not hmac.compare_digest(signature, expected_signature):
+        raise ValueError("The CRM intake code is invalid.")
+    return UUID(user_id_text)
+
+
+def _download_telegram_file(bot_token: str, file_id: str) -> bytes:
+    metadata_request = request.Request(
+        url=f"https://api.telegram.org/bot{bot_token}/getFile?file_id={file_id}",
+        method="GET",
+    )
+    try:
+        with request.urlopen(metadata_request) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except Exception as exc:  # pragma: no cover - exercised via tests
+        raise ValueError("Unable to download the Telegram note image.") from exc
+    if not isinstance(payload, dict) or payload.get("ok") is not True:
+        raise ValueError("Unable to download the Telegram note image.")
+    result = payload.get("result")
+    if not isinstance(result, dict) or not isinstance(result.get("file_path"), str):
+        raise ValueError("Unable to download the Telegram note image.")
+    file_path = result["file_path"]
+    file_request = request.Request(
+        url=f"https://api.telegram.org/file/bot{bot_token}/{file_path}",
+        method="GET",
+    )
+    try:
+        with request.urlopen(file_request) as response:
+            return response.read()
+    except Exception as exc:  # pragma: no cover - exercised via tests
+        raise ValueError("Unable to download the Telegram note image.") from exc
+
+
+def _run_telegram_crm_image_intake(
+    notifier: TelegramNotifier,
+    intake: _TelegramImageIntake,
+    deps: ApiDependencies,
+) -> None:
+    try:
+        secret = _get_crm_intake_secret()
+        if not secret:
+            raise ValueError("Remote CRM note capture is not configured yet.")
+        user_id = _parse_crm_intake_token(intake.intake_token, secret)
+        user_repository = deps.user_repository_factory()
+        if user_repository is None:
+            raise ValueError("Remote CRM note capture needs the app database to be configured.")
+        user = user_repository.get_user_by_id(user_id)
+        if user is None:
+            raise ValueError("That CRM intake code no longer points to an active Brivoly account.")
+        _ensure_advanced_ai_intake_access(user, deps)
+        settings = GetUserDashboardSettingsUseCase(
+            repository=deps.personalization_repository_factory(),
+            default_factory=_build_default_dashboard_settings,
+        ).execute(user)
+        bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+        if not bot_token:
+            raise ValueError("Telegram bot token is not configured.")
+        file_bytes = _download_telegram_file(bot_token, intake.file_id)
+        csv_content = GenerateLeadImportFromImageUseCase(
+            image_intake=build_crm_image_intake_agent_from_env(),
+        ).execute(
+            prompt=settings.crm_ai_prompt,
+            preferred_formats=settings.crm_preferred_import_formats,
+            file_name=intake.file_name,
+            file_bytes=file_bytes,
+        )
+        result = CommitLeadImportUseCase(
+            repository=deps.lead_follow_up_repository_factory(),
+            now=deps.now,
+        ).execute(
+            user,
+            csv_content,
+            "image",
+            intake.file_name,
+        )
+        notifier.send_message(
+            "Brivoly imported your note image into CRM.\n"
+            f"Imported: {result.imported_count}\n"
+            f"Skipped duplicates: {result.skipped_duplicates}\n"
+            f"Skipped invalid: {result.skipped_invalid}"
+        )
+    except (EmailNotificationError, TelegramNotificationError, ValueError, RuntimeError) as exc:
+        api_logger.exception("Telegram CRM image intake failed", exc_info=exc)
+        try:
+            notifier.send_message(f"CRM note import failed: {exc}")
+        except TelegramNotificationError:
+            return
+
+
+def _resolve_crm_import_source(
+    payload: LeadImportPayload,
+    user: User | None = None,
+    deps: ApiDependencies | None = None,
+) -> tuple[str, str, str]:
     if payload.source_type == "csv":
         if not payload.csv_content:
             raise ValueError("CSV content is required for spreadsheet import.")
-        return payload.csv_content, "CSV upload"
+        return payload.csv_content, "CSV upload", "csv"
     if payload.source_type == "excel":
         if not payload.file_name:
             raise ValueError("Spreadsheet file name is required.")
@@ -750,12 +971,45 @@ def _resolve_crm_import_source(payload: LeadImportPayload) -> tuple[str, str]:
             raise ValueError("Spreadsheet file content is required.")
         file_bytes = decode_base64_file_content(payload.file_content_base64)
         csv_content = convert_excel_bytes_to_csv(payload.file_name, file_bytes)
-        return csv_content, payload.file_name
+        return csv_content, payload.file_name, "excel"
+    if payload.source_type == "image":
+        if not payload.file_name:
+            raise ValueError("Image file name is required.")
+        if not payload.file_content_base64:
+            raise ValueError("Image file content is required.")
+        if user is None or deps is None:
+            raise ValueError("Authenticated image intake context is required.")
+        _ensure_advanced_ai_intake_access(user, deps)
+        settings = GetUserDashboardSettingsUseCase(
+            repository=deps.personalization_repository_factory(),
+            default_factory=_build_default_dashboard_settings,
+        ).execute(user)
+        file_bytes = decode_base64_file_content(payload.file_content_base64)
+        csv_content = GenerateLeadImportFromImageUseCase(
+            image_intake=build_crm_image_intake_agent_from_env(),
+        ).execute(
+            prompt=settings.crm_ai_prompt,
+            preferred_formats=settings.crm_preferred_import_formats,
+            file_name=payload.file_name,
+            file_bytes=file_bytes,
+        )
+        return csv_content, payload.file_name, "image"
     if payload.source_type == "google_sheets":
         if not payload.sheet_url:
             raise ValueError("A Google Sheets URL is required.")
-        return fetch_google_sheets_csv(payload.sheet_url), "Google Sheets"
+        return fetch_google_sheets_csv(payload.sheet_url), "Google Sheets", "google_sheets"
     raise ValueError("Unsupported import source.")
+
+
+def _ensure_advanced_ai_intake_access(user: User, deps: ApiDependencies) -> None:
+    billing = deps.billing_port_factory()
+    if billing is None:
+        return
+    overview = GetBillingOverviewUseCase(billing).execute(user)
+    if not overview.enabled:
+        return
+    if overview.subscription_status not in {"active", "trialing"}:
+        raise ValueError("AI note image intake is available on active or trialing paid plans.")
 
 
 class _DisabledBillingPort:

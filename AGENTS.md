@@ -194,6 +194,8 @@ Use this section to give the next session a fast, practical starting point. Refr
   - a paid-only AI Intake Profile foundation in CRM
   - per-user AI intake prompts stored with account settings
   - per-user preferred import-format memory stored with account settings
+  - paid AI note-image upload support inside the CRM import flow
+  - remote Telegram note capture with per-user signed `/intake ...` captions
   - a clearer signed-in versus signed-out portal state
   - a more explicit and welcoming sign-in handoff
 - The current CRM wedge is:
@@ -238,6 +240,11 @@ Use this section to give the next session a fast, practical starting point. Refr
 - Prospecting automation cadence is currently set to every 12 hours, not every hour.
 - Each successful automated prospect run should trigger an operator briefing email; the separate scheduled operator briefing job is optional rather than the default.
 - Local app agents should prefer `APP_OPENAI_API_KEY` over `OPENAI_API_KEY` so app automation can use a dedicated credential path separate from the editor/Codex environment.
+- Remote CRM note capture now works through Telegram first:
+  - the CRM page exposes a per-user signed intake caption
+  - the Telegram webhook can accept photo or image-document uploads with that caption
+  - the image is interpreted through the paid AI intake path and imported into the user’s CRM queue
+  - `CRM_INTAKE_SECRET` should be configured anywhere the API needs to validate those captions
 - `/code` does not let Railway self-edit the repo. It truthfully triggers research, queues a build brief, and notifies the founder; actual code changes still happen through this coding agent.
 - The newest bridge layer is a founder-code sync job: Railway stores both `/code` requests and prospect-agent build prompts, and the local automation worker can poll them into `var/founder_code_inbox.jsonl` when the sync env vars are configured.
 - This bridge has now been proven end to end with a live production `/prospect` run; the first mirrored `agent:prospect` prompt recommended `CSV and Google Sheets import`.

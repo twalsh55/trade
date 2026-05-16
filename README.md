@@ -181,6 +181,7 @@ Optional startup and alert notifications use:
 TELEGRAM_BOT_TOKEN=your_bot_token
 TELEGRAM_CHAT_ID=your_chat_id
 TELEGRAM_WEBHOOK_SECRET=shared_secret_for_webhook_optional
+CRM_INTAKE_SECRET=shared_secret_for_signed_crm_image_intake
 ```
 
 Utilities:
@@ -203,6 +204,13 @@ Telegram-triggered prospecting:
   - `/code`
   - `/code <guidance>`
   - `/help`
+
+Telegram CRM note capture:
+
+- the CRM workspace can generate a per-user `/intake ...` caption
+- users can send a photo or image document to the Telegram bot with that caption
+- the API downloads the image, runs paid AI note interpretation, and imports the resulting rows into that user’s CRM queue
+- this remote intake path uses the same paid AI gate as advanced file and image interpretation
 
 ## Daily Prospecting Agent
 

@@ -12,16 +12,19 @@ import type {
   CRMImportPreview,
   CRMImportPreviewRow,
   CRMLeadFollowUp,
+  CRMRemoteIntakeChannel,
 } from "@/lib/types";
 
 export function CRMFollowUpWorkspace({
   initialOverview,
   initialSettings,
   initialBilling,
+  initialIntakeChannel,
 }: {
   initialOverview: CRMFollowUpOverview;
   initialSettings: AccountSettings | null;
   initialBilling: BillingOverview | null;
+  initialIntakeChannel: CRMRemoteIntakeChannel | null;
 }) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -109,6 +112,9 @@ export function CRMFollowUpWorkspace({
     if (sourceType === "file_upload") {
       if (!selectedFile) {
         throw new Error("Choose a spreadsheet file first.");
+      }
+      if (isImageFile(selectedFile.name) && !advancedAiUnlocked) {
+        throw new Error("AI note image intake is available on active or trialing paid plans.");
       }
       formData.set("file", selectedFile);
       return formData;
@@ -244,7 +250,7 @@ export function CRMFollowUpWorkspace({
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Spreadsheet Import</p>
             <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Bring your lead sheet in without retyping it.</h2>
             <p className="mt-3 text-sm leading-6 text-slate-600">
-              Upload a CSV, XLSX, or XLS file, or paste a Google Sheets link. Brivoly normalizes messy headers, flags validation problems, and skips duplicates before anything enters the follow-up queue.
+              Upload a CSV, XLSX, XLS, or note image, or paste a Google Sheets link. Brivoly normalizes messy headers, flags validation problems, and skips duplicates before anything enters the follow-up queue.
             </p>
 
             <div className="mt-5 flex flex-wrap gap-3">
@@ -262,7 +268,7 @@ export function CRMFollowUpWorkspace({
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.xls,application/vnd.ms-excel"
+                  accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.xls,application/vnd.ms-excel,.png,image/png,.jpg,image/jpeg,.jpeg,image/jpeg,.webp,image/webp"
                   className="mt-3 block w-full rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-5 text-sm text-slate-600"
                   onChange={(event) => {
                     setSelectedFile(event.target.files?.[0] ?? null);
@@ -274,9 +280,14 @@ export function CRMFollowUpWorkspace({
                   }}
                 />
                 <p className="mt-3 text-xs text-slate-500">
-                  Supported uploads: CSV, XLSX, and XLS. Suggested columns: contact, company, owner, status, next follow-up, and notes.
+                  Supported uploads: CSV, XLSX, XLS, PNG, JPG, JPEG, and WEBP. Note images use paid AI intake. Suggested spreadsheet columns: contact, company, owner, status, next follow-up, and notes.
                 </p>
                 {selectedFile ? <p className="mt-2 text-sm font-medium text-slate-700">{selectedFile.name}</p> : null}
+                {selectedFile && isImageFile(selectedFile.name) ? (
+                  <p className="mt-2 text-xs text-slate-500">
+                    Brivoly will use your AI Intake Profile to turn this note image into CRM-ready rows before previewing them.
+                  </p>
+                ) : null}
               </section>
             ) : (
               <section className="mt-5 rounded-[1.4rem] border bg-slate-50/80 p-5">
@@ -412,6 +423,10 @@ export function CRMFollowUpWorkspace({
             isSaving={isAiSettingsPending}
             canPersistSettings={Boolean(settings)}
           />
+          <RemoteImageCapturePanel
+            intakeChannel={initialIntakeChannel}
+            advancedAiUnlocked={advancedAiUnlocked}
+          />
           <section className="rounded-[1.75rem] border bg-slate-950 p-6 text-slate-50 shadow-[0_24px_90px_-55px_rgba(15,23,42,0.9)]">
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300">Why This Slice</p>
             <h2 className="mt-3 text-3xl font-semibold tracking-tight">Relationship memory matters.</h2>
@@ -424,6 +439,52 @@ export function CRMFollowUpWorkspace({
         </section>
       </section>
     </>
+  );
+}
+
+function RemoteImageCapturePanel({
+  intakeChannel,
+  advancedAiUnlocked,
+}: {
+  intakeChannel: CRMRemoteIntakeChannel | null;
+  advancedAiUnlocked: boolean;
+}) {
+  return (
+    <section className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm">
+      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Remote Note Capture</p>
+      <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Send note photos from your phone.</h2>
+      <p className="mt-3 text-sm leading-6 text-slate-600">
+        Uploading inside Brivoly is great, but operators often snap notes on the move. Telegram is the first remote
+        intake channel because it is already wired into the product and can drop images straight into your account.
+      </p>
+
+      {!advancedAiUnlocked ? (
+        <div className="mt-5 rounded-[1.3rem] border border-amber-200 bg-amber-50 px-4 py-4 text-sm leading-6 text-amber-900">
+          Remote image intake uses the same paid AI gate as advanced spreadsheet and file interpretation.
+        </div>
+      ) : null}
+
+      <div className="mt-5 rounded-[1.3rem] border bg-slate-50 px-4 py-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Current channel</p>
+        <p className="mt-2 text-sm font-medium text-slate-900">
+          {intakeChannel?.telegram_available ? "Telegram is live for remote note images." : "Remote note capture is not configured yet."}
+        </p>
+        <p className="mt-2 text-sm leading-6 text-slate-600">
+          {intakeChannel?.instructions ?? "Set the CRM intake secret and Telegram bot config to enable phone-first note capture."}
+        </p>
+        {intakeChannel?.intake_caption ? (
+          <>
+            <p className="mt-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Caption to send with the image</p>
+            <code className="mt-2 block overflow-x-auto rounded-2xl border bg-white px-4 py-3 text-sm text-slate-900">
+              {intakeChannel.intake_caption}
+            </code>
+            <p className="mt-3 text-xs text-slate-500">
+              Send a photo or image document to the bot with that exact caption. Brivoly will import the note into your CRM queue and reply with the result.
+            </p>
+          </>
+        ) : null}
+      </div>
+    </section>
   );
 }
 
@@ -786,4 +847,9 @@ function formatBillingStatusLabel(status: string | null) {
     return "no active subscription";
   }
   return status.replaceAll("_", " ");
+}
+
+function isImageFile(fileName: string) {
+  const normalized = fileName.toLowerCase();
+  return normalized.endsWith(".png") || normalized.endsWith(".jpg") || normalized.endsWith(".jpeg") || normalized.endsWith(".webp");
 }

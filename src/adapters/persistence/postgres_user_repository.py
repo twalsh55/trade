@@ -138,6 +138,49 @@ class PostgresUserRepository:
                 )
             connection.commit()
 
+    def get_user_by_id(self, user_id: UUID) -> User | None:
+        with connect(self.database_url, row_factory=dict_row) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT
+                        id,
+                        auth_provider,
+                        auth_issuer,
+                        auth_subject,
+                        stripe_customer_id,
+                        email,
+                        given_name,
+                        family_name,
+                        display_name,
+                        created_at,
+                        updated_at,
+                        last_login_at
+                    FROM app_user
+                    WHERE id = %(user_id)s
+                    """,
+                    {"user_id": user_id},
+                )
+                row = cursor.fetchone()
+
+        if row is None:
+            return None
+
+        return User(
+            id=_parse_uuid(row["id"]),
+            auth_provider=str(row["auth_provider"]),
+            auth_issuer=str(row["auth_issuer"]),
+            auth_subject=str(row["auth_subject"]),
+            stripe_customer_id=_optional_string(row["stripe_customer_id"]),
+            email=_optional_string(row["email"]),
+            given_name=_optional_string(row["given_name"]),
+            family_name=_optional_string(row["family_name"]),
+            display_name=_optional_string(row["display_name"]),
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+            last_login_at=row["last_login_at"],
+        )
+
 
 def _parse_uuid(value: object) -> UUID:
     if isinstance(value, UUID):

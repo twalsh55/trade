@@ -5,6 +5,7 @@ import type {
   CRMFollowUpOverview,
   CRMImportPreview,
   CRMImportResult,
+  CRMRemoteIntakeChannel,
   DashboardFilters,
   DashboardSnapshot,
   SessionResponse,
@@ -139,6 +140,10 @@ export async function getCrmFollowUpOverview(options: ApiRequestOptions = {}): P
   return apiRequest<CRMFollowUpOverview>("/api/crm/followups", {}, options);
 }
 
+export async function getCrmRemoteIntakeChannel(options: ApiRequestOptions = {}): Promise<CRMRemoteIntakeChannel> {
+  return apiRequest<CRMRemoteIntakeChannel>("/api/crm/intake-channel", {}, options);
+}
+
 export async function updateCrmFollowUp(
   followUpId: string,
   payload: { action: "complete" | "snooze" | "note"; snooze_hours?: number; note_body?: string },
@@ -156,7 +161,7 @@ export async function updateCrmFollowUp(
 
 export async function previewCrmImport(
   payload: {
-    source_type: "csv" | "excel" | "google_sheets";
+    source_type: "csv" | "excel" | "image" | "google_sheets";
     csv_content?: string;
     sheet_url?: string;
     file_name?: string;
@@ -177,7 +182,7 @@ export async function previewCrmImport(
 
 export async function commitCrmImport(
   payload: {
-    source_type: "csv" | "excel" | "google_sheets";
+    source_type: "csv" | "excel" | "image" | "google_sheets";
     csv_content?: string;
     sheet_url?: string;
     file_name?: string;

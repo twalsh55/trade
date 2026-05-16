@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from base64 import b64encode
 from io import BytesIO
+import os
 from uuid import UUID
 
 import pandas as pd
@@ -14,9 +15,11 @@ from src.adapters.api.app import (
     ApiDependencies,
     _DisabledBillingPort,
     _TelegramCommand,
+    _build_crm_intake_token,
     _build_etf_sentiment_status_message,
     _build_prospecting_status_message,
     _extract_telegram_command,
+    _extract_telegram_image_intake,
     _normalize_universe,
     _run_code_from_telegram,
     _run_etf_sentiment_from_telegram,
@@ -194,6 +197,16 @@ class FakeBillingPort:
         return self.portal_url
 
 
+@dataclass
+class FakeUserRepository:
+    user: User | None = None
+
+    def get_user_by_id(self, user_id: UUID) -> User | None:
+        if self.user and self.user.id == user_id:
+            return self.user
+        return None
+
+
 def make_client(
     *,
     user: User | None = None,
@@ -203,12 +216,14 @@ def make_client(
     personalization_repository: InMemoryPersonalizationRepository | None = None,
     lead_follow_up_repository: InMemoryLeadFollowUpRepository | None = None,
     billing_port: FakeBillingPort | None = None,
+    user_repository: FakeUserRepository | None = None,
 ) -> TestClient:
     result = dashboard_result or make_dashboard_result()
     now = datetime(2024, 5, 6, 12, 30, tzinfo=UTC)
     auth_use_case = FakeAuthUseCase(user=user, error=auth_error, seen_tokens=seen_tokens)
     repository = personalization_repository or InMemoryPersonalizationRepository()
     crm_repository = lead_follow_up_repository or InMemoryLeadFollowUpRepository(now=lambda: now)
+    user_repo = user_repository or FakeUserRepository(user=user)
     app = create_app(
         ApiDependencies(
             auth_use_case_factory=lambda: auth_use_case,
@@ -216,6 +231,7 @@ def make_client(
             personalization_repository_factory=lambda: repository,
             lead_follow_up_repository_factory=lambda: crm_repository,
             billing_port_factory=lambda: billing_port,
+            user_repository_factory=lambda: user_repo,
             now=lambda: now,
         )
     )
@@ -355,6 +371,40 @@ def test_extract_telegram_command_parses_supported_message_shapes() -> None:
         argument="fix a bug with login",
         text="/code fix a bug with login",
     )
+
+
+def test_extract_telegram_image_intake_supports_photos_and_image_documents() -> None:
+    assert _extract_telegram_image_intake({}) is None
+    assert _extract_telegram_image_intake({"message": {"chat": {"id": 123}}}) is None
+    assert _extract_telegram_image_intake({"message": {"caption": "/intake code", "chat": "bad"}}) is None
+    assert _extract_telegram_image_intake({"message": {"caption": "hello", "chat": {"id": 123}}}) is None
+    assert _extract_telegram_image_intake({"message": {"caption": "/intake", "chat": {"id": 123}}}) is None
+    assert _extract_telegram_image_intake({"message": {"caption": "/intake code", "chat": {"id": 123}}}) is None
+
+    photo_intake = _extract_telegram_image_intake(
+        {
+            "message": {
+                "caption": "/intake abc123",
+                "chat": {"id": 123},
+                "photo": [{"file_id": "small"}, {"file_id": "large"}],
+            }
+        }
+    )
+    assert photo_intake is not None
+    assert photo_intake.file_id == "large"
+    assert photo_intake.file_name == "telegram-photo.jpg"
+
+    document_intake = _extract_telegram_image_intake(
+        {
+            "message": {
+                "caption": "/intake token",
+                "chat": {"id": 123},
+                "document": {"file_id": "doc-1", "file_name": "note.webp", "mime_type": "image/webp"},
+            }
+        }
+    )
+    assert document_intake is not None
+    assert document_intake.file_id == "doc-1"
 
 
 def test_build_prospecting_status_message_reports_errors_and_modes(monkeypatch) -> None:
@@ -598,6 +648,288 @@ def test_telegram_webhook_handles_commands_and_guards(monkeypatch) -> None:
         json={"message": {"text": "/unknown", "chat": {"id": 123}}},
     )
     assert response.json() == {"ok": True, "handled": False}
+
+
+def test_telegram_webhook_handles_remote_crm_image_intake(monkeypatch) -> None:
+    user = make_user()
+    client = make_client(
+        user=user,
+        billing_port=FakeBillingPort(),
+        personalization_repository=InMemoryPersonalizationRepository(),
+        lead_follow_up_repository=InMemoryLeadFollowUpRepository(now=lambda: datetime(2024, 5, 6, 12, 30, tzinfo=UTC)),
+    )
+    sent: list[str] = []
+    tasks: list[tuple[str, str, str]] = []
+
+    class FakeNotifier:
+        def __init__(self, bot_token: str, chat_id: str) -> None:
+            self.bot_token = bot_token
+            self.chat_id = chat_id
+
+        def send_message(self, text: str) -> None:
+            sent.append(text)
+
+    def fake_run(notifier, intake, deps) -> None:
+        tasks.append((notifier.chat_id, intake.file_id, intake.file_name))
+
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "bot")
+    monkeypatch.setenv("TELEGRAM_WEBHOOK_SECRET", "secret")
+    monkeypatch.setenv("CRM_INTAKE_SECRET", "crm-secret")
+    monkeypatch.setattr("src.adapters.api.app.TelegramNotifier", FakeNotifier)
+    monkeypatch.setattr("src.adapters.api.app._run_telegram_crm_image_intake", fake_run)
+
+    token = _build_crm_intake_token(user.id, "crm-secret")
+    response = client.post(
+        "/api/telegram/webhook",
+        headers={"X-Telegram-Bot-Api-Secret-Token": "secret"},
+        json={
+            "message": {
+                "caption": f"/intake {token}",
+                "chat": {"id": 456},
+                "photo": [{"file_id": "small"}, {"file_id": "large"}],
+            }
+        },
+    )
+
+    assert response.json() == {"ok": True, "handled": True, "command": "/intake"}
+    assert sent[-1] == "Received your note image. Brivoly is importing it into your CRM now."
+    assert tasks == [("456", "large", "telegram-photo.jpg")]
+
+
+def test_crm_intake_channel_returns_caption_for_authenticated_user(monkeypatch) -> None:
+    user = make_user()
+    client = make_client(user=user)
+    monkeypatch.setenv("CRM_INTAKE_SECRET", "crm-secret")
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "bot")
+
+    response = client.get("/api/crm/intake-channel", headers={"Authorization": "Bearer session-token"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["telegram_available"] is True
+    assert payload["intake_channel"] == "telegram"
+    assert payload["intake_caption"].startswith("/intake ")
+
+
+def test_crm_intake_channel_reports_missing_configuration() -> None:
+    client = make_client(user=make_user())
+    for env_name in ("CRM_INTAKE_SECRET", "INTERNAL_CRON_SECRET", "TELEGRAM_WEBHOOK_SECRET", "TELEGRAM_BOT_TOKEN"):
+        os.environ.pop(env_name, None)
+
+    response = client.get("/api/crm/intake-channel", headers={"Authorization": "Bearer session-token"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["telegram_available"] is False
+    assert payload["intake_caption"] is None
+
+
+def test_run_telegram_crm_image_intake_imports_rows(monkeypatch) -> None:
+    user = make_user()
+    repository = InMemoryLeadFollowUpRepository(now=lambda: datetime(2024, 5, 6, 12, 30, tzinfo=UTC))
+    personalization = InMemoryPersonalizationRepository()
+    personalization.save_dashboard_settings(build_default_dashboard_settings(user.id, telegram_enabled=True))
+    deps = ApiDependencies(
+        auth_use_case_factory=lambda: FakeAuthUseCase(user=user),
+        market_data_factory=lambda: FakeMarketDataAdapter(result=make_dashboard_result(), captured_configs=[]),
+        personalization_repository_factory=lambda: personalization,
+        lead_follow_up_repository_factory=lambda: repository,
+        billing_port_factory=lambda: FakeBillingPort(),
+        user_repository_factory=lambda: FakeUserRepository(user=user),
+        now=lambda: datetime(2024, 5, 6, 12, 30, tzinfo=UTC),
+    )
+    sent: list[str] = []
+
+    class FakeNotifier:
+        def send_message(self, text: str) -> None:
+            sent.append(text)
+
+    class FakeImageIntake:
+        def extract_spreadsheet_rows_from_image(self, prompt, preferred_formats, file_name, file_bytes) -> str:
+            assert file_name == "telegram-photo.jpg"
+            assert file_bytes == b"image-bytes"
+            return (
+                "lead_name,company_name,owner_name,stage,next_follow_up_at,notes,priority,contact_channel,next_step\n"
+                "Taylor Brooks,Beacon Ridge,Samir Patel,Discovery,2024-05-09,Imported from Telegram image,high,image,Follow up\n"
+            )
+
+    class FakeResponse:
+        def __init__(self, body: bytes) -> None:
+            self.body = body
+
+        def read(self) -> bytes:
+            return self.body
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    def fake_urlopen(request_obj):
+        if "getFile" in request_obj.full_url:
+            return FakeResponse(b'{"ok": true, "result": {"file_path": "photos/file_1.jpg"}}')
+        return FakeResponse(b"image-bytes")
+
+    monkeypatch.setenv("CRM_INTAKE_SECRET", "crm-secret")
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "bot")
+    monkeypatch.setattr("src.adapters.api.app.build_crm_image_intake_agent_from_env", lambda: FakeImageIntake())
+    monkeypatch.setattr("src.adapters.api.app.request.urlopen", fake_urlopen)
+
+    api_app_module._run_telegram_crm_image_intake(  # type: ignore[attr-defined]
+        FakeNotifier(),  # type: ignore[arg-type]
+        api_app_module._TelegramImageIntake(  # type: ignore[attr-defined]
+            chat_id="123",
+            command_name="/intake",
+            intake_token=_build_crm_intake_token(user.id, "crm-secret"),
+            file_id="telegram-file",
+            file_name="telegram-photo.jpg",
+        ),
+        deps,
+    )
+
+    assert "Imported: 1" in sent[-1]
+    overview = GetLeadFollowUpOverviewUseCase(repository=repository, now=lambda: datetime(2024, 5, 6, 12, 30, tzinfo=UTC)).execute(user)
+    assert any(item.notes == "Imported from Telegram image" for item in overview.items)
+
+
+def test_run_telegram_crm_image_intake_reports_failure_branches(monkeypatch) -> None:
+    user = make_user()
+    deps = ApiDependencies(
+        auth_use_case_factory=lambda: FakeAuthUseCase(user=user),
+        market_data_factory=lambda: FakeMarketDataAdapter(result=make_dashboard_result(), captured_configs=[]),
+        personalization_repository_factory=lambda: InMemoryPersonalizationRepository(),
+        lead_follow_up_repository_factory=lambda: InMemoryLeadFollowUpRepository(now=lambda: datetime(2024, 5, 6, 12, 30, tzinfo=UTC)),
+        billing_port_factory=lambda: FakeBillingPort(overview=BillingOverview(enabled=False, customer_id=None, subscription_id=None, subscription_status=None, price_id=None, cancel_at_period_end=False, current_period_end=None, checkout_available=False, portal_available=False)),
+        user_repository_factory=lambda: FakeUserRepository(user=user),
+        now=lambda: datetime(2024, 5, 6, 12, 30, tzinfo=UTC),
+    )
+    sent: list[str] = []
+
+    class FakeNotifier:
+        def send_message(self, text: str) -> None:
+            sent.append(text)
+
+    monkeypatch.delenv("CRM_INTAKE_SECRET", raising=False)
+    monkeypatch.delenv("INTERNAL_CRON_SECRET", raising=False)
+    monkeypatch.delenv("TELEGRAM_WEBHOOK_SECRET", raising=False)
+    api_app_module._run_telegram_crm_image_intake(  # type: ignore[attr-defined]
+        FakeNotifier(),  # type: ignore[arg-type]
+        api_app_module._TelegramImageIntake(  # type: ignore[attr-defined]
+            chat_id="123",
+            command_name="/intake",
+            intake_token="bad",
+            file_id="telegram-file",
+            file_name="telegram-photo.jpg",
+        ),
+        deps,
+    )
+    assert sent[-1] == "CRM note import failed: Remote CRM note capture is not configured yet."
+
+    monkeypatch.setenv("CRM_INTAKE_SECRET", "crm-secret")
+    api_app_module._run_telegram_crm_image_intake(  # type: ignore[attr-defined]
+        FakeNotifier(),  # type: ignore[arg-type]
+        api_app_module._TelegramImageIntake(  # type: ignore[attr-defined]
+            chat_id="123",
+            command_name="/intake",
+            intake_token=_build_crm_intake_token(UUID("22222222-2222-2222-2222-222222222222"), "crm-secret"),
+            file_id="telegram-file",
+            file_name="telegram-photo.jpg",
+        ),
+        deps,
+    )
+    assert "active Brivoly account" in sent[-1]
+
+    deps_without_repo = ApiDependencies(
+        auth_use_case_factory=deps.auth_use_case_factory,
+        market_data_factory=deps.market_data_factory,
+        personalization_repository_factory=deps.personalization_repository_factory,
+        lead_follow_up_repository_factory=deps.lead_follow_up_repository_factory,
+        billing_port_factory=deps.billing_port_factory,
+        user_repository_factory=lambda: None,
+        now=deps.now,
+    )
+    api_app_module._run_telegram_crm_image_intake(  # type: ignore[attr-defined]
+        FakeNotifier(),  # type: ignore[arg-type]
+        api_app_module._TelegramImageIntake(  # type: ignore[attr-defined]
+            chat_id="123",
+            command_name="/intake",
+            intake_token=_build_crm_intake_token(user.id, "crm-secret"),
+            file_id="telegram-file",
+            file_name="telegram-photo.jpg",
+        ),
+        deps_without_repo,
+    )
+    assert "app database" in sent[-1]
+
+    monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
+    api_app_module._run_telegram_crm_image_intake(  # type: ignore[attr-defined]
+        FakeNotifier(),  # type: ignore[arg-type]
+        api_app_module._TelegramImageIntake(  # type: ignore[attr-defined]
+            chat_id="123",
+            command_name="/intake",
+            intake_token=_build_crm_intake_token(user.id, "crm-secret"),
+            file_id="telegram-file",
+            file_name="telegram-photo.jpg",
+        ),
+        deps,
+    )
+    assert "Telegram bot token is not configured" in sent[-1]
+
+    class FailingNotifier:
+        def send_message(self, text: str) -> None:
+            raise __import__("src.adapters.notifications.telegram_notifier", fromlist=["TelegramNotificationError"]).TelegramNotificationError("down")
+
+    monkeypatch.delenv("CRM_INTAKE_SECRET", raising=False)
+    api_app_module._run_telegram_crm_image_intake(  # type: ignore[attr-defined]
+        FailingNotifier(),  # type: ignore[arg-type]
+        api_app_module._TelegramImageIntake(  # type: ignore[attr-defined]
+            chat_id="123",
+            command_name="/intake",
+            intake_token="bad",
+            file_id="telegram-file",
+            file_name="telegram-photo.jpg",
+        ),
+        deps,
+    )
+
+
+def test_parse_crm_intake_token_and_download_telegram_file_validate_shapes(monkeypatch) -> None:
+    with pytest.raises(ValueError, match="invalid"):
+        api_app_module._parse_crm_intake_token("not-base64", "secret")  # type: ignore[attr-defined]
+
+    bad_payload = b64encode(b'["bad"]').decode("ascii").rstrip("=")
+    with pytest.raises(ValueError, match="invalid"):
+        api_app_module._parse_crm_intake_token(bad_payload, "secret")  # type: ignore[attr-defined]
+
+    missing_fields = b64encode(b'{"user_id": 1}').decode("ascii").rstrip("=")
+    with pytest.raises(ValueError, match="invalid"):
+        api_app_module._parse_crm_intake_token(missing_fields, "secret")  # type: ignore[attr-defined]
+
+    wrong_signature = b64encode(b'{"user_id":"11111111-1111-1111-1111-111111111111","signature":"wrong"}').decode("ascii").rstrip("=")
+    with pytest.raises(ValueError, match="invalid"):
+        api_app_module._parse_crm_intake_token(wrong_signature, "secret")  # type: ignore[attr-defined]
+
+    class FakeResponse:
+        def __init__(self, body: bytes) -> None:
+            self.body = body
+
+        def read(self) -> bytes:
+            return self.body
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    monkeypatch.setattr("src.adapters.api.app.request.urlopen", lambda req: FakeResponse(b'{"ok": false}'))
+    with pytest.raises(ValueError, match="Unable to download"):
+        api_app_module._download_telegram_file("bot", "file-1")  # type: ignore[attr-defined]
+
+    monkeypatch.setattr("src.adapters.api.app.request.urlopen", lambda req: FakeResponse(b'{"ok": true, "result": {}}'))
+    with pytest.raises(ValueError, match="Unable to download"):
+        api_app_module._download_telegram_file("bot", "file-1")  # type: ignore[attr-defined]
 
 
 def test_telegram_webhook_requires_configuration(monkeypatch) -> None:
@@ -1273,8 +1605,32 @@ def test_crm_import_preview_and_commit_endpoints_support_csv_and_google_sheets(m
     assert excel_commit.status_code == 200
     assert excel_commit.json()["imported_count"] == 1
 
+    class FakeImageIntake:
+        def extract_spreadsheet_rows_from_image(self, prompt: str, preferred_formats: list[str], file_name: str, file_bytes: bytes) -> str:
+            assert "follow-up-critical CRM fields" in prompt
+            assert file_name == "note.png"
+            assert file_bytes == b"note-image"
+            return (
+                "lead_name,company_name,owner_name,stage,next_follow_up_at,notes,priority,contact_channel,next_step\n"
+                "Taylor Brooks,Beacon Ridge,Samir Patel,Discovery,2024-05-09,Imported from note image,high,image,Follow up\n"
+            )
 
-def test_crm_import_endpoints_return_validation_errors_for_bad_sources() -> None:
+    monkeypatch.setattr(api_app_module, "build_crm_image_intake_agent_from_env", lambda: FakeImageIntake())
+    image_preview = client.post(
+        "/api/crm/import/preview",
+        headers={"Authorization": "Bearer session-token"},
+        json={
+            "source_type": "image",
+            "file_name": "note.png",
+            "file_content_base64": b64encode(b"note-image").decode("ascii"),
+        },
+    )
+    assert image_preview.status_code == 200
+    assert image_preview.json()["source_type"] == "image"
+    assert image_preview.json()["rows"][0]["notes"] == "Imported from note image"
+
+
+def test_crm_import_endpoints_return_validation_errors_for_bad_sources(monkeypatch) -> None:
     client = make_client(user=make_user(), lead_follow_up_repository=InMemoryLeadFollowUpRepository(now=lambda: datetime(2024, 5, 6, 12, 30, tzinfo=UTC)))
 
     preview = client.post(
@@ -1312,6 +1668,57 @@ def test_crm_import_endpoints_return_validation_errors_for_bad_sources() -> None
     )
     assert missing_excel_name.status_code == 422
     assert missing_excel_name.json()["detail"] == "Spreadsheet file name is required."
+
+    free_plan_client = make_client(
+        user=make_user(),
+        lead_follow_up_repository=InMemoryLeadFollowUpRepository(now=lambda: datetime(2024, 5, 6, 12, 30, tzinfo=UTC)),
+        billing_port=FakeBillingPort(
+            overview=BillingOverview(
+                enabled=True,
+                customer_id="cus_123",
+                subscription_id=None,
+                subscription_status=None,
+                price_id="price_123",
+                cancel_at_period_end=False,
+                current_period_end=None,
+                checkout_available=True,
+                portal_available=True,
+            )
+        ),
+    )
+    image_on_free_plan = free_plan_client.post(
+        "/api/crm/import/preview",
+        headers={"Authorization": "Bearer session-token"},
+        json={
+            "source_type": "image",
+            "file_name": "note.png",
+            "file_content_base64": b64encode(b"note-image").decode("ascii"),
+        },
+    )
+    assert image_on_free_plan.status_code == 422
+    assert image_on_free_plan.json()["detail"] == "AI note image intake is available on active or trialing paid plans."
+
+    paid_client = make_client(
+        user=make_user(),
+        lead_follow_up_repository=InMemoryLeadFollowUpRepository(now=lambda: datetime(2024, 5, 6, 12, 30, tzinfo=UTC)),
+        billing_port=FakeBillingPort(),
+    )
+    monkeypatch.setattr(
+        api_app_module,
+        "build_crm_image_intake_agent_from_env",
+        lambda: (_ for _ in ()).throw(ValueError("AI note image intake is unavailable because no app OpenAI key is configured.")),
+    )
+    no_ai_key = paid_client.post(
+        "/api/crm/import/preview",
+        headers={"Authorization": "Bearer session-token"},
+        json={
+            "source_type": "image",
+            "file_name": "note.png",
+            "file_content_base64": b64encode(b"note-image").decode("ascii"),
+        },
+    )
+    assert no_ai_key.status_code == 422
+    assert "no app OpenAI key is configured" in no_ai_key.json()["detail"]
 
 
 def test_account_settings_validation_and_alert_defaults_work() -> None:
@@ -1385,6 +1792,7 @@ def test_dashboard_endpoint_maps_value_errors_to_422() -> None:
                     now=lambda: datetime(2024, 5, 6, 12, 30, tzinfo=UTC)
                 ),
                 billing_port_factory=lambda: None,
+                user_repository_factory=lambda: FakeUserRepository(user=make_user()),
                 now=lambda: datetime(2024, 5, 6, 12, 30, tzinfo=UTC),
             )
         )

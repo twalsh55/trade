@@ -128,7 +128,7 @@ export type CRMImportHeaderMapping = {
 };
 
 export type CRMImportPreview = {
-  source_type: "csv" | "excel" | "google_sheets";
+  source_type: "csv" | "excel" | "image" | "google_sheets";
   source_label: string;
   normalized_headers: string[];
   header_mappings: CRMImportHeaderMapping[];
@@ -146,6 +146,13 @@ export type CRMImportResult = {
   skipped_duplicates: number;
   skipped_invalid: number;
   overview: CRMFollowUpOverview;
+};
+
+export type CRMRemoteIntakeChannel = {
+  telegram_available: boolean;
+  intake_channel: string | null;
+  intake_caption: string | null;
+  instructions: string;
 };
 
 export type IndicatorPercentile = {

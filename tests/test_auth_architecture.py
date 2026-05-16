@@ -10,6 +10,7 @@ import pytest
 from psycopg import OperationalError
 
 from src.adapters.auth import runtime
+from src.adapters.persistence import runtime as persistence_runtime
 from src.adapters.auth.clerk_auth import (
     AuthenticationError,
     ClerkAuthConfig,
@@ -456,6 +457,38 @@ def test_postgres_user_repository_updates_stripe_customer_id(monkeypatch) -> Non
     assert connection.commit_calls == 1
 
 
+def test_postgres_user_repository_get_user_by_id_maps_rows_and_none(monkeypatch) -> None:
+    now = datetime(2024, 5, 6, 12, 30, tzinfo=UTC)
+    row = {
+        "id": "11111111-1111-1111-1111-111111111111",
+        "auth_provider": "clerk",
+        "auth_issuer": "https://example.clerk.accounts.dev",
+        "auth_subject": "user_123",
+        "stripe_customer_id": None,
+        "email": "user@example.com",
+        "given_name": "Ada",
+        "family_name": "Lovelace",
+        "display_name": "Ada Lovelace",
+        "created_at": now,
+        "updated_at": now,
+        "last_login_at": now,
+    }
+    cursor = FakeCursor(fetchone_result=row)
+    connection = FakeConnection(cursor)
+    monkeypatch.setattr(repo_module, "connect", lambda *args, **kwargs: connection)
+
+    repository = PostgresUserRepository("postgres://example")
+    user = repository.get_user_by_id(UUID("11111111-1111-1111-1111-111111111111"))
+
+    assert user is not None
+    assert user.email == "user@example.com"
+
+    empty_cursor = FakeCursor(fetchone_result=None)
+    empty_connection = FakeConnection(empty_cursor)
+    monkeypatch.setattr(repo_module, "connect", lambda *args, **kwargs: empty_connection)
+    assert repository.get_user_by_id(UUID("11111111-1111-1111-1111-111111111111")) is None
+
+
 def test_postgres_user_repository_raises_if_upsert_returns_no_row(monkeypatch) -> None:
     cursor = FakeCursor(fetchone_result=None)
     connection = FakeConnection(cursor)
@@ -486,6 +519,36 @@ def test_runtime_build_authenticate_user_use_case_requires_env(monkeypatch) -> N
     monkeypatch.setenv("CLERK_PUBLISHABLE_KEY", "pk_test_ZXhhbXBsZS5jbGVyay5hY2NvdW50cy5kZXYk")
     with pytest.raises(RuntimeError, match="DATABASE_URL"):
         runtime.build_authenticate_user_use_case()
+
+
+def test_persistence_runtime_build_user_repository_handles_env_and_failures(monkeypatch) -> None:
+    persistence_runtime.build_user_repository.cache_clear()
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    assert persistence_runtime.build_user_repository() is None
+
+    class FakeRepository:
+        def __init__(self, database_url: str) -> None:
+            self.database_url = database_url
+            self.ensure_schema_calls = 0
+
+        def ensure_schema(self) -> None:
+            self.ensure_schema_calls += 1
+
+    monkeypatch.setenv("DATABASE_URL", "postgres://example")
+    monkeypatch.setattr(persistence_runtime, "PostgresUserRepository", FakeRepository)
+    persistence_runtime.build_user_repository.cache_clear()
+    repository = persistence_runtime.build_user_repository()
+    assert isinstance(repository, FakeRepository)
+    assert repository.ensure_schema_calls == 1
+
+    class BrokenRepository(FakeRepository):
+        def ensure_schema(self) -> None:
+            raise OperationalError("boom")
+
+    monkeypatch.setattr(persistence_runtime, "PostgresUserRepository", BrokenRepository)
+    persistence_runtime.build_user_repository.cache_clear()
+    with pytest.raises(RuntimeError, match="Authentication database is unavailable"):
+        persistence_runtime.build_user_repository()
 
 
 def test_runtime_build_authenticate_user_use_case_builds_repository_and_provider(monkeypatch) -> None:

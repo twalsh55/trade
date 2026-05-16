@@ -31,6 +31,9 @@ class UserRepositoryPort(Protocol):
     def upsert_authenticated_user(self, identity: ExternalIdentity) -> User:
         """Create or update the internal user record for an authenticated identity."""
 
+    def get_user_by_id(self, user_id: UUID) -> User | None:
+        """Return one internal user by id, if it exists."""
+
 
 class UserDashboardSettingsPort(Protocol):
     def get_dashboard_settings(self, user_id: UUID) -> UserDashboardSettings | None:
@@ -74,6 +77,17 @@ class LeadFollowUpRepositoryPort(Protocol):
 
     def import_lead_follow_ups(self, user: User, follow_ups: list[LeadFollowUp]) -> int:
         """Insert imported follow-ups and return how many were stored."""
+
+
+class CRMImageIntakePort(Protocol):
+    def extract_spreadsheet_rows_from_image(
+        self,
+        prompt: str,
+        preferred_formats: list[str],
+        file_name: str,
+        file_bytes: bytes,
+    ) -> str:
+        """Extract CRM-shaped rows from an uploaded note image and return CSV content."""
 
 
 class SocialLeadSourcePort(Protocol):

@@ -141,6 +141,21 @@ def test_preview_lead_import_supports_ignoring_auto_detected_headers_and_skips_u
     assert notes_mapping.mapped_field is None
 
 
+def test_preview_lead_import_recognizes_canonical_machine_headers() -> None:
+    repository = InMemoryLeadFollowUpRepository(now=lambda: datetime(2024, 5, 6, 12, 30, tzinfo=UTC))
+    use_case = PreviewLeadImportUseCase(repository=repository, now=lambda: datetime(2024, 5, 6, 12, 30, tzinfo=UTC))
+    preview = use_case.execute(
+        make_user(),
+        "lead_name,company_name,owner_name,stage,next_follow_up_at,notes\n"
+        "Taylor Brooks,Beacon Ridge,Samir Patel,Discovery,2024-05-09,Imported from image\n",
+        "image",
+        "telegram-photo.jpg",
+    )
+
+    assert preview.importable_rows == 1
+    assert preview.rows[0].owner_name == "Samir Patel"
+
+
 def test_build_google_sheets_csv_url_keeps_gid() -> None:
     csv_url = build_google_sheets_csv_url("https://docs.google.com/spreadsheets/d/abc123/edit#gid=456")
     assert csv_url == "https://docs.google.com/spreadsheets/d/abc123/export?format=csv&gid=456"
@@ -348,9 +363,10 @@ def test_google_sheet_fetch_and_source_resolution_cover_error_paths(monkeypatch)
         file_name="leads.xlsx",
         file_content_base64=b64encode(buffer.getvalue()).decode("ascii"),
     )
-    excel_content, excel_label = _resolve_crm_import_source(excel_payload)
+    excel_content, excel_label, excel_source_type = _resolve_crm_import_source(excel_payload)
     assert "Contact,Company" in excel_content
     assert excel_label == "leads.xlsx"
+    assert excel_source_type == "excel"
 
     with pytest.raises(ValueError, match="Spreadsheet file name is required"):
         _resolve_crm_import_source(LeadImportPayload(source_type="excel", file_content_base64="aGVsbG8="))
@@ -358,7 +374,11 @@ def test_google_sheet_fetch_and_source_resolution_cover_error_paths(monkeypatch)
     with pytest.raises(ValueError, match="Spreadsheet file content is required"):
         _resolve_crm_import_source(LeadImportPayload(source_type="excel", file_name="leads.xlsx"))
 
-    assert _resolve_crm_import_source(LeadImportPayload(source_type="csv", csv_content="a,b\n1,2")) == ("a,b\n1,2", "CSV upload")
+    assert _resolve_crm_import_source(LeadImportPayload(source_type="csv", csv_content="a,b\n1,2")) == (
+        "a,b\n1,2",
+        "CSV upload",
+        "csv",
+    )
     with pytest.raises(ValueError, match="CSV content is required"):
         _resolve_crm_import_source(LeadImportPayload(source_type="csv"))
     with pytest.raises(ValueError, match="Google Sheets URL is required"):
@@ -367,8 +387,25 @@ def test_google_sheet_fetch_and_source_resolution_cover_error_paths(monkeypatch)
     monkeypatch.setattr(api_app_module, "fetch_google_sheets_csv", lambda sheet_url: "contact,company\nTaylor,Beacon\n")
     assert _resolve_crm_import_source(
         LeadImportPayload(source_type="google_sheets", sheet_url="https://docs.google.com/spreadsheets/d/abc123/edit")
-    ) == ("contact,company\nTaylor,Beacon\n", "Google Sheets")
+    ) == ("contact,company\nTaylor,Beacon\n", "Google Sheets", "google_sheets")
 
     payload = LeadImportPayload.model_construct(source_type="unsupported", csv_content=None, sheet_url=None)
     with pytest.raises(ValueError, match="Unsupported import source."):
         _resolve_crm_import_source(payload)
+
+
+def test_image_source_resolution_requires_authenticated_context_and_image_fields() -> None:
+    with pytest.raises(ValueError, match="Image file name is required"):
+        _resolve_crm_import_source(LeadImportPayload(source_type="image", file_content_base64="aGVsbG8="))
+
+    with pytest.raises(ValueError, match="Image file content is required"):
+        _resolve_crm_import_source(LeadImportPayload(source_type="image", file_name="note.png"))
+
+    with pytest.raises(ValueError, match="Authenticated image intake context is required"):
+        _resolve_crm_import_source(
+            LeadImportPayload(
+                source_type="image",
+                file_name="note.png",
+                file_content_base64=b64encode(b"image").decode("ascii"),
+            )
+        )
