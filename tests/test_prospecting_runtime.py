@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+from src.adapters.notifications.smtp_email_notifier import EmailNotificationError
 from src.adapters.prospecting.runtime import (
     build_config_from_env,
     build_drafter_from_env,
@@ -389,6 +390,43 @@ def test_run_prospecting_job_can_disable_operator_briefing(monkeypatch) -> None:
 
     assert run_prospecting_job() is digest
     assert briefing_triggers == []
+
+
+def test_run_prospecting_job_tolerates_operator_briefing_email_failure(monkeypatch) -> None:
+    config = object()
+    digest = type(
+        "Digest",
+        (),
+        {
+            "generated_at": datetime(2026, 5, 14, tzinfo=UTC),
+            "profile": "crm_direction",
+            "scanned_post_count": 5,
+            "shortlisted_count": 2,
+            "shortlisted_posts": (),
+            "token_usage": None,
+        },
+    )()
+    monkeypatch.setattr("src.adapters.prospecting.runtime.build_config_from_env", lambda founder_guidance=None: config)
+    monkeypatch.setattr("src.adapters.prospecting.runtime.build_lead_source_from_env", lambda: object())
+    monkeypatch.setattr("src.adapters.prospecting.runtime.build_drafter_from_env", lambda: object())
+    monkeypatch.setattr("src.adapters.prospecting.runtime.build_digest_delivery_from_env", lambda: object())
+    monkeypatch.setattr("src.adapters.prospecting.runtime.build_usage_log_from_env", lambda: None)
+    monkeypatch.setattr(
+        "src.adapters.prospecting.runtime.run_operator_briefing_job",
+        lambda trigger_label="scheduled update": (_ for _ in ()).throw(EmailNotificationError("smtp down")),
+    )
+
+    class FakeUseCase:
+        def __init__(self, lead_source, drafter, email_delivery) -> None:  # type: ignore[no-untyped-def]
+            pass
+
+        def execute(self, passed_config):  # type: ignore[no-untyped-def]
+            assert passed_config is config
+            return digest
+
+    monkeypatch.setattr("src.adapters.prospecting.runtime.RunDailyProspectingUseCase", FakeUseCase)
+
+    assert run_prospecting_job() is digest
 
 
 def test_build_usage_log_from_env_respects_toggle_and_path(monkeypatch, tmp_path) -> None:

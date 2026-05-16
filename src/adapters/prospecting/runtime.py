@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
 
 from src.adapters.llm.openai_prospect_drafter import OpenAIProspectDrafter, TemplateProspectDrafter
 from src.adapters.notifications.composite_email_notifier import CompositeEmailNotifier
 from src.adapters.notifications.smtp_email_notifier import SMTPEmailNotifier
+from src.adapters.notifications.smtp_email_notifier import EmailNotificationError
 from src.adapters.notifications.telegram_digest_notifier import TelegramDigestNotifier
 from src.adapters.notifications.telegram_notifier import TelegramNotifier
 from src.adapters.operator_briefing.runtime import append_prospect_digest_to_history, run_operator_briefing_job
@@ -32,6 +34,7 @@ from src.env_utils import get_first_configured_env
 
 DEFAULT_RECIPIENT = "tom.mg.walsh@gmail.com"
 APP_OPENAI_ENV_NAMES = ("APP_OPENAI_API_KEY", "OPENAI_API_KEY")
+prospecting_logger = logging.getLogger("brivoly.prospecting")
 
 
 def is_placeholder_openai_key(api_key: str) -> bool:
@@ -145,7 +148,10 @@ def run_prospecting_job(founder_guidance: str | None = None) -> ProspectingDiges
         usage_log.append(digest)
     append_prospect_digest_to_history(digest)
     if os.getenv("PROSPECT_SEND_OPERATOR_BRIEFING", "true").strip().lower() != "false":
-        run_operator_briefing_job(trigger_label="prospect run")
+        try:
+            run_operator_briefing_job(trigger_label="prospect run")
+        except EmailNotificationError as exc:
+            prospecting_logger.warning("Operator briefing delivery failed after prospect run", exc_info=exc)
     return digest
 
 
