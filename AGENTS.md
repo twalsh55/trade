@@ -165,12 +165,84 @@ web/
 
 Keep this file up to date whenever the stack, deployment model, architecture, or core tooling changes. Update it when adding or removing major frameworks, infrastructure dependencies, auth providers, databases, package managers, or primary developer workflows.
 
+## Fast Start
+
+Use this section to give the next session a fast, practical starting point. Refresh it at the end of every meaningful session so a new session can get oriented quickly without re-discovering the current product state.
+
+### Current Product Progress
+
+- The product is now a multi-surface SaaS app with two active tracks:
+  - `crash-monitor` for market risk monitoring
+  - `crm` for the new greenfield CRM wedge
+- The CRM direction is currently the main build focus.
+- The CRM app already has:
+  - a homepage portal entry
+  - an authenticated `/crm` workspace
+  - a lead follow-up queue
+  - complete and snooze/reschedule actions
+- The current CRM wedge is:
+  - follow-up-first
+  - spreadsheet-friendly
+  - relationship-memory oriented
+  - aimed at operators, agencies, and similar SMB workflows
+
+### Current Agent Progress
+
+- The prospect agent is being used as a research partner to guide CRM direction.
+- The prospecting profile is tuned toward `crm_direction`.
+- Cooperative runs have repeatedly reinforced:
+  - follow-up discipline
+  - spreadsheet-held CRM workflows
+  - pipeline hygiene
+  - relationship memory
+- The strongest recurring adjacent idea is later `message / DM capture` into CRM, but that is still secondary to the core follow-up workflow.
+- The sentiment agent is live separately for ETF analysis and is not the main product direction.
+
+### Current Automation Progress
+
+- Local automation is the primary reliable 24/7 path.
+- The local automation worker can run prospecting and operator briefing jobs continuously on this machine.
+- The operator briefing system can email the founder with:
+  - agent interaction summaries
+  - guidance received
+  - features/refinements shipped
+  - profitability progress
+- Prospecting automation cadence is currently set to every 12 hours, not every hour.
+
+### Current Deployment Status
+
+- API deploy target: Railway
+- Frontend deploy target: Vercel
+- Latest autonomous CRM follow-up action feature has already been:
+  - implemented
+  - tested
+  - deployed to Railway and Vercel
+  - logged into `product_updates.jsonl`
+  - summarized by email through the operator briefing flow
+
+### Current Verification Notes
+
+- Backend verification standard:
+  - `uv run pytest`
+- Frontend verification standard:
+  - `cd web && npm run build`
+- `cd web && npm run typecheck` currently has a known pre-existing issue with missing `.next/types/**` generated files referenced by `web/tsconfig.json`. Treat this as a repo issue unless the failure changes shape.
+
+### Next Recommended Product Moves
+
+- Highest-conviction next CRM features:
+  - contact timeline
+  - notes / relationship memory
+  - CSV or spreadsheet import / cleanup
+- Broader CRM expansion should stay constrained until the follow-up-first wedge shows stronger pull.
+
 ## Autonomy Rule
 
 - The agent should proactively implement the next high-conviction feature set when product direction is already clear, without waiting for explicit step-by-step instructions.
 - Each autonomous change set should include implementation, local verification, commit, push, and deployment when the affected surface is production-facing and deployment credentials are already available.
 - The agent should use existing email and operator-briefing mechanisms to keep the founder updated on shipped work, validation learnings, and profitability progress.
 - The agent should still pause when a change would introduce hidden risk, destructive actions, major architectural drift, or unclear product tradeoffs.
+- The agent should update the `Fast Start` section in this file at the end of each meaningful session so the next session begins with a current snapshot.
 
 ## Handoff Rule
 
