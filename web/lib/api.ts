@@ -63,11 +63,39 @@ async function apiRequest<T>(
   });
 
   if (!response.ok) {
-    const payload = (await response.json().catch(() => null)) as { detail?: string } | null;
-    throw new ApiError(payload?.detail ?? `Request failed for ${path}`, response.status);
+    throw new ApiError(await extractApiErrorMessage(response, path), response.status);
   }
 
   return (await response.json()) as T;
+}
+
+async function extractApiErrorMessage(response: Response, path: string): Promise<string> {
+  const bodyText = await response.text().catch(() => "");
+  let payload: { detail?: unknown; error?: unknown; message?: unknown } | null = null;
+  if (bodyText) {
+    try {
+      payload = JSON.parse(bodyText) as { detail?: unknown; error?: unknown; message?: unknown };
+    } catch {
+      payload = null;
+    }
+  }
+
+  const candidates = [payload?.detail, payload?.error, payload?.message];
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" && candidate.trim()) {
+      return candidate.trim();
+    }
+  }
+
+  if (bodyText.trim()) {
+    return bodyText.trim().slice(0, 400);
+  }
+
+  if (response.status >= 500 && path === "/api/crm/import/preview") {
+    return "Brivoly hit an import hiccup while building the preview. It will keep trying best-effort recovery, so please retry the preview.";
+  }
+
+  return `Request failed with status ${response.status}.`;
 }
 
 function buildDashboardQuery(filters?: Partial<DashboardFilters>) {

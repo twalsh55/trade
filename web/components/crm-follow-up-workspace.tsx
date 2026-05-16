@@ -138,14 +138,7 @@ export function CRMFollowUpWorkspace({
     setImportStatus(null);
     startImportTransition(async () => {
       try {
-        const response = await fetch("/api/crm/import/preview", {
-          method: "POST",
-          body: buildImportFormData(answersOverride),
-        });
-        const data = (await response.json().catch(() => null)) as CRMImportPreview | { error?: string } | null;
-        if (!response.ok || !data || !("rows" in data)) {
-          throw new Error((data && "error" in data && data.error) || "Unable to preview import.");
-        }
+        const data = await requestImportPreviewWithBestEffort(() => buildImportFormData(answersOverride));
         setImportPreview(data);
         setImportFieldMapping(
           Object.fromEntries(
@@ -172,7 +165,11 @@ export function CRMFollowUpWorkspace({
         );
       } catch (previewError) {
         setImportPreview(null);
-        setImportError(previewError instanceof Error ? previewError.message : "Unable to preview import.");
+        setImportError(
+          previewError instanceof Error
+            ? previewError.message
+            : "Brivoly could not build the preview this time, but it kept the import staged so you can try again.",
+        );
       }
     });
   }
@@ -230,6 +227,27 @@ export function CRMFollowUpWorkspace({
     };
     setClarificationAnswers(nextAnswers);
     requestImportPreview(nextAnswers);
+  }
+
+  async function requestImportPreviewWithBestEffort(buildFormData: () => FormData) {
+    let lastMessage = "Brivoly could not build the preview this time, but it kept the import staged so you can try again.";
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const response = await fetch("/api/crm/import/preview", {
+        method: "POST",
+        body: buildFormData(),
+      });
+      const data = (await response.json().catch(() => null)) as CRMImportPreview | { error?: string } | null;
+      if (response.ok && data && "rows" in data) {
+        return data;
+      }
+
+      if (data && "error" in data && typeof data.error === "string" && data.error.trim()) {
+        lastMessage = data.error.trim();
+      } else if (!response.ok && attempt === 0 && response.status >= 500) {
+        lastMessage = "Brivoly hit an import hiccup, so it retried the preview automatically. Please try once more if the sheet is still not visible.";
+      }
+    }
+    throw new Error(lastMessage);
   }
 
   function saveAiImportSettings() {

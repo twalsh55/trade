@@ -76,6 +76,10 @@ cd web && npm run e2e
 - Brivoly has two live surfaces:
   - `crash-monitor`
   - `crm`
+- Standing product constraint:
+  - optimize for near-zero pain
+  - avoid copy/paste and unnecessary typing
+  - prefer strong recommendations and acceptance flows over blank forms
 - Current main focus: CRM.
 - Current CRM wedge:
   - follow-up-first
@@ -95,6 +99,7 @@ cd web && npm run e2e
   - duplicate detection + validation preview
   - AI header rescue for messy spreadsheets
   - interactive AI clarification questions when mapping is still ambiguous
+  - best-effort import preview retry and friendlier fallback messaging instead of raw request-failure text
   - commit blocked until required clarification is resolved
   - paid AI intake profile per user
   - first-login business onboarding with skip-for-now path
