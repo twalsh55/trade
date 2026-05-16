@@ -84,6 +84,45 @@ def sync_founder_code_requests_from_api() -> int:
     return len(requests)
 
 
+def stage_founder_code_requests_from_inbox() -> int:
+    inbox_path = Path(
+        os.getenv("AUTONOMOUS_CODE_INBOX_FILE", "var/founder_code_inbox.jsonl").strip()
+        or "var/founder_code_inbox.jsonl"
+    )
+    if not inbox_path.exists():
+        return 0
+
+    cursor_path = Path(
+        os.getenv("AUTONOMOUS_CODE_PENDING_CURSOR_FILE", "var/founder_code_pending_cursor.txt").strip()
+        or "var/founder_code_pending_cursor.txt"
+    )
+    pending_path = Path(
+        os.getenv("AUTONOMOUS_CODE_PENDING_FILE", "var/founder_code_pending.jsonl").strip()
+        or "var/founder_code_pending.jsonl"
+    )
+    latest_path = Path(
+        os.getenv("AUTONOMOUS_CODE_LATEST_FILE", "var/founder_code_latest.json").strip()
+        or "var/founder_code_latest.json"
+    )
+
+    last_seen_id = _read_last_seen_request_id(cursor_path)
+    pending_requests = _collect_requests_after_cursor(inbox_path, last_seen_id)
+    if not pending_requests:
+        return 0
+
+    pending_path.parent.mkdir(parents=True, exist_ok=True)
+    with pending_path.open("a", encoding="utf-8") as handle:
+        for item in pending_requests:
+            handle.write(json.dumps(item, sort_keys=True))
+            handle.write("\n")
+
+    latest_path.parent.mkdir(parents=True, exist_ok=True)
+    latest_path.write_text(json.dumps(pending_requests[-1], sort_keys=True, indent=2), encoding="utf-8")
+    cursor_path.parent.mkdir(parents=True, exist_ok=True)
+    cursor_path.write_text(str(pending_requests[-1]["id"]), encoding="utf-8")
+    return len(pending_requests)
+
+
 def parse_positive_int(name: str, default: int) -> int:
     raw_value = os.getenv(name, "").strip()
     if not raw_value:
@@ -105,3 +144,35 @@ def _read_cursor(path: Path) -> str | None:
         return None
     datetime.fromisoformat(value)
     return value
+
+
+def _read_last_seen_request_id(path: Path) -> str | None:
+    if not path.exists():
+        return None
+    value = path.read_text(encoding="utf-8").strip()
+    return value or None
+
+
+def _collect_requests_after_cursor(inbox_path: Path, last_seen_id: str | None) -> list[dict[str, object]]:
+    items: list[dict[str, object]] = []
+    seen_cursor = last_seen_id is None
+    parsed_items: list[dict[str, object]] = []
+    for raw_line in inbox_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        item = json.loads(line)
+        if not isinstance(item, dict):
+            continue
+        item_id = item.get("id")
+        if not isinstance(item_id, str):
+            continue
+        parsed_items.append(item)
+        if not seen_cursor:
+            if item_id == last_seen_id:
+                seen_cursor = True
+            continue
+        items.append(item)
+    if last_seen_id is not None and not seen_cursor:
+        return parsed_items
+    return items

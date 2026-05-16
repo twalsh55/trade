@@ -228,6 +228,7 @@ Use this section to give the next session a fast, practical starting point. Refr
 - `/code` does not let Railway self-edit the repo. It truthfully triggers research, queues a build brief, and notifies the founder; actual code changes still happen through this coding agent.
 - The newest bridge layer is a founder-code sync job: Railway stores both `/code` requests and prospect-agent build prompts, and the local automation worker can poll them into `var/founder_code_inbox.jsonl` when the sync env vars are configured.
 - This bridge has now been proven end to end with a live production `/prospect` run; the first mirrored `agent:prospect` prompt recommended `CSV and Google Sheets import`.
+- The local worker now also stages newly synced remote instructions into `var/founder_code_pending.jsonl` and writes the newest one to `var/founder_code_latest.json`, so remote requests are surfaced automatically instead of waiting for manual inbox inspection.
 
 ### Current Deployment Status
 

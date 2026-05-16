@@ -9,7 +9,12 @@ import pytest
 from psycopg import OperationalError
 
 from src.adapters.founder_code import runtime as runtime_module
-from src.adapters.founder_code.runtime import build_founder_code_request_repository, parse_positive_int, sync_founder_code_requests_from_api
+from src.adapters.founder_code.runtime import (
+    build_founder_code_request_repository,
+    parse_positive_int,
+    stage_founder_code_requests_from_inbox,
+    sync_founder_code_requests_from_api,
+)
 from src.adapters.persistence import postgres_founder_code_request_repository as repo_module
 from src.adapters.persistence.postgres_founder_code_request_repository import (
     PostgresFounderCodeRequestRepository,
@@ -265,6 +270,85 @@ def test_sync_founder_code_requests_from_api_handles_empty_and_invalid_states(tm
 def test_founder_code_parse_positive_int_uses_default_and_validates(monkeypatch) -> None:
     monkeypatch.delenv("AUTONOMOUS_CODE_SYNC_LIMIT", raising=False)
     assert parse_positive_int("AUTONOMOUS_CODE_SYNC_LIMIT", default=25) == 25
+
+
+def test_stage_founder_code_requests_from_inbox_writes_pending_latest_and_cursor(tmp_path, monkeypatch) -> None:
+    inbox_path = tmp_path / "inbox.jsonl"
+    pending_path = tmp_path / "pending.jsonl"
+    latest_path = tmp_path / "latest.json"
+    cursor_path = tmp_path / "pending-cursor.txt"
+    inbox_path.write_text(
+        "\n".join(
+            [
+                json.dumps({"id": "1", "command_text": "/code first", "source_chat_id": "123"}),
+                json.dumps({"id": "2", "command_text": "/agent csv import", "source_chat_id": "agent:prospect"}),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("AUTONOMOUS_CODE_INBOX_FILE", str(inbox_path))
+    monkeypatch.setenv("AUTONOMOUS_CODE_PENDING_FILE", str(pending_path))
+    monkeypatch.setenv("AUTONOMOUS_CODE_LATEST_FILE", str(latest_path))
+    monkeypatch.setenv("AUTONOMOUS_CODE_PENDING_CURSOR_FILE", str(cursor_path))
+
+    assert stage_founder_code_requests_from_inbox() == 2
+    pending_lines = pending_path.read_text(encoding="utf-8").splitlines()
+    assert len(pending_lines) == 2
+    assert json.loads(latest_path.read_text(encoding="utf-8"))["id"] == "2"
+    assert cursor_path.read_text(encoding="utf-8") == "2"
+
+    assert stage_founder_code_requests_from_inbox() == 0
+
+    with inbox_path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps({"id": "3", "command_text": "/code new", "source_chat_id": "123"}))
+        handle.write("\n")
+
+    assert stage_founder_code_requests_from_inbox() == 1
+    assert pending_path.read_text(encoding="utf-8").splitlines()[-1]
+    assert cursor_path.read_text(encoding="utf-8") == "3"
+
+
+def test_stage_founder_code_requests_from_inbox_recovers_if_cursor_is_stale(tmp_path, monkeypatch) -> None:
+    inbox_path = tmp_path / "inbox.jsonl"
+    inbox_path.write_text(json.dumps({"id": "11", "command_text": "/code first", "source_chat_id": "123"}) + "\n", encoding="utf-8")
+    cursor_path = tmp_path / "pending-cursor.txt"
+    cursor_path.write_text("missing-id", encoding="utf-8")
+    pending_path = tmp_path / "pending.jsonl"
+
+    monkeypatch.setenv("AUTONOMOUS_CODE_INBOX_FILE", str(inbox_path))
+    monkeypatch.setenv("AUTONOMOUS_CODE_PENDING_FILE", str(pending_path))
+    monkeypatch.setenv("AUTONOMOUS_CODE_LATEST_FILE", str(tmp_path / "latest.json"))
+    monkeypatch.setenv("AUTONOMOUS_CODE_PENDING_CURSOR_FILE", str(cursor_path))
+
+    assert stage_founder_code_requests_from_inbox() == 1
+    assert json.loads(pending_path.read_text(encoding="utf-8").strip())["id"] == "11"
+
+
+def test_stage_founder_code_requests_from_inbox_handles_missing_inbox_and_sparse_lines(tmp_path, monkeypatch) -> None:
+    inbox_path = tmp_path / "inbox.jsonl"
+    monkeypatch.setenv("AUTONOMOUS_CODE_INBOX_FILE", str(inbox_path))
+    assert stage_founder_code_requests_from_inbox() == 0
+
+    inbox_path.write_text(
+        "\n".join(
+            [
+                "",
+                json.dumps(["not-a-dict"]),
+                json.dumps({"command_text": "/code missing id", "source_chat_id": "123"}),
+                json.dumps({"id": "22", "command_text": "/code valid", "source_chat_id": "123"}),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    pending_path = tmp_path / "pending.jsonl"
+    monkeypatch.setenv("AUTONOMOUS_CODE_PENDING_FILE", str(pending_path))
+    monkeypatch.setenv("AUTONOMOUS_CODE_LATEST_FILE", str(tmp_path / "latest.json"))
+    monkeypatch.setenv("AUTONOMOUS_CODE_PENDING_CURSOR_FILE", str(tmp_path / "cursor.txt"))
+
+    assert stage_founder_code_requests_from_inbox() == 1
+    assert json.loads(pending_path.read_text(encoding="utf-8").strip())["id"] == "22"
 
 
 def test_sync_founder_code_requests_from_api_raises_for_http_or_bad_payload(tmp_path, monkeypatch) -> None:

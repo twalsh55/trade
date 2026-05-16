@@ -13,6 +13,7 @@ from src.adapters.automation.runtime import (
     FileAutomationStateStore,
     LocalAutomationWorker,
     _format_token_usage,
+    _run_founder_code_consume_job,
     _run_founder_code_sync_job,
     _run_job_with_timeout,
     _run_operator_briefing_job,
@@ -189,19 +190,21 @@ def test_build_jobs_worker_and_run_worker_from_env(monkeypatch, tmp_path) -> Non
     jobs = build_jobs_from_env()
     assert jobs[1].name == "founder_code_sync"
     assert jobs[1].interval == timedelta(seconds=60)
+    assert jobs[2].name == "founder_code_consume"
+    assert jobs[2].interval == timedelta(seconds=60)
 
     worker = build_worker_from_env()
     assert worker.poll_seconds == 9
 
     monkeypatch.setenv("AUTOMATION_ENABLE_SCHEDULED_OPERATOR_BRIEFING", "true")
     jobs = build_jobs_from_env()
-    assert jobs[2].interval == timedelta(hours=12)
+    assert jobs[3].interval == timedelta(hours=12)
 
     monkeypatch.setenv("AUTOMATION_ENABLE_SENTIMENT_JOB", "true")
     monkeypatch.setenv("AUTOMATION_SENTIMENT_INTERVAL_HOURS", "6")
     jobs = build_jobs_from_env()
-    assert jobs[3].name == "sentiment_daily"
-    assert jobs[3].interval == timedelta(hours=6)
+    assert jobs[4].name == "sentiment_daily"
+    assert jobs[4].interval == timedelta(hours=6)
 
     class FakeWorker:
         def run_forever(self, max_iterations=None):
@@ -279,6 +282,15 @@ def test_automation_job_runners_report_success_and_failure(monkeypatch) -> None:
         lambda: (_ for _ in ()).throw(RuntimeError("down")),
     )
     assert _run_founder_code_sync_job().status == "failed"
+
+    monkeypatch.setattr("src.adapters.automation.runtime.stage_founder_code_requests_from_inbox", lambda: 2)
+    assert _run_founder_code_consume_job().detail == "staged=2"
+
+    monkeypatch.setattr(
+        "src.adapters.automation.runtime.stage_founder_code_requests_from_inbox",
+        lambda: (_ for _ in ()).throw(RuntimeError("bad inbox")),
+    )
+    assert _run_founder_code_consume_job().status == "failed"
 
     briefing = type("Briefing", (), {"prospect_run_count": 2, "total_shortlisted_ideas": 5, "product_updates": (1, 2)})()
     monkeypatch.setattr("src.adapters.automation.runtime.run_daily_operator_briefing_job", lambda: briefing)

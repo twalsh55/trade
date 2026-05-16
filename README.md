@@ -304,6 +304,9 @@ INTERNAL_CRON_SECRET=replace-me
 AUTONOMOUS_SYNC_API_BASE_URL=https://api.brivoly.com
 AUTONOMOUS_CODE_INBOX_FILE=var/founder_code_inbox.jsonl
 AUTONOMOUS_CODE_CURSOR_FILE=var/founder_code_cursor.txt
+AUTONOMOUS_CODE_PENDING_FILE=var/founder_code_pending.jsonl
+AUTONOMOUS_CODE_PENDING_CURSOR_FILE=var/founder_code_pending_cursor.txt
+AUTONOMOUS_CODE_LATEST_FILE=var/founder_code_latest.json
 AUTONOMOUS_CODE_SYNC_LIMIT=25
 ```
 
@@ -370,6 +373,7 @@ Automation behavior:
 - a heartbeat file makes health checks and watchdog recovery straightforward
 - state persists last successful run timestamps so the worker can resume cleanly after restarts
 - when `AUTOMATION_ENABLE_FOUNDER_CODE_SYNC=true`, the worker polls the production API for stored `/code` requests and appends them to `AUTONOMOUS_CODE_INBOX_FILE`
+- the worker also stages newly synced items into `AUTONOMOUS_CODE_PENDING_FILE` and keeps the newest staged instruction in `AUTONOMOUS_CODE_LATEST_FILE`
 - the same sync path also brings down strong prospect-agent build recommendations, tagged with `source_chat_id=agent:prospect`
 - unattended prospect runs fall back to template mode automatically if the local OpenAI credential is invalid
 - each successful automated prospect run also sends an operator briefing email so product guidance arrives with the run itself

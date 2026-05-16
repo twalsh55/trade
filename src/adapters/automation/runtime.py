@@ -12,7 +12,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from src.adapters.notifications.smtp_email_notifier import EmailNotificationError
-from src.adapters.founder_code.runtime import sync_founder_code_requests_from_api
+from src.adapters.founder_code.runtime import stage_founder_code_requests_from_inbox, sync_founder_code_requests_from_api
 from src.adapters.llm.openai_prospect_drafter import OpenAIProspectDrafterError
 from src.adapters.operator_briefing.runtime import run_daily_operator_briefing_job
 from src.adapters.prospecting.runtime import get_app_openai_api_key, is_placeholder_openai_key, parse_positive_int, run_prospecting_job
@@ -102,11 +102,19 @@ def build_jobs_from_env() -> tuple[AutomationJob, ...]:
         ),
     ]
     if os.getenv("AUTOMATION_ENABLE_FOUNDER_CODE_SYNC", "false").strip().lower() == "true":
+        founder_code_interval = timedelta(seconds=parse_positive_int("AUTOMATION_FOUNDER_CODE_SYNC_INTERVAL_SECONDS", default=60))
         jobs.append(
             AutomationJob(
                 name="founder_code_sync",
-                interval=timedelta(seconds=parse_positive_int("AUTOMATION_FOUNDER_CODE_SYNC_INTERVAL_SECONDS", default=60)),
+                interval=founder_code_interval,
                 runner=lambda: _run_job_with_timeout("founder_code_sync", _run_founder_code_sync_job, timeout_seconds),
+            )
+        )
+        jobs.append(
+            AutomationJob(
+                name="founder_code_consume",
+                interval=founder_code_interval,
+                runner=lambda: _run_job_with_timeout("founder_code_consume", _run_founder_code_consume_job, timeout_seconds),
             )
         )
     if os.getenv("AUTOMATION_ENABLE_SCHEDULED_OPERATOR_BRIEFING", "false").strip().lower() == "true":
@@ -239,6 +247,14 @@ def _run_founder_code_sync_job() -> AutomationJobResult:
     except (ValueError, RuntimeError) as exc:
         return AutomationJobResult(status="failed", detail=str(exc))
     return AutomationJobResult(status="ok", detail=f"synced={synced_count}")
+
+
+def _run_founder_code_consume_job() -> AutomationJobResult:
+    try:
+        staged_count = stage_founder_code_requests_from_inbox()
+    except (ValueError, RuntimeError, json.JSONDecodeError) as exc:
+        return AutomationJobResult(status="failed", detail=str(exc))
+    return AutomationJobResult(status="ok", detail=f"staged={staged_count}")
 
 
 def _run_sentiment_job(runner) -> AutomationJobResult:  # type: ignore[no-untyped-def]
