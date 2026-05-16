@@ -84,6 +84,7 @@ The backend exposes these routes from `src/adapters/api/app.py`:
 - `POST /api/account/billing/checkout`
 - `POST /api/account/billing/portal`
 - `GET /api/alerts/history`
+- `GET /api/internal/founder-code-requests`
 
 Notes:
 
@@ -209,6 +210,7 @@ Use this section to give the next session a fast, practical starting point. Refr
 - The sentiment agent is live separately for ETF analysis and is not the main product direction.
 - Telegram now has a `/code` command that runs the cooperative prospect pass, makes a build/no-build judgment, and appends a structured recommendation to `var/autonomous_build_queue.jsonl` by default.
 - `/code <guidance>` should treat the trailing text as explicit founder direction unless it clearly harms the current goal of building a narrow, profitable CRM wedge.
+- `/code` requests are now also stored durably in Postgres so this always-on machine can mirror them into a local inbox.
 
 ### Current Automation Progress
 
@@ -223,6 +225,7 @@ Use this section to give the next session a fast, practical starting point. Refr
 - Each successful automated prospect run should trigger an operator briefing email; the separate scheduled operator briefing job is optional rather than the default.
 - Local app agents should prefer `APP_OPENAI_API_KEY` over `OPENAI_API_KEY` so app automation can use a dedicated credential path separate from the editor/Codex environment.
 - `/code` does not let Railway self-edit the repo. It truthfully triggers research, queues a build brief, and notifies the founder; actual code changes still happen through this coding agent.
+- The newest bridge layer is a founder-code sync job: Railway stores `/code` requests, and the local automation worker can poll them into `var/founder_code_inbox.jsonl` when the sync env vars are configured.
 
 ### Current Deployment Status
 
@@ -235,6 +238,7 @@ Use this section to give the next session a fast, practical starting point. Refr
   - logged into `product_updates.jsonl`
   - summarized by email through the operator briefing flow
 - The latest platform automation addition is the Telegram `/code` workflow on the API side; it is production-facing and should be kept in sync with the fast-start notes and README.
+- The newest reliability fix is that `/code` and `/prospect` now tolerate SMTP failure as long as Telegram delivery still works.
 
 ### Current Verification Notes
 

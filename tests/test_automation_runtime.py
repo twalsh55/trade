@@ -13,6 +13,7 @@ from src.adapters.automation.runtime import (
     FileAutomationStateStore,
     LocalAutomationWorker,
     _format_token_usage,
+    _run_founder_code_sync_job,
     _run_job_with_timeout,
     _run_operator_briefing_job,
     _run_prospect_job,
@@ -180,18 +181,24 @@ def test_build_jobs_worker_and_run_worker_from_env(monkeypatch, tmp_path) -> Non
     assert jobs[0].interval == timedelta(minutes=720)
     assert len(jobs) == 1
 
+    monkeypatch.setenv("AUTOMATION_ENABLE_FOUNDER_CODE_SYNC", "true")
+    monkeypatch.setenv("AUTOMATION_FOUNDER_CODE_SYNC_INTERVAL_SECONDS", "60")
+    jobs = build_jobs_from_env()
+    assert jobs[1].name == "founder_code_sync"
+    assert jobs[1].interval == timedelta(seconds=60)
+
     worker = build_worker_from_env()
     assert worker.poll_seconds == 9
 
     monkeypatch.setenv("AUTOMATION_ENABLE_SCHEDULED_OPERATOR_BRIEFING", "true")
     jobs = build_jobs_from_env()
-    assert jobs[1].interval == timedelta(hours=12)
+    assert jobs[2].interval == timedelta(hours=12)
 
     monkeypatch.setenv("AUTOMATION_ENABLE_SENTIMENT_JOB", "true")
     monkeypatch.setenv("AUTOMATION_SENTIMENT_INTERVAL_HOURS", "6")
     jobs = build_jobs_from_env()
-    assert jobs[2].name == "sentiment_daily"
-    assert jobs[2].interval == timedelta(hours=6)
+    assert jobs[3].name == "sentiment_daily"
+    assert jobs[3].interval == timedelta(hours=6)
 
     class FakeWorker:
         def run_forever(self, max_iterations=None):
@@ -260,6 +267,15 @@ def test_automation_job_runners_report_success_and_failure(monkeypatch) -> None:
 
     monkeypatch.setattr("src.adapters.automation.runtime.run_prospecting_job", lambda: (_ for _ in ()).throw(ValueError("nope")))
     assert _run_prospect_job().status == "failed"
+
+    monkeypatch.setattr("src.adapters.automation.runtime.sync_founder_code_requests_from_api", lambda: 3)
+    assert _run_founder_code_sync_job().detail == "synced=3"
+
+    monkeypatch.setattr(
+        "src.adapters.automation.runtime.sync_founder_code_requests_from_api",
+        lambda: (_ for _ in ()).throw(RuntimeError("down")),
+    )
+    assert _run_founder_code_sync_job().status == "failed"
 
     briefing = type("Briefing", (), {"prospect_run_count": 2, "total_shortlisted_ideas": 5, "product_updates": (1, 2)})()
     monkeypatch.setattr("src.adapters.automation.runtime.run_daily_operator_briefing_job", lambda: briefing)

@@ -12,6 +12,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from src.adapters.notifications.smtp_email_notifier import EmailNotificationError
+from src.adapters.founder_code.runtime import sync_founder_code_requests_from_api
 from src.adapters.llm.openai_prospect_drafter import OpenAIProspectDrafterError
 from src.adapters.operator_briefing.runtime import run_daily_operator_briefing_job
 from src.adapters.prospecting.runtime import get_app_openai_api_key, is_placeholder_openai_key, parse_positive_int, run_prospecting_job
@@ -100,6 +101,14 @@ def build_jobs_from_env() -> tuple[AutomationJob, ...]:
             runner=lambda: _run_job_with_timeout("prospect_hourly", _run_prospect_job, timeout_seconds),
         ),
     ]
+    if os.getenv("AUTOMATION_ENABLE_FOUNDER_CODE_SYNC", "false").strip().lower() == "true":
+        jobs.append(
+            AutomationJob(
+                name="founder_code_sync",
+                interval=timedelta(seconds=parse_positive_int("AUTOMATION_FOUNDER_CODE_SYNC_INTERVAL_SECONDS", default=60)),
+                runner=lambda: _run_job_with_timeout("founder_code_sync", _run_founder_code_sync_job, timeout_seconds),
+            )
+        )
     if os.getenv("AUTOMATION_ENABLE_SCHEDULED_OPERATOR_BRIEFING", "false").strip().lower() == "true":
         jobs.append(
             AutomationJob(
@@ -141,6 +150,7 @@ def collect_automation_config_errors() -> list[str]:
     for name in (
         "AUTOMATION_POLL_SECONDS",
         "AUTOMATION_PROSPECT_INTERVAL_MINUTES",
+        "AUTOMATION_FOUNDER_CODE_SYNC_INTERVAL_SECONDS",
         "AUTOMATION_OPERATOR_BRIEFING_INTERVAL_HOURS",
         "AUTOMATION_SENTIMENT_INTERVAL_HOURS",
         "AUTOMATION_JOB_TIMEOUT_SECONDS",
@@ -221,6 +231,14 @@ def _run_operator_briefing_job() -> AutomationJobResult:
             f"updates={len(briefing.product_updates)}"
         ),
     )
+
+
+def _run_founder_code_sync_job() -> AutomationJobResult:
+    try:
+        synced_count = sync_founder_code_requests_from_api()
+    except (ValueError, RuntimeError) as exc:
+        return AutomationJobResult(status="failed", detail=str(exc))
+    return AutomationJobResult(status="ok", detail=f"synced={synced_count}")
 
 
 def _run_sentiment_job(runner) -> AutomationJobResult:  # type: ignore[no-untyped-def]

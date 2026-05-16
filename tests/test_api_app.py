@@ -33,6 +33,7 @@ from src.application.account import (
 )
 from src.application.billing import BillingOverview
 from src.application.crm import GetLeadFollowUpOverviewUseCase
+from src.application.founder_code import FounderCodeRequest
 from src.application.dashboard import (
     build_dashboard_config,
     build_default_dashboard_settings,
@@ -492,6 +493,8 @@ def test_telegram_webhook_handles_commands_and_guards(monkeypatch) -> None:
     monkeypatch.setattr("src.adapters.api.app._run_prospecting_from_telegram", lambda notifier: tasks.append("ran"))
     monkeypatch.setattr("src.adapters.api.app._run_etf_sentiment_from_telegram", lambda notifier: tasks.append("sentiment"))
     monkeypatch.setattr("src.adapters.api.app._run_code_from_telegram", lambda notifier, founder_guidance=None: tasks.append("code"))
+    queued_commands: list[str] = []
+    monkeypatch.setattr("src.adapters.api.app._queue_founder_code_request", lambda command: queued_commands.append(command.text))
     monkeypatch.setattr("src.adapters.api.app.collect_prospecting_config_errors", lambda: [])
     monkeypatch.setattr("src.adapters.api.app.collect_etf_sentiment_config_errors", lambda: [])
     monkeypatch.delenv("APP_OPENAI_API_KEY", raising=False)
@@ -556,6 +559,7 @@ def test_telegram_webhook_handles_commands_and_guards(monkeypatch) -> None:
     assert response.json() == {"ok": True, "handled": True, "command": "/code"}
     assert sent[-1] == "Starting a cooperative code run now. I will send a build recommendation when it finishes."
     assert tasks == ["ran", "sentiment", "code"]
+    assert queued_commands[-1] == "/code"
 
     response = client.post(
         "/api/telegram/webhook",
@@ -568,6 +572,7 @@ def test_telegram_webhook_handles_commands_and_guards(monkeypatch) -> None:
         " Founder guidance received: fix a bug with login."
     )
     assert tasks == ["ran", "sentiment", "code", "code"]
+    assert queued_commands[-1] == "/code fix a bug with login"
 
     response = client.post(
         "/api/telegram/webhook",
@@ -652,6 +657,49 @@ def test_operator_briefing_webhook_requires_valid_secret(monkeypatch) -> None:
         "shortlisted_ideas": 7,
         "product_updates": 2,
     }
+
+
+def test_founder_code_requests_webhook_lists_requests(monkeypatch) -> None:
+    client = make_client(user=make_user())
+    monkeypatch.setenv("INTERNAL_CRON_SECRET", "internal-secret")
+
+    request = FounderCodeRequest(
+        id=UUID("11111111-1111-1111-1111-111111111111"),
+        created_at=datetime(2026, 5, 16, 12, 0, tzinfo=UTC),
+        source_chat_id="123",
+        command_text="/code fix login",
+        guidance="fix login",
+    )
+
+    class FakeRepository:
+        pass
+
+    monkeypatch.setattr("src.adapters.api.app.build_founder_code_request_repository", lambda: FakeRepository())
+    monkeypatch.setattr(
+        "src.adapters.api.app.ListFounderCodeRequestsUseCase.execute",
+        lambda self, since=None, limit=50: [request],
+    )
+
+    response = client.get(
+        "/api/internal/founder-code-requests",
+        headers={"X-Internal-Cron-Secret": "internal-secret"},
+        params={"since": "2026-05-16T11:00:00+00:00", "limit": 10},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["ok"] is True
+    assert payload["requests"][0]["command_text"] == "/code fix login"
+
+
+def test_queue_founder_code_request_tolerates_runtime_error(monkeypatch) -> None:
+    command = _TelegramCommand(chat_id="123", name="/code", argument="fix login", text="/code fix login")
+    monkeypatch.setattr(
+        "src.adapters.api.app.build_founder_code_request_repository",
+        lambda: (_ for _ in ()).throw(RuntimeError("db down")),
+    )
+
+    __import__("src.adapters.api.app", fromlist=["_queue_founder_code_request"])._queue_founder_code_request(command)
 
 
 def test_operator_briefing_webhook_reports_configuration_errors(monkeypatch) -> None:

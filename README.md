@@ -216,6 +216,7 @@ What it does:
 - can run in a CRM-focused direction mode to steer product decisions for the CRM app
 - `/code` runs the same cooperative prospect pass, sends the usual digest/briefing, and appends a structured build recommendation to `AUTONOMOUS_BUILD_QUEUE_FILE`
 - `/code <guidance>` treats the trailing text as founder direction and queues it unless it clearly conflicts with the narrow profitable CRM goal
+- every `/code` command is also stored durably in Postgres as a founder code request so the always-on local machine can mirror it into a local inbox
 - sends a plain-text email digest to `tom.mg.walsh@gmail.com` by default
 - falls back to Telegram digest delivery when SMTP is not configured but Telegram is
 - never posts to Reddit, Hacker News, or any other social network
@@ -299,6 +300,10 @@ OPERATOR_BRIEFING_RECIPIENT=tom.mg.walsh@gmail.com
 OPERATOR_BRIEFING_LOOKBACK_HOURS=24
 OPERATOR_BRIEFING_GOAL=Zero in on a narrow, recurring CRM workflow with measurable ROI, low support burden, and fast time-to-revenue for a solo founder.
 INTERNAL_CRON_SECRET=replace-me
+AUTONOMOUS_SYNC_API_BASE_URL=https://api.brivoly.com
+AUTONOMOUS_CODE_INBOX_FILE=var/founder_code_inbox.jsonl
+AUTONOMOUS_CODE_CURSOR_FILE=var/founder_code_cursor.txt
+AUTONOMOUS_CODE_SYNC_LIMIT=25
 ```
 
 Scheduling:
@@ -343,6 +348,8 @@ Useful automation settings:
 ```bash
 AUTOMATION_POLL_SECONDS=30
 AUTOMATION_PROSPECT_INTERVAL_MINUTES=720
+AUTOMATION_ENABLE_FOUNDER_CODE_SYNC=false
+AUTOMATION_FOUNDER_CODE_SYNC_INTERVAL_SECONDS=60
 AUTOMATION_ENABLE_SCHEDULED_OPERATOR_BRIEFING=false
 AUTOMATION_OPERATOR_BRIEFING_INTERVAL_HOURS=24
 AUTOMATION_ENABLE_SENTIMENT_JOB=false
@@ -360,6 +367,7 @@ Automation behavior:
 - a file lock prevents duplicate workers
 - a heartbeat file makes health checks and watchdog recovery straightforward
 - state persists last successful run timestamps so the worker can resume cleanly after restarts
+- when `AUTOMATION_ENABLE_FOUNDER_CODE_SYNC=true`, the worker polls the production API for stored `/code` requests and appends them to `AUTONOMOUS_CODE_INBOX_FILE`
 - unattended prospect runs fall back to template mode automatically if the local OpenAI credential is invalid
 - each successful automated prospect run also sends an operator briefing email so product guidance arrives with the run itself
 - the separate scheduled operator briefing job is opt-in via `AUTOMATION_ENABLE_SCHEDULED_OPERATOR_BRIEFING=true`

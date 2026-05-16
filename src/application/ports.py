@@ -13,6 +13,7 @@ from src.domain.prospecting import ProspectDraft, ProspectMatch, ProspectTokenUs
 if TYPE_CHECKING:
     from src.application.account import AlertHistoryEntry, UserDashboardSettings
     from src.application.billing import BillingOverview
+    from src.application.founder_code import FounderCodeRequest
     from src.application.operator_briefing import ProductUpdateRecord, ProspectRunRecord
 
 
@@ -109,3 +110,17 @@ class ProductUpdateLogPort(Protocol):
 
     def list_product_updates(self, since: datetime) -> list[ProductUpdateRecord]:
         """Return product updates at or after the given timestamp."""
+
+
+class FounderCodeRequestPort(Protocol):
+    def create_request(
+        self,
+        source_chat_id: str,
+        command_text: str,
+        guidance: str | None,
+        created_at: datetime,
+    ) -> FounderCodeRequest:
+        """Persist one founder code request and return the stored record."""
+
+    def list_requests(self, since: datetime | None, limit: int) -> list[FounderCodeRequest]:
+        """Return founder code requests ordered from oldest to newest."""

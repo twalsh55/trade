@@ -28,6 +28,7 @@ from src.adapters.auth.runtime import (
     get_configured_clerk_page_url,
 )
 from src.adapters.autonomous_build.runtime import append_autonomous_build_brief
+from src.adapters.founder_code.runtime import build_founder_code_request_repository
 from src.adapters.market_data.yfinance_provider import YFinanceMarketDataAdapter
 from src.adapters.notifications.smtp_email_notifier import EmailNotificationError
 from src.adapters.notifications.telegram_notifier import TelegramNotificationError, TelegramNotifier
@@ -50,6 +51,7 @@ from src.application.billing import (
     GetBillingOverviewUseCase,
 )
 from src.application.autonomous_build import decide_autonomous_build_brief, format_autonomous_build_brief
+from src.application.founder_code import ListFounderCodeRequestsUseCase, QueueFounderCodeRequestUseCase
 from src.application.crm import GetLeadFollowUpOverviewUseCase
 from src.application.crm import AddLeadFollowUpNoteUseCase, CompleteLeadFollowUpUseCase, SnoozeLeadFollowUpUseCase
 from src.application.dashboard import (
@@ -109,6 +111,14 @@ class LeadFollowUpActionPayload(BaseModel):
     action: str
     snooze_hours: int | None = Field(default=None, ge=1, le=24 * 14)
     note_body: str | None = Field(default=None, min_length=1, max_length=1000)
+
+
+class FounderCodeRequestDTO(BaseModel):
+    id: str
+    created_at: str
+    source_chat_id: str
+    command_text: str
+    guidance: str | None
 
 
 def create_app(dependencies: ApiDependencies | None = None) -> FastAPI:
@@ -420,6 +430,7 @@ def create_app(dependencies: ApiDependencies | None = None) -> FastAPI:
             notifier.send_message(_build_etf_sentiment_status_message())
             return {"ok": True, "handled": True, "command": command.text}
         if command.name == "/code":
+            _queue_founder_code_request(command)
             guidance_notice = f" Founder guidance received: {command.argument}." if command.argument else ""
             notifier.send_message(
                 "Starting a cooperative code run now. I will send a build recommendation when it finishes."
@@ -454,6 +465,29 @@ def create_app(dependencies: ApiDependencies | None = None) -> FastAPI:
             "prospect_run_count": briefing.prospect_run_count,
             "shortlisted_ideas": briefing.total_shortlisted_ideas,
             "product_updates": len(briefing.product_updates),
+        }
+
+    @app.get("/api/internal/founder-code-requests")
+    def founder_code_requests_webhook(
+        internal_secret: str | None = Header(default=None, alias="X-Internal-Cron-Secret"),
+        since: str | None = Query(default=None),
+        limit: int = Query(default=25, ge=1, le=100),
+    ) -> dict[str, object]:
+        _validate_internal_cron_secret(internal_secret)
+        since_datetime = datetime.fromisoformat(since) if since else None
+        requests = ListFounderCodeRequestsUseCase(build_founder_code_request_repository()).execute(since=since_datetime, limit=limit)
+        return {
+            "ok": True,
+            "requests": [
+                FounderCodeRequestDTO(
+                    id=str(item.id),
+                    created_at=item.created_at.isoformat(),
+                    source_chat_id=item.source_chat_id,
+                    command_text=item.command_text,
+                    guidance=item.guidance,
+                ).model_dump()
+                for item in requests
+            ],
         }
 
     return app
@@ -561,6 +595,17 @@ def _build_telegram_notifier() -> TelegramNotifier:
     if not bot_token or not chat_id:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Telegram bot is not configured.")
     return TelegramNotifier(bot_token=bot_token, chat_id=chat_id)
+
+
+def _queue_founder_code_request(command: _TelegramCommand) -> None:
+    try:
+        QueueFounderCodeRequestUseCase(build_founder_code_request_repository()).execute(
+            chat_id=command.chat_id,
+            command_text=command.text,
+            guidance=command.argument,
+        )
+    except RuntimeError as exc:
+        api_logger.warning("Unable to persist founder code request", exc_info=exc)
 
 
 def _build_prospecting_status_message() -> str:
