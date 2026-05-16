@@ -61,6 +61,7 @@ class TemplateETFSentimentAgent:
     def generate_briefing(self, prompt: str, market_snapshot: dict[str, Any]) -> str:
         _ = prompt
         overview = market_snapshot.get("overview", {})
+        text_signals = market_snapshot.get("text_signals", {})
         leaders = market_snapshot.get("leaders", [])
         laggards = market_snapshot.get("laggards", [])
         crowding = market_snapshot.get("crowding_watch", [])
@@ -73,6 +74,7 @@ class TemplateETFSentimentAgent:
         weakness_line = ", ".join(_format_move(item) for item in laggards[:3]) or "No clear short-term laggards."
         crowding_line = ", ".join(_format_crowding(item) for item in crowding[:3]) or "No crowding extremes detected from price action alone."
         risk_line = "; ".join(str(item) for item in risk_flags[:3]) or "No major price-based risk flags detected."
+        text_signal_line = _format_text_signals(text_signals)
 
         return (
             "ETF Sentiment Brief\n"
@@ -84,8 +86,9 @@ class TemplateETFSentimentAgent:
             f"- Average 5d return across tracked ETFs: {average_five_day}\n"
             f"- Average 1m return across tracked ETFs: {average_one_month}\n"
             f"- Crowding watch: {crowding_line}\n"
+            f"- Text signals: {text_signal_line}\n"
             "Interpretation:\n"
-            "- This template mode uses price behavior only, so narrative and positioning signals are lower-confidence.\n"
+            "- This template mode uses simple text harvesting plus price behavior, so narrative inference is still lower-confidence than a fully modeled sentiment stack.\n"
             f"- Key risks: {risk_line}\n"
             "Scenarios:\n"
             "- Base case: trend persistence remains possible if leadership stays broad and volatility contained.\n"
@@ -145,3 +148,24 @@ def _format_crowding(item: object) -> str:
     drawdown = _format_pct(item.get("drawdown_from_52_week_high_pct"))
     monthly = _format_pct(item.get("one_month_return_pct"))
     return f"{label} 1m {monthly}, drawdown {drawdown}"
+
+
+def _format_text_signals(value: object) -> str:
+    if not isinstance(value, dict):
+        return "n/a"
+    items = value.get("items", [])
+    if not isinstance(items, list) or not items:
+        return "No recent discussion or news signals collected."
+    source_counts = value.get("source_counts", {})
+    if not isinstance(source_counts, dict):
+        source_counts = {}
+    counts_line = ", ".join(f"{key}={count}" for key, count in sorted(source_counts.items())) or "signals collected"
+    top_titles: list[str] = []
+    for item in items[:2]:
+        if not isinstance(item, dict):
+            continue
+        title = item.get("title")
+        if isinstance(title, str) and title.strip():
+            top_titles.append(title.strip())
+    title_line = " | ".join(top_titles)
+    return f"{counts_line}. Top themes: {title_line}" if title_line else counts_line

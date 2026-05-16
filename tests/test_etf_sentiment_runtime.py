@@ -6,20 +6,27 @@ import pandas as pd
 
 from src.adapters.sentiment.runtime import (
     DEFAULT_ETF_PROMPT_FILE,
+    DEFAULT_SENTIMENT_QUERIES,
     ETFSnapshot,
     _annualized_volatility_pct,
     _average_metric,
+    _build_source_counts,
     _build_risk_flags,
     _classify_market_mood,
+    _dedupe_signals,
     _drawdown_from_high_pct,
     _return_pct,
     build_etf_market_snapshot,
+    build_sentiment_signal_snapshot,
     build_etf_sentiment_agent_from_env,
+    build_signal_sources_from_env,
     collect_etf_sentiment_config_errors,
     load_etf_sentiment_prompt,
+    load_sentiment_queries_from_env,
     parse_positive_int,
     run_etf_sentiment_job,
 )
+from src.adapters.sentiment.sources.google_news_rss import SentimentSignal
 
 
 def test_load_etf_sentiment_prompt_uses_env_override(tmp_path, monkeypatch) -> None:
@@ -95,7 +102,11 @@ def test_build_etf_market_snapshot_computes_summary(monkeypatch) -> None:
             return data[tickers]
 
     monkeypatch.delenv("ETF_SENTIMENT_LOOKBACK_DAYS", raising=False)
-    snapshot = build_etf_market_snapshot(market_data=FakeAdapter(), as_of=date(2025, 2, 20))  # type: ignore[arg-type]
+    snapshot = build_etf_market_snapshot(
+        market_data=FakeAdapter(),
+        signal_sources=(),
+        as_of=date(2025, 2, 20),
+    )  # type: ignore[arg-type]
 
     assert snapshot["overview"]["tracked_etf_count"] == 16
     assert snapshot["overview"]["market_mood"] in {"constructive", "optimistic"}
@@ -103,6 +114,7 @@ def test_build_etf_market_snapshot_computes_summary(monkeypatch) -> None:
     assert snapshot["laggards"][0]["ticker"] in {"EEM", "MCHI", "BND"}
     assert snapshot["etfs"][0]["label"] == "Global Equities"
     assert "yfinance proxies" in snapshot["data_note"]
+    assert snapshot["text_signals"]["items"] == []
 
 
 def test_build_etf_market_snapshot_rejects_missing_data(monkeypatch) -> None:
@@ -111,7 +123,7 @@ def test_build_etf_market_snapshot_rejects_missing_data(monkeypatch) -> None:
             return pd.DataFrame()
 
     try:
-        build_etf_market_snapshot(market_data=EmptyAdapter(), as_of=date(2025, 2, 20))  # type: ignore[arg-type]
+        build_etf_market_snapshot(market_data=EmptyAdapter(), signal_sources=(), as_of=date(2025, 2, 20))  # type: ignore[arg-type]
     except ValueError as exc:
         assert str(exc) == "Unable to load ETF market snapshot. Check ticker symbols or network connectivity."
     else:
@@ -122,7 +134,7 @@ def test_build_etf_market_snapshot_rejects_missing_data(monkeypatch) -> None:
             return pd.DataFrame({"OTHER": [1.0, 2.0]}, index=pd.bdate_range("2025-01-01", periods=2))
 
     try:
-        build_etf_market_snapshot(market_data=MissingColumnsAdapter(), as_of=date(2025, 2, 20))  # type: ignore[arg-type]
+        build_etf_market_snapshot(market_data=MissingColumnsAdapter(), signal_sources=(), as_of=date(2025, 2, 20))  # type: ignore[arg-type]
     except ValueError as exc:
         assert str(exc) == "Unable to build ETF sentiment snapshot from downloaded market data."
     else:
@@ -157,7 +169,7 @@ def test_build_etf_market_snapshot_skips_empty_series_columns() -> None:
         def load_close_data(self, tickers: list[str], start_date: date, end_date: date) -> pd.DataFrame:
             return data[tickers]
 
-    snapshot = build_etf_market_snapshot(market_data=FakeAdapter(), as_of=date(2025, 2, 20))  # type: ignore[arg-type]
+    snapshot = build_etf_market_snapshot(market_data=FakeAdapter(), signal_sources=(), as_of=date(2025, 2, 20))  # type: ignore[arg-type]
     assert snapshot["overview"]["tracked_etf_count"] == 15
 
 
@@ -165,11 +177,15 @@ def test_collect_etf_sentiment_config_errors_reports_missing_and_invalid_fields(
     monkeypatch.setenv("ETF_SENTIMENT_PROMPT_FILE", str(tmp_path / "missing.md"))
     monkeypatch.setenv("ETF_SENTIMENT_LOOKBACK_DAYS", "0")
     monkeypatch.setenv("ETF_SENTIMENT_OPENAI_MAX_OUTPUT_TOKENS", "abc")
+    monkeypatch.setenv("ETF_SENTIMENT_SIGNAL_LIMIT_PER_QUERY", "-1")
+    monkeypatch.setenv("ETF_SENTIMENT_MAX_SIGNALS", "zero")
 
     assert collect_etf_sentiment_config_errors() == [
         f"Missing ETF sentiment prompt file: {tmp_path / 'missing.md'}",
         "ETF_SENTIMENT_LOOKBACK_DAYS must be greater than zero",
         "ETF_SENTIMENT_OPENAI_MAX_OUTPUT_TOKENS must be an integer",
+        "ETF_SENTIMENT_SIGNAL_LIMIT_PER_QUERY must be greater than zero",
+        "ETF_SENTIMENT_MAX_SIGNALS must be an integer",
     ]
 
 
@@ -202,6 +218,65 @@ def test_parse_positive_int_validates_values(monkeypatch) -> None:
         raise AssertionError("Expected positive validation failure")
 
 
+def test_load_sentiment_queries_from_env_uses_defaults_and_override(monkeypatch) -> None:
+    monkeypatch.delenv("ETF_SENTIMENT_QUERIES", raising=False)
+    assert load_sentiment_queries_from_env() == DEFAULT_SENTIMENT_QUERIES
+
+    monkeypatch.setenv("ETF_SENTIMENT_QUERIES", "one, two , ,three")
+    assert load_sentiment_queries_from_env() == ("one", "two", "three")
+
+
+def test_build_signal_sources_from_env_respects_toggles(monkeypatch) -> None:
+    monkeypatch.delenv("ETF_SENTIMENT_ENABLE_REDDIT_SIGNALS", raising=False)
+    monkeypatch.delenv("ETF_SENTIMENT_ENABLE_NEWS_SIGNALS", raising=False)
+    assert [source.__class__.__name__ for source in build_signal_sources_from_env()] == [
+        "RedditDiscussionSource",
+        "GoogleNewsRSSSource",
+    ]
+
+    monkeypatch.setenv("ETF_SENTIMENT_ENABLE_REDDIT_SIGNALS", "false")
+    monkeypatch.setenv("ETF_SENTIMENT_ENABLE_NEWS_SIGNALS", "false")
+    assert build_signal_sources_from_env() == ()
+
+
+def test_build_sentiment_signal_snapshot_collects_dedupes_and_records_errors(monkeypatch) -> None:
+    class WorkingSource:
+        def __init__(self, name: str) -> None:
+            self.name = name
+
+        def collect_signals(self, query: str, limit: int) -> list[SentimentSignal]:
+            assert limit == 2
+            return [
+                SentimentSignal(self.name, "channel", query, f"{self.name} {query}", "summary", "https://example.com/shared", "2026-01-01T00:00:00+00:00"),
+                SentimentSignal(self.name, "channel", query, f"{self.name} unique {query}", "summary", f"https://example.com/{self.name}/{query}", "2026-01-02T00:00:00+00:00"),
+            ]
+
+    class FailingSource:
+        def collect_signals(self, query: str, limit: int) -> list[SentimentSignal]:
+            raise RuntimeError(f"broken {query}")
+
+    monkeypatch.setenv("ETF_SENTIMENT_QUERIES", "alpha,beta")
+    monkeypatch.setenv("ETF_SENTIMENT_SIGNAL_LIMIT_PER_QUERY", "2")
+    monkeypatch.setenv("ETF_SENTIMENT_MAX_SIGNALS", "3")
+
+    snapshot = build_sentiment_signal_snapshot(signal_sources=(WorkingSource("reddit"), FailingSource()))  # type: ignore[arg-type]
+
+    assert snapshot["queries"] == ["alpha", "beta"]
+    assert snapshot["source_counts"] == {"reddit": 3}
+    assert len(snapshot["items"]) == 3
+    assert snapshot["source_errors"] == ["broken alpha", "broken beta"]
+
+
+def test_build_sentiment_signal_snapshot_handles_no_sources(monkeypatch) -> None:
+    monkeypatch.delenv("ETF_SENTIMENT_QUERIES", raising=False)
+    assert build_sentiment_signal_snapshot(signal_sources=()) == {
+        "queries": list(DEFAULT_SENTIMENT_QUERIES),
+        "source_errors": [],
+        "source_counts": {},
+        "items": [],
+    }
+
+
 def test_etf_sentiment_helper_functions_cover_edge_cases() -> None:
     short_series = pd.Series([1.0])
     zero_baseline_series = pd.Series([0.0, 1.0])
@@ -224,6 +299,19 @@ def test_etf_sentiment_helper_functions_cover_edge_cases() -> None:
     assert _classify_market_mood(1.0, 1.0) == "constructive"
     assert _classify_market_mood(-1.0, 1.0) == "cautious"
     assert _classify_market_mood(0.1, 0.1) == "neutral"
+    assert _dedupe_signals(
+        [
+            SentimentSignal("reddit", "subreddit:ETFs", "q", "a", "s", "https://example.com/1", "2026-01-01T00:00:00+00:00"),
+            SentimentSignal("reddit", "subreddit:ETFs", "q", "b", "s", "https://example.com/1", "2026-01-02T00:00:00+00:00"),
+        ]
+    )[0].title == "a"
+    assert _build_source_counts(
+        [
+            SentimentSignal("reddit", "subreddit:ETFs", "q", "a", "s", "https://example.com/1", "2026-01-01T00:00:00+00:00"),
+            SentimentSignal("google_news_rss", "news", "q", "b", "s", "https://example.com/2", "2026-01-01T00:00:00+00:00"),
+            SentimentSignal("reddit", "subreddit:ETFs", "q", "c", "s", "https://example.com/3", "2026-01-01T00:00:00+00:00"),
+        ]
+    ) == {"reddit": 2, "google_news_rss": 1}
 
     flags = _build_risk_flags(
         [

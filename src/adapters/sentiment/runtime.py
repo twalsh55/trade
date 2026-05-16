@@ -4,12 +4,14 @@ import os
 from dataclasses import asdict, dataclass
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 import pandas as pd
 
 from src.adapters.llm.openai_etf_sentiment_agent import OpenAIETFSentimentAgent, TemplateETFSentimentAgent
 from src.adapters.market_data.yfinance_provider import YFinanceMarketDataAdapter
+from src.adapters.sentiment.sources.google_news_rss import GoogleNewsRSSSource, SentimentSignal
+from src.adapters.sentiment.sources.reddit_discussion import RedditDiscussionSource
 
 DEFAULT_ETF_PROMPT_FILE = Path(__file__).resolve().parents[3] / "prompts" / "ETF_SENTIMENT.md"
 DEFAULT_ETF_UNIVERSE: tuple[tuple[str, str], ...] = (
@@ -30,6 +32,19 @@ DEFAULT_ETF_UNIVERSE: tuple[tuple[str, str], ...] = (
     ("India", "INDA"),
     ("China", "MCHI"),
 )
+DEFAULT_SENTIMENT_QUERIES: tuple[str, ...] = (
+    "ETF market sentiment",
+    "MSCI World ETF",
+    "S&P 500 ETF sentiment",
+    "Nasdaq 100 ETF",
+    "AI ETF OR semiconductor ETF",
+    "bond ETF OR defensive rotation",
+)
+
+
+class SentimentSignalSource(Protocol):
+    def collect_signals(self, query: str, limit: int) -> list[SentimentSignal]:
+        """Return recent text signals for the provided query."""
 
 
 @dataclass(frozen=True)
@@ -75,9 +90,11 @@ def build_etf_sentiment_agent_from_env() -> OpenAIETFSentimentAgent | TemplateET
 
 def build_etf_market_snapshot(
     market_data: YFinanceMarketDataAdapter | None = None,
+    signal_sources: tuple[SentimentSignalSource, ...] | None = None,
     as_of: date | None = None,
 ) -> dict[str, Any]:
     adapter = market_data or YFinanceMarketDataAdapter()
+    signals = build_sentiment_signal_snapshot(signal_sources=signal_sources)
     resolved_date = as_of or date.today()
     lookback_days = parse_positive_int("ETF_SENTIMENT_LOOKBACK_DAYS", default=400)
     start_date = resolved_date - timedelta(days=lookback_days)
@@ -136,8 +153,8 @@ def build_etf_market_snapshot(
     return {
         "generated_at": datetime.now(UTC).isoformat(),
         "data_note": (
-            "This snapshot is built from recent ETF price action via yfinance proxies. "
-            "It does not include direct Trade Republic catalog data, ETF fund flows, or scraped social/news sentiment."
+            "This snapshot combines recent ETF price action via yfinance proxies with lightweight public text signals. "
+            "It still does not include direct Trade Republic catalog data, ETF fund flow data, or private/proprietary datasets."
         ),
         "overview": {
             "tracked_etf_count": len(snapshots),
@@ -145,6 +162,7 @@ def build_etf_market_snapshot(
             "average_five_day_return_pct": average_five_day,
             "average_one_month_return_pct": average_one_month,
         },
+        "text_signals": signals,
         "leaders": [asdict(snapshot) for snapshot in leaders],
         "laggards": [asdict(snapshot) for snapshot in laggards],
         "crowding_watch": [asdict(snapshot) for snapshot in crowding_watch],
@@ -159,7 +177,12 @@ def collect_etf_sentiment_config_errors() -> list[str]:
     if not prompt_path.is_file():
         errors.append(f"Missing ETF sentiment prompt file: {prompt_path}")
 
-    for name in ("ETF_SENTIMENT_LOOKBACK_DAYS", "ETF_SENTIMENT_OPENAI_MAX_OUTPUT_TOKENS"):
+    for name in (
+        "ETF_SENTIMENT_LOOKBACK_DAYS",
+        "ETF_SENTIMENT_OPENAI_MAX_OUTPUT_TOKENS",
+        "ETF_SENTIMENT_SIGNAL_LIMIT_PER_QUERY",
+        "ETF_SENTIMENT_MAX_SIGNALS",
+    ):
         raw_value = os.getenv(name, "").strip()
         if not raw_value:
             continue
@@ -182,6 +205,62 @@ def parse_positive_int(name: str, default: int) -> int:
     if value <= 0:
         raise ValueError(f"{name} must be greater than zero.")
     return value
+
+
+def build_sentiment_signal_snapshot(
+    signal_sources: tuple[SentimentSignalSource, ...] | None = None,
+) -> dict[str, Any]:
+    queries = load_sentiment_queries_from_env()
+    limit = parse_positive_int("ETF_SENTIMENT_SIGNAL_LIMIT_PER_QUERY", default=4)
+    sources = build_signal_sources_from_env() if signal_sources is None else signal_sources
+
+    if not sources:
+        return {
+            "queries": list(queries),
+            "source_errors": [],
+            "source_counts": {},
+            "items": [],
+        }
+
+    items: list[SentimentSignal] = []
+    source_errors: list[str] = []
+    for query in queries:
+        for source in sources:
+            try:
+                items.extend(source.collect_signals(query, limit))
+            except RuntimeError as exc:
+                source_errors.append(str(exc))
+
+    deduped_items = _dedupe_signals(items)
+    source_counts = _build_source_counts(deduped_items)
+    return {
+        "queries": list(queries),
+        "source_errors": source_errors,
+        "source_counts": source_counts,
+        "items": [asdict(item) for item in deduped_items[: parse_positive_int("ETF_SENTIMENT_MAX_SIGNALS", default=18)]],
+    }
+
+
+def build_signal_sources_from_env() -> tuple[SentimentSignalSource, ...]:
+    reddit_enabled = os.getenv("ETF_SENTIMENT_ENABLE_REDDIT_SIGNALS", "true").strip().lower() != "false"
+    news_enabled = os.getenv("ETF_SENTIMENT_ENABLE_NEWS_SIGNALS", "true").strip().lower() != "false"
+    sources: list[SentimentSignalSource] = []
+    if reddit_enabled:
+        sources.append(
+            RedditDiscussionSource(
+                user_agent=os.getenv("ETF_SENTIMENT_REDDIT_USER_AGENT", "brivoly-etf-sentiment-bot/0.1").strip()
+                or "brivoly-etf-sentiment-bot/0.1"
+            )
+        )
+    if news_enabled:
+        sources.append(GoogleNewsRSSSource())
+    return tuple(sources)
+
+
+def load_sentiment_queries_from_env() -> tuple[str, ...]:
+    raw_value = os.getenv("ETF_SENTIMENT_QUERIES", "").strip()
+    queries = tuple(item.strip() for item in raw_value.split(",") if item.strip())
+    return queries or DEFAULT_SENTIMENT_QUERIES
 
 
 def _return_pct(series: pd.Series, periods: int) -> float | None:
@@ -258,3 +337,22 @@ def _build_risk_flags(snapshots: list[ETFSnapshot]) -> list[str]:
     if high_vol:
         flags.append("Elevated 20d realized volatility in: " + ", ".join(high_vol[:4]))
     return flags
+
+
+def _dedupe_signals(items: list[SentimentSignal]) -> list[SentimentSignal]:
+    seen: set[str] = set()
+    deduped: list[SentimentSignal] = []
+    for item in items:
+        key = f"{item.source}:{item.url}"
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(item)
+    return deduped
+
+
+def _build_source_counts(items: list[SentimentSignal]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for item in items:
+        counts[item.source] = counts.get(item.source, 0) + 1
+    return counts

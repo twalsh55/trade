@@ -10,6 +10,7 @@ from src.adapters.llm.openai_etf_sentiment_agent import (
     _format_crowding,
     _format_move,
     _format_pct,
+    _format_text_signals,
 )
 
 
@@ -34,12 +35,20 @@ def test_template_etf_sentiment_agent_builds_briefing() -> None:
                 }
             ],
             "risk_flags": ["Potential crowding near highs in: AI / Technology"],
+            "text_signals": {
+                "source_counts": {"reddit": 2, "google_news_rss": 1},
+                "items": [
+                    {"title": "Tech ETF concentration debate grows"},
+                    {"title": "Defensive rotation narrative is back"},
+                ],
+            },
         },
     )
 
     assert "ETF Sentiment Brief" in briefing
     assert "Semiconductors (+4.2%)" in briefing
     assert "Potential crowding near highs in: AI / Technology" in briefing
+    assert "Text signals: google_news_rss=1, reddit=2." in briefing
     assert briefing.endswith("Not financial advice.")
 
 
@@ -155,4 +164,8 @@ def test_etf_sentiment_format_helpers_cover_fallback_branches() -> None:
     assert _format_pct(None) == "n/a"
     assert _format_move("bad") == "n/a"
     assert _format_crowding("bad") == "n/a"
+    assert _format_text_signals("bad") == "n/a"
+    assert _format_text_signals({"items": []}) == "No recent discussion or news signals collected."
+    assert _format_text_signals({"source_counts": {"reddit": 1}, "items": [{"title": "One"}]}) == "reddit=1. Top themes: One"
+    assert _format_text_signals({"source_counts": "bad", "items": ["bad", {"title": " "} ]}) == "signals collected"
     assert _extract_text_from_response({"output": ["bad", {"content": "bad"}, {"content": ["bad", {"text": "A"}]}]}) == "A"

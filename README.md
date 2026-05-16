@@ -238,13 +238,20 @@ ETF_SENTIMENT_OPENAI_MODEL=gpt-5-nano
 ETF_SENTIMENT_OPENAI_MAX_OUTPUT_TOKENS=900
 ETF_SENTIMENT_LOOKBACK_DAYS=400
 ETF_SENTIMENT_PROMPT_FILE=prompts/ETF_SENTIMENT.md
+ETF_SENTIMENT_QUERIES=ETF market sentiment,MSCI World ETF,S&P 500 ETF sentiment,Nasdaq 100 ETF,AI ETF OR semiconductor ETF,bond ETF OR defensive rotation
+ETF_SENTIMENT_SIGNAL_LIMIT_PER_QUERY=4
+ETF_SENTIMENT_MAX_SIGNALS=18
+ETF_SENTIMENT_ENABLE_REDDIT_SIGNALS=true
+ETF_SENTIMENT_ENABLE_NEWS_SIGNALS=true
+ETF_SENTIMENT_REDDIT_USER_AGENT=brivoly-etf-sentiment-bot/0.1
 ```
 
 ETF sentiment Telegram brief:
 
 - `/sentiment` runs a server-side ETF sentiment snapshot and sends the result back to the configured Telegram chat
 - `/sentiment status` reports whether the ETF sentiment agent is ready and whether it will use OpenAI or template mode
-- when `OPENAI_API_KEY` is missing, the agent still works in price-action template mode using `yfinance` ETF proxies
+- the snapshot now combines `yfinance` ETF proxies with lightweight public text signals from Reddit search and Google News RSS
+- when `OPENAI_API_KEY` is missing, the agent still works in template mode using those price and text inputs
 - the prompt source lives at `prompts/ETF_SENTIMENT.md`
 
 Run it manually:
