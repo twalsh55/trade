@@ -31,7 +31,7 @@ from src.adapters.notifications.smtp_email_notifier import EmailNotificationErro
 from src.adapters.notifications.telegram_notifier import TelegramNotificationError, TelegramNotifier
 from src.adapters.persistence.runtime import build_personalization_repository
 from src.adapters.prospecting.runtime import collect_prospecting_config_errors, run_prospecting_job
-from src.adapters.sentiment.runtime import collect_etf_sentiment_config_errors, run_etf_sentiment_job
+from src.adapters.sentiment.runtime import collect_etf_sentiment_config_errors, deliver_etf_sentiment_job, run_etf_sentiment_job
 from src.adapters.social.reddit_lead_source import RedditLeadSourceError
 from src.application.account import (
     AlertHistoryEntry,
@@ -492,7 +492,7 @@ def _build_etf_sentiment_status_message() -> str:
 
 def _run_etf_sentiment_from_telegram(notifier: TelegramNotifier) -> None:
     try:
-        notifier.send_message(run_etf_sentiment_job())
+        deliver_etf_sentiment_job()
     except (EmailNotificationError, RedditLeadSourceError, TelegramNotificationError, ValueError, RuntimeError) as exc:
         try:
             notifier.send_message(f"ETF sentiment run failed: {exc}")

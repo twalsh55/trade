@@ -340,11 +340,11 @@ def test_run_etf_sentiment_from_telegram_sends_success_and_failure_updates(monke
         def send_message(self, text: str) -> None:
             sent.append(text)
 
-    monkeypatch.setattr("src.adapters.api.app.run_etf_sentiment_job", lambda: "ETF Sentiment Brief")
+    monkeypatch.setattr("src.adapters.api.app.deliver_etf_sentiment_job", lambda: "ETF Sentiment Brief")
     _run_etf_sentiment_from_telegram(FakeNotifier())  # type: ignore[arg-type]
-    assert sent[-1] == "ETF Sentiment Brief"
+    assert sent == []
 
-    monkeypatch.setattr("src.adapters.api.app.run_etf_sentiment_job", lambda: (_ for _ in ()).throw(ValueError("broken")))
+    monkeypatch.setattr("src.adapters.api.app.deliver_etf_sentiment_job", lambda: (_ for _ in ()).throw(ValueError("broken")))
     _run_etf_sentiment_from_telegram(FakeNotifier())  # type: ignore[arg-type]
     assert sent[-1] == "ETF sentiment run failed: broken"
 
@@ -357,7 +357,7 @@ def test_run_etf_sentiment_from_telegram_sends_success_and_failure_updates(monke
                 "down"
             )
 
-    monkeypatch.setattr("src.adapters.api.app.run_etf_sentiment_job", lambda: (_ for _ in ()).throw(ValueError("broken")))
+    monkeypatch.setattr("src.adapters.api.app.deliver_etf_sentiment_job", lambda: (_ for _ in ()).throw(ValueError("broken")))
     _run_etf_sentiment_from_telegram(FailingNotifier())  # type: ignore[arg-type]
 
 

@@ -19,11 +19,16 @@ from src.adapters.sentiment.runtime import (
     build_etf_market_snapshot,
     build_sentiment_signal_snapshot,
     build_etf_sentiment_agent_from_env,
+    build_etf_sentiment_delivery_from_env,
     build_signal_sources_from_env,
     collect_etf_sentiment_config_errors,
+    deliver_etf_sentiment_job,
+    has_configured_smtp_delivery,
+    has_configured_telegram_delivery,
     load_etf_sentiment_prompt,
     load_sentiment_queries_from_env,
     parse_positive_int,
+    required_env,
     run_etf_sentiment_job,
 )
 from src.adapters.sentiment.sources.google_news_rss import SentimentSignal
@@ -179,6 +184,7 @@ def test_collect_etf_sentiment_config_errors_reports_missing_and_invalid_fields(
     monkeypatch.setenv("ETF_SENTIMENT_OPENAI_MAX_OUTPUT_TOKENS", "abc")
     monkeypatch.setenv("ETF_SENTIMENT_SIGNAL_LIMIT_PER_QUERY", "-1")
     monkeypatch.setenv("ETF_SENTIMENT_MAX_SIGNALS", "zero")
+    monkeypatch.setenv("SMTP_PORT", "bad")
 
     assert collect_etf_sentiment_config_errors() == [
         f"Missing ETF sentiment prompt file: {tmp_path / 'missing.md'}",
@@ -186,6 +192,7 @@ def test_collect_etf_sentiment_config_errors_reports_missing_and_invalid_fields(
         "ETF_SENTIMENT_OPENAI_MAX_OUTPUT_TOKENS must be an integer",
         "ETF_SENTIMENT_SIGNAL_LIMIT_PER_QUERY must be greater than zero",
         "ETF_SENTIMENT_MAX_SIGNALS must be an integer",
+        "SMTP_PORT must be an integer",
     ]
 
 
@@ -237,6 +244,72 @@ def test_build_signal_sources_from_env_respects_toggles(monkeypatch) -> None:
     monkeypatch.setenv("ETF_SENTIMENT_ENABLE_REDDIT_SIGNALS", "false")
     monkeypatch.setenv("ETF_SENTIMENT_ENABLE_NEWS_SIGNALS", "false")
     assert build_signal_sources_from_env() == ()
+
+
+def test_etf_sentiment_delivery_builders_and_config_helpers(monkeypatch) -> None:
+    monkeypatch.delenv("SMTP_HOST", raising=False)
+    monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
+    assert has_configured_smtp_delivery() is False
+    assert has_configured_telegram_delivery() is False
+
+    monkeypatch.setenv("SMTP_HOST", "smtp.example.com")
+    monkeypatch.setenv("SMTP_PORT", "587")
+    monkeypatch.setenv("SMTP_USERNAME", "user")
+    monkeypatch.setenv("SMTP_PASSWORD", "pass")
+    monkeypatch.setenv("SMTP_FROM_EMAIL", "alerts@example.com")
+    assert has_configured_smtp_delivery() is True
+    assert required_env("SMTP_HOST") == "smtp.example.com"
+    assert build_etf_sentiment_delivery_from_env().__class__.__name__ == "SMTPEmailNotifier"
+
+    monkeypatch.delenv("SMTP_HOST", raising=False)
+    monkeypatch.delenv("SMTP_USERNAME", raising=False)
+    monkeypatch.delenv("SMTP_PASSWORD", raising=False)
+    monkeypatch.delenv("SMTP_FROM_EMAIL", raising=False)
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "bot")
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "123")
+    assert has_configured_telegram_delivery() is True
+    assert build_etf_sentiment_delivery_from_env().__class__.__name__ == "TelegramDigestNotifier"
+
+    monkeypatch.setenv("SMTP_HOST", "smtp.example.com")
+    monkeypatch.setenv("SMTP_USERNAME", "user")
+    monkeypatch.setenv("SMTP_PASSWORD", "pass")
+    monkeypatch.setenv("SMTP_FROM_EMAIL", "alerts@example.com")
+    assert build_etf_sentiment_delivery_from_env().__class__.__name__ == "CompositeEmailNotifier"
+
+    monkeypatch.delenv("SMTP_HOST", raising=False)
+    monkeypatch.delenv("SMTP_USERNAME", raising=False)
+    monkeypatch.delenv("SMTP_PASSWORD", raising=False)
+    monkeypatch.delenv("SMTP_FROM_EMAIL", raising=False)
+    monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
+    monkeypatch.delenv("TELEGRAM_CHAT_ID", raising=False)
+    try:
+        build_etf_sentiment_delivery_from_env()
+    except ValueError as exc:
+        assert str(exc) == "Missing SMTP delivery settings and Telegram delivery fallback is unavailable."
+    else:
+        raise AssertionError("Expected delivery configuration failure")
+
+    try:
+        required_env("SMTP_HOST")
+    except ValueError as exc:
+        assert str(exc) == "Missing SMTP_HOST. Add it to .env first."
+    else:
+        raise AssertionError("Expected missing env validation failure")
+
+
+def test_deliver_etf_sentiment_job_builds_and_sends(monkeypatch) -> None:
+    sent: list[tuple[str, str, str]] = []
+
+    class FakeDelivery:
+        def send_email(self, recipient: str, subject: str, text_body: str) -> None:
+            sent.append((recipient, subject, text_body))
+
+    monkeypatch.setattr("src.adapters.sentiment.runtime.run_etf_sentiment_job", lambda: "ETF Sentiment Brief")
+    monkeypatch.setattr("src.adapters.sentiment.runtime.build_etf_sentiment_delivery_from_env", lambda: FakeDelivery())
+    monkeypatch.setenv("ETF_SENTIMENT_EMAIL_RECIPIENT", "sentiment@example.com")
+
+    assert deliver_etf_sentiment_job() == "ETF Sentiment Brief"
+    assert sent == [("sentiment@example.com", f"ETF sentiment brief for {date.today().isoformat()}", "ETF Sentiment Brief")]
 
 
 def test_build_sentiment_signal_snapshot_collects_dedupes_and_records_errors(monkeypatch) -> None:

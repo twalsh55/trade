@@ -10,8 +10,13 @@ import pandas as pd
 
 from src.adapters.llm.openai_etf_sentiment_agent import OpenAIETFSentimentAgent, TemplateETFSentimentAgent
 from src.adapters.market_data.yfinance_provider import YFinanceMarketDataAdapter
+from src.adapters.notifications.composite_email_notifier import CompositeEmailNotifier
+from src.adapters.notifications.smtp_email_notifier import SMTPEmailNotifier
+from src.adapters.notifications.telegram_digest_notifier import TelegramDigestNotifier
+from src.adapters.notifications.telegram_notifier import TelegramNotifier
 from src.adapters.sentiment.sources.google_news_rss import GoogleNewsRSSSource, SentimentSignal
 from src.adapters.sentiment.sources.reddit_discussion import RedditDiscussionSource
+from src.application.ports import EmailDeliveryPort
 
 DEFAULT_ETF_PROMPT_FILE = Path(__file__).resolve().parents[3] / "prompts" / "ETF_SENTIMENT.md"
 DEFAULT_ETF_UNIVERSE: tuple[tuple[str, str], ...] = (
@@ -66,6 +71,17 @@ def run_etf_sentiment_job() -> str:
     return agent.generate_briefing(prompt=prompt, market_snapshot=market_snapshot)
 
 
+def deliver_etf_sentiment_job() -> str:
+    briefing = run_etf_sentiment_job()
+    build_etf_sentiment_delivery_from_env().send_email(
+        recipient=os.getenv("ETF_SENTIMENT_EMAIL_RECIPIENT", os.getenv("PROSPECT_EMAIL_RECIPIENT", "tom.mg.walsh@gmail.com")).strip()
+        or "tom.mg.walsh@gmail.com",
+        subject=f"ETF sentiment brief for {date.today().isoformat()}",
+        text_body=briefing,
+    )
+    return briefing
+
+
 def load_etf_sentiment_prompt() -> str:
     prompt_path = Path(os.getenv("ETF_SENTIMENT_PROMPT_FILE", "").strip() or DEFAULT_ETF_PROMPT_FILE)
     try:
@@ -86,6 +102,39 @@ def build_etf_sentiment_agent_from_env() -> OpenAIETFSentimentAgent | TemplateET
         model=os.getenv("ETF_SENTIMENT_OPENAI_MODEL", "gpt-5-nano").strip() or "gpt-5-nano",
         max_output_tokens=parse_positive_int("ETF_SENTIMENT_OPENAI_MAX_OUTPUT_TOKENS", default=900),
     )
+
+
+def build_email_notifier_from_env() -> SMTPEmailNotifier:
+    return SMTPEmailNotifier(
+        host=required_env("SMTP_HOST"),
+        port=parse_positive_int("SMTP_PORT", default=587),
+        username=required_env("SMTP_USERNAME"),
+        password=required_env("SMTP_PASSWORD"),
+        from_email=required_env("SMTP_FROM_EMAIL"),
+        use_tls=os.getenv("SMTP_USE_TLS", "true").strip().lower() != "false",
+    )
+
+
+def build_telegram_digest_notifier_from_env() -> TelegramDigestNotifier:
+    return TelegramDigestNotifier(
+        TelegramNotifier(
+            bot_token=required_env("TELEGRAM_BOT_TOKEN"),
+            chat_id=required_env("TELEGRAM_CHAT_ID"),
+        )
+    )
+
+
+def build_etf_sentiment_delivery_from_env() -> EmailDeliveryPort:
+    notifiers: list[EmailDeliveryPort] = []
+    if has_configured_smtp_delivery():
+        notifiers.append(build_email_notifier_from_env())
+    if has_configured_telegram_delivery():
+        notifiers.append(build_telegram_digest_notifier_from_env())
+    if not notifiers:
+        raise ValueError("Missing SMTP delivery settings and Telegram delivery fallback is unavailable.")
+    if len(notifiers) == 1:
+        return notifiers[0]
+    return CompositeEmailNotifier(tuple(notifiers))
 
 
 def build_etf_market_snapshot(
@@ -182,6 +231,7 @@ def collect_etf_sentiment_config_errors() -> list[str]:
         "ETF_SENTIMENT_OPENAI_MAX_OUTPUT_TOKENS",
         "ETF_SENTIMENT_SIGNAL_LIMIT_PER_QUERY",
         "ETF_SENTIMENT_MAX_SIGNALS",
+        "SMTP_PORT",
     ):
         raw_value = os.getenv(name, "").strip()
         if not raw_value:
@@ -192,6 +242,13 @@ def collect_etf_sentiment_config_errors() -> list[str]:
         except ValueError:
             errors.append(f"{name} must be an integer")
     return errors
+
+
+def required_env(name: str) -> str:
+    value = os.getenv(name, "").strip()
+    if not value:
+        raise ValueError(f"Missing {name}. Add it to .env first.")
+    return value
 
 
 def parse_positive_int(name: str, default: int) -> int:
@@ -205,6 +262,20 @@ def parse_positive_int(name: str, default: int) -> int:
     if value <= 0:
         raise ValueError(f"{name} must be greater than zero.")
     return value
+
+
+def has_configured_smtp_delivery() -> bool:
+    return all(
+        os.getenv(name, "").strip()
+        for name in ("SMTP_HOST", "SMTP_USERNAME", "SMTP_PASSWORD", "SMTP_FROM_EMAIL")
+    )
+
+
+def has_configured_telegram_delivery() -> bool:
+    return all(
+        os.getenv(name, "").strip()
+        for name in ("TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID")
+    )
 
 
 def build_sentiment_signal_snapshot(
