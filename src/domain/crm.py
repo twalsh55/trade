@@ -5,6 +5,15 @@ from datetime import datetime
 
 
 @dataclass(frozen=True)
+class LeadTimelineEntry:
+    id: str
+    occurred_at: datetime
+    kind: str
+    channel: str
+    summary: str
+
+
+@dataclass(frozen=True)
 class LeadFollowUp:
     id: str
     lead_name: str
@@ -16,6 +25,7 @@ class LeadFollowUp:
     next_follow_up_at: datetime
     next_step: str
     notes: str
+    timeline: tuple[LeadTimelineEntry, ...]
 
 
 @dataclass(frozen=True)

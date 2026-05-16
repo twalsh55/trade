@@ -8,7 +8,7 @@ import pandas as pd
 from src.application.account import AlertHistoryEntry, UserDashboardSettings
 from src.application.billing import BillingOverview
 from src.domain.auth import User
-from src.domain.crm import LeadFollowUp, LeadFollowUpOverview
+from src.domain.crm import LeadFollowUp, LeadFollowUpOverview, LeadTimelineEntry
 from src.domain.models import DashboardConfig, DashboardResult
 from src.domain.services import compute_buyer_participation_series, compute_new_high_ratio_series
 
@@ -124,6 +124,16 @@ class LeadFollowUpDTO:
     next_follow_up_at: str
     next_step: str
     notes: str
+    timeline: list["LeadTimelineEntryDTO"]
+
+
+@dataclass(frozen=True)
+class LeadTimelineEntryDTO:
+    id: str
+    occurred_at: str
+    kind: str
+    channel: str
+    summary: str
 
 
 @dataclass(frozen=True)
@@ -280,6 +290,17 @@ def build_lead_follow_up_dto(item: LeadFollowUp) -> LeadFollowUpDTO:
         next_follow_up_at=item.next_follow_up_at.isoformat(),
         next_step=item.next_step,
         notes=item.notes,
+        timeline=[build_lead_timeline_entry_dto(entry) for entry in item.timeline],
+    )
+
+
+def build_lead_timeline_entry_dto(entry: LeadTimelineEntry) -> LeadTimelineEntryDTO:
+    return LeadTimelineEntryDTO(
+        id=entry.id,
+        occurred_at=entry.occurred_at.isoformat(),
+        kind=entry.kind,
+        channel=entry.channel,
+        summary=entry.summary,
     )
 
 

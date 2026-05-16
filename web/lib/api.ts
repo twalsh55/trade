@@ -139,7 +139,7 @@ export async function getCrmFollowUpOverview(options: ApiRequestOptions = {}): P
 
 export async function updateCrmFollowUp(
   followUpId: string,
-  payload: { action: "complete" | "snooze"; snooze_hours?: number },
+  payload: { action: "complete" | "snooze" | "note"; snooze_hours?: number; note_body?: string },
   options: ApiRequestOptions = {},
 ): Promise<CRMFollowUpOverview> {
   return apiRequest<CRMFollowUpOverview>(

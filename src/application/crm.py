@@ -74,3 +74,25 @@ class SnoozeLeadFollowUpUseCase:
             action="snooze",
             effective_at=effective_at,
         )
+
+
+class AddLeadFollowUpNoteUseCase:
+    def __init__(
+        self,
+        repository: LeadFollowUpRepositoryPort,
+        now: Callable[[], datetime],
+    ) -> None:
+        self.repository = repository
+        self.now = now
+
+    def execute(self, user: User, follow_up_id: str, note_body: str) -> LeadFollowUpActionResult:
+        normalized_note = note_body.strip()
+        if not normalized_note:
+            raise ValueError("Note body is required.")
+        effective_at = self.now()
+        self.repository.append_note_to_lead_follow_up(user, follow_up_id, normalized_note, effective_at)
+        return LeadFollowUpActionResult(
+            follow_up_id=follow_up_id,
+            action="note",
+            effective_at=effective_at,
+        )

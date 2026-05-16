@@ -47,7 +47,7 @@ from src.application.dto import (
     dto_to_dict,
 )
 from src.domain.auth import User
-from src.domain.crm import LeadFollowUp
+from src.domain.crm import LeadFollowUp, LeadTimelineEntry
 from src.domain.models import DashboardConfig, DashboardResult
 
 
@@ -286,6 +286,15 @@ def test_crm_follow_up_overview_dto_and_use_case_sort_and_count_values() -> None
             next_follow_up_at=now - pd.Timedelta(hours=1),
             next_step="Follow up",
             notes="Warm lead",
+            timeline=(
+                LeadTimelineEntry(
+                    id="a-1",
+                    occurred_at=now,
+                    kind="call",
+                    channel="phone",
+                    summary="Discovery call complete.",
+                ),
+            ),
         ),
         LeadFollowUp(
             id="b",
@@ -298,6 +307,7 @@ def test_crm_follow_up_overview_dto_and_use_case_sort_and_count_values() -> None
             next_follow_up_at=now + pd.Timedelta(days=1),
             next_step="Check proposal",
             notes="Waiting on stakeholder",
+            timeline=(),
         ),
     ]
 
@@ -947,9 +957,10 @@ def test_crm_followups_endpoint_requires_auth_and_returns_queue() -> None:
     assert payload["high_priority"] == 2
     assert payload["items"][0]["lead_name"] == "Amber Flores"
     assert payload["items"][0]["stage"] == "Discovery"
+    assert payload["items"][0]["timeline"]
 
 
-def test_crm_followups_endpoint_supports_complete_and_snooze() -> None:
+def test_crm_followups_endpoint_supports_complete_snooze_and_notes() -> None:
     repository = InMemoryLeadFollowUpRepository(now=lambda: datetime(2024, 5, 6, 12, 30, tzinfo=UTC))
     client = make_client(user=make_user(), lead_follow_up_repository=repository)
 
@@ -985,6 +996,32 @@ def test_crm_followups_endpoint_supports_complete_and_snooze() -> None:
         json={"action": "snooze"},
     )
     assert invalid.status_code == 422
+
+    note = client.patch(
+        "/api/crm/followups/lead-riverbridge",
+        headers={"Authorization": "Bearer session-token"},
+        json={"action": "note", "note_body": "Needs tighter rollout framing before sign-off."},
+    )
+    assert note.status_code == 200
+    riverbridge = next(item for item in note.json()["items"] if item["id"] == "lead-riverbridge")
+    assert riverbridge["notes"] == "Needs tighter rollout framing before sign-off."
+    assert riverbridge["timeline"][0]["kind"] == "internal_note"
+    assert riverbridge["timeline"][0]["summary"] == "Needs tighter rollout framing before sign-off."
+
+    invalid_note = client.patch(
+        "/api/crm/followups/lead-riverbridge",
+        headers={"Authorization": "Bearer session-token"},
+        json={"action": "note"},
+    )
+    assert invalid_note.status_code == 422
+
+    blank_note = client.patch(
+        "/api/crm/followups/lead-riverbridge",
+        headers={"Authorization": "Bearer session-token"},
+        json={"action": "note", "note_body": "   "},
+    )
+    assert blank_note.status_code == 422
+    assert blank_note.json()["detail"] == "Note body is required."
 
     bad_action = client.patch(
         "/api/crm/followups/lead-riverbridge",

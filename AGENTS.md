@@ -180,6 +180,8 @@ Use this section to give the next session a fast, practical starting point. Refr
   - an authenticated `/crm` workspace
   - a lead follow-up queue
   - complete and snooze/reschedule actions
+  - contact timeline history per lead
+  - lightweight internal note capture
 - The current CRM wedge is:
   - follow-up-first
   - spreadsheet-friendly
@@ -241,9 +243,9 @@ Use this section to give the next session a fast, practical starting point. Refr
 ### Next Recommended Product Moves
 
 - Highest-conviction next CRM features:
-  - contact timeline
-  - notes / relationship memory
   - CSV or spreadsheet import / cleanup
+  - richer handoff history and stage memory
+  - consultant / agency specific templates or checklists
 - Broader CRM expansion should stay constrained until the follow-up-first wedge shows stronger pull.
 
 ## Autonomy Rule

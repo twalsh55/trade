@@ -68,6 +68,9 @@ class LeadFollowUpRepositoryPort(Protocol):
     def snooze_lead_follow_up(self, user: User, follow_up_id: str, next_follow_up_at: datetime) -> None:
         """Move the next follow-up time forward."""
 
+    def append_note_to_lead_follow_up(self, user: User, follow_up_id: str, note_body: str, noted_at: datetime) -> None:
+        """Append an internal note to a lead follow-up timeline."""
+
 
 class SocialLeadSourcePort(Protocol):
     def search_recent_posts(self, search_term: str, limit: int) -> list[SocialPost]:

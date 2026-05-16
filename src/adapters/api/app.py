@@ -49,7 +49,7 @@ from src.application.billing import (
     GetBillingOverviewUseCase,
 )
 from src.application.crm import GetLeadFollowUpOverviewUseCase
-from src.application.crm import CompleteLeadFollowUpUseCase, SnoozeLeadFollowUpUseCase
+from src.application.crm import AddLeadFollowUpNoteUseCase, CompleteLeadFollowUpUseCase, SnoozeLeadFollowUpUseCase
 from src.application.dashboard import (
     DEFAULT_BENCHMARK,
     DEFAULT_LONG_YIELD_SYMBOL,
@@ -106,6 +106,7 @@ class BillingSessionPayload(BaseModel):
 class LeadFollowUpActionPayload(BaseModel):
     action: str
     snooze_hours: int | None = Field(default=None, ge=1, le=24 * 14)
+    note_body: str | None = Field(default=None, min_length=1, max_length=1000)
 
 
 def create_app(dependencies: ApiDependencies | None = None) -> FastAPI:
@@ -259,8 +260,18 @@ def create_app(dependencies: ApiDependencies | None = None) -> FastAPI:
                     follow_up_id,
                     payload.snooze_hours,
                 )
+            elif payload.action == "note":
+                if payload.note_body is None:
+                    raise HTTPException(status_code=422, detail="note_body is required for note.")
+                AddLeadFollowUpNoteUseCase(repository=repository, now=deps.now).execute(
+                    user,
+                    follow_up_id,
+                    payload.note_body,
+                )
             else:
                 raise HTTPException(status_code=422, detail="Unsupported CRM follow-up action.")
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
         except KeyError as exc:
             raise HTTPException(status_code=404, detail="CRM follow-up not found.") from exc
 

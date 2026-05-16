@@ -79,6 +79,15 @@ export type CRMLeadFollowUp = {
   next_follow_up_at: string;
   next_step: string;
   notes: string;
+  timeline: CRMLeadTimelineEntry[];
+};
+
+export type CRMLeadTimelineEntry = {
+  id: string;
+  occurred_at: string;
+  kind: string;
+  channel: string;
+  summary: string;
 };
 
 export type CRMFollowUpOverview = {

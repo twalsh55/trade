@@ -5,7 +5,7 @@ from uuid import UUID
 
 import pandas as pd
 
-from src.application.crm import CompleteLeadFollowUpUseCase, SnoozeLeadFollowUpUseCase
+from src.application.crm import AddLeadFollowUpNoteUseCase, CompleteLeadFollowUpUseCase, SnoozeLeadFollowUpUseCase
 from src.application.use_cases import BuildCrashDashboardUseCase
 from src.domain.auth import User
 from src.domain.models import DashboardConfig
@@ -25,6 +25,7 @@ class StubLeadFollowUpRepository:
     def __init__(self) -> None:
         self.completed: list[tuple[str, datetime]] = []
         self.snoozed: list[tuple[str, datetime]] = []
+        self.notes: list[tuple[str, str, datetime]] = []
 
     def list_lead_follow_ups(self, user: User):  # type: ignore[no-untyped-def]
         return []
@@ -34,6 +35,9 @@ class StubLeadFollowUpRepository:
 
     def snooze_lead_follow_up(self, user: User, follow_up_id: str, next_follow_up_at: datetime) -> None:
         self.snoozed.append((follow_up_id, next_follow_up_at))
+
+    def append_note_to_lead_follow_up(self, user: User, follow_up_id: str, note_body: str, noted_at: datetime) -> None:
+        self.notes.append((follow_up_id, note_body, noted_at))
 
 
 def make_user() -> User:
@@ -128,3 +132,20 @@ def test_crm_follow_up_action_use_cases_delegate_with_expected_times() -> None:
     assert snooze.follow_up_id == "lead-2"
     assert snooze.action == "snooze"
     assert repository.snoozed == [("lead-2", datetime(2024, 5, 7, 12, 30, tzinfo=UTC))]
+
+    note = AddLeadFollowUpNoteUseCase(repository=repository, now=lambda: now).execute(user, "lead-3", "Need tighter rollout framing.")
+    assert note.follow_up_id == "lead-3"
+    assert note.action == "note"
+    assert repository.notes == [("lead-3", "Need tighter rollout framing.", now)]
+
+
+def test_add_lead_follow_up_note_requires_non_empty_body() -> None:
+    repository = StubLeadFollowUpRepository()
+    now = datetime(2024, 5, 6, 12, 30, tzinfo=UTC)
+
+    try:
+        AddLeadFollowUpNoteUseCase(repository=repository, now=lambda: now).execute(make_user(), "lead-1", "   ")
+    except ValueError as exc:
+        assert str(exc) == "Note body is required."
+    else:
+        raise AssertionError("Expected ValueError for empty note")

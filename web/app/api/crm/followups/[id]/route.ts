@@ -19,7 +19,7 @@ export async function PATCH(request: NextRequest, context: Context) {
   }
 
   const payload = (await request.json().catch(() => null)) as
-    | { action?: "complete" | "snooze"; snooze_hours?: number }
+    | { action?: "complete" | "snooze" | "note"; snooze_hours?: number; note_body?: string }
     | null;
 
   if (!payload?.action) {
@@ -29,6 +29,8 @@ export async function PATCH(request: NextRequest, context: Context) {
   const normalizedPayload =
     payload.action === "complete"
       ? { action: "complete" as const }
+      : payload.action === "note"
+        ? { action: "note" as const, note_body: payload.note_body }
       : { action: "snooze" as const, snooze_hours: payload.snooze_hours };
 
   try {
