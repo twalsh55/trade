@@ -178,6 +178,7 @@ def test_build_jobs_worker_and_run_worker_from_env(monkeypatch, tmp_path) -> Non
     monkeypatch.setenv("AUTOMATION_POLL_SECONDS", "9")
     monkeypatch.setenv("AUTOMATION_JOB_TIMEOUT_SECONDS", "45")
     monkeypatch.setenv("AUTOMATION_ENABLE_FOUNDER_CODE_SYNC", "false")
+    monkeypatch.setenv("AUTOMATION_ENABLE_FOUNDER_CODE_EXECUTOR", "false")
     monkeypatch.setenv("AUTOMATION_ENABLE_SCHEDULED_OPERATOR_BRIEFING", "false")
     monkeypatch.setenv("AUTOMATION_ENABLE_SENTIMENT_JOB", "false")
     monkeypatch.setenv("AUTOMATION_STATE_FILE", str(tmp_path / "state.json"))

@@ -153,7 +153,7 @@ def launch_next_pending_founder_code_request() -> str:
     if not pending_requests:
         return "no_new_requests"
 
-    next_request = pending_requests[0]
+    next_request = _pick_next_pending_request(pending_requests)
     request_id = str(next_request["id"])
     codex_bin = shutil.which("codex")
     if not codex_bin:
@@ -177,8 +177,6 @@ def launch_next_pending_founder_code_request() -> str:
         "exec",
         "-C",
         str(workspace_root),
-        "-a",
-        "never",
         "-s",
         "danger-full-access",
         "-o",
@@ -289,6 +287,14 @@ def _is_executor_running(pid_path: Path) -> bool:
         os.kill(pid, 0)
     except OSError:
         return False
+    proc_stat_path = Path(f"/proc/{pid}/stat")
+    if proc_stat_path.exists():
+        try:
+            stat_parts = proc_stat_path.read_text(encoding="utf-8").split()
+        except OSError:
+            return False
+        if len(stat_parts) >= 3 and stat_parts[2] == "Z":
+            return False
     return True
 
 
@@ -306,3 +312,20 @@ def _build_codex_exec_prompt(request: dict[str, object]) -> str:
         "Run relevant tests, commit and push coherent change sets, and deploy when appropriate. "
         "If the request conflicts with the product goal or cannot be completed safely, explain that clearly instead of forcing a change."
     )
+
+
+def _pick_next_pending_request(requests: list[dict[str, object]]) -> dict[str, object]:
+    def rank(item: dict[str, object]) -> tuple[int, datetime]:
+        source_chat_id = str(item.get("source_chat_id") or "").strip()
+        founder_priority = 1 if source_chat_id and source_chat_id != "agent:prospect" else 0
+        created_at_raw = item.get("created_at")
+        if isinstance(created_at_raw, str):
+            try:
+                created_at = datetime.fromisoformat(created_at_raw)
+            except ValueError:
+                created_at = datetime.min
+        else:
+            created_at = datetime.min
+        return (founder_priority, created_at)
+
+    return sorted(requests, key=rank, reverse=True)[0]

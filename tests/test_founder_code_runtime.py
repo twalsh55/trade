@@ -391,9 +391,53 @@ def test_launch_next_pending_founder_code_request_launches_one_job(tmp_path, mon
 
     assert result == "launched=44 pid=9876"
     assert captured["command"][0] == "/usr/bin/codex"
+    assert "-a" not in captured["command"]
     assert (tmp_path / "executor.pid").read_text(encoding="utf-8") == "9876"
     assert json.loads((tmp_path / "active.json").read_text(encoding="utf-8"))["id"] == "44"
     assert (tmp_path / "exec-cursor.txt").read_text(encoding="utf-8") == "44"
+
+
+def test_launch_next_pending_founder_code_request_prefers_newest_founder_request(tmp_path, monkeypatch) -> None:
+    pending_path = tmp_path / "pending.jsonl"
+    pending_path.write_text(
+        "\n".join(
+            [
+                json.dumps({"id": "1", "command_text": "/agent import", "created_at": "2026-05-16T19:41:07+00:00", "source_chat_id": "agent:prospect"}),
+                json.dumps({"id": "2", "command_text": "/code older founder", "created_at": "2026-05-16T19:42:00+00:00", "source_chat_id": "8213497118"}),
+                json.dumps({"id": "3", "command_text": "/code newest founder", "created_at": "2026-05-16T19:43:00+00:00", "source_chat_id": "8213497118"}),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("AUTONOMOUS_CODE_PENDING_FILE", str(pending_path))
+    monkeypatch.setenv("AUTONOMOUS_CODE_EXECUTION_CURSOR_FILE", str(tmp_path / "exec-cursor.txt"))
+    monkeypatch.setenv("AUTONOMOUS_CODE_EXECUTOR_PID_FILE", str(tmp_path / "executor.pid"))
+    monkeypatch.setenv("AUTONOMOUS_CODE_ACTIVE_FILE", str(tmp_path / "active.json"))
+    monkeypatch.setenv("AUTONOMOUS_CODE_RUN_DIR", str(tmp_path / "runs"))
+    monkeypatch.setenv("AUTONOMOUS_CODE_WORKSPACE_ROOT", str(tmp_path))
+    monkeypatch.setattr(runtime_module.shutil, "which", lambda name: "/usr/bin/codex")
+    monkeypatch.setattr(runtime_module, "_is_executor_running", lambda path: False)
+
+    class FakeProcess:
+        pid = 9876
+
+    monkeypatch.setattr(runtime_module.subprocess, "Popen", lambda *args, **kwargs: FakeProcess())
+
+    result = launch_next_pending_founder_code_request()
+
+    assert result == "launched=3 pid=9876"
+    assert json.loads((tmp_path / "active.json").read_text(encoding="utf-8"))["command_text"] == "/code newest founder"
+
+
+def test_pick_next_pending_request_handles_invalid_created_at() -> None:
+    request = runtime_module._pick_next_pending_request(
+        [
+            {"id": "1", "source_chat_id": "agent:prospect", "created_at": "not-a-date"},
+            {"id": "2", "source_chat_id": "", "created_at": None},
+        ]
+    )
+    assert request["id"] == "1"
 
 
 def test_launch_next_pending_founder_code_request_handles_idle_and_running_states(tmp_path, monkeypatch) -> None:
@@ -437,7 +481,32 @@ def test_is_executor_running_handles_missing_invalid_and_dead_pid(tmp_path, monk
     assert runtime_module._is_executor_running(pid_path) is False
 
     monkeypatch.setattr(runtime_module.os, "kill", lambda pid, signal: None)
+    proc_dir = tmp_path / "proc"
+    proc_dir.mkdir()
+    monkeypatch.setattr(runtime_module, "Path", lambda value: proc_dir / "12345" / "stat" if str(value) == "/proc/12345/stat" else Path(value))
+    zombie_stat = proc_dir / "12345" / "stat"
+    zombie_stat.parent.mkdir()
+    zombie_stat.write_text("12345 (codex) Z 1", encoding="utf-8")
+    assert runtime_module._is_executor_running(pid_path) is False
+
+    zombie_stat.write_text("12345 (codex) S 1", encoding="utf-8")
     assert runtime_module._is_executor_running(pid_path) is True
+
+
+def test_is_executor_running_handles_unreadable_proc_stat(tmp_path, monkeypatch) -> None:
+    pid_path = tmp_path / "executor.pid"
+    pid_path.write_text("12345", encoding="utf-8")
+    monkeypatch.setattr(runtime_module.os, "kill", lambda pid, signal: None)
+
+    class FakeProcPath:
+        def exists(self) -> bool:
+            return True
+
+        def read_text(self, encoding="utf-8") -> str:
+            raise OSError("unreadable")
+
+    monkeypatch.setattr(runtime_module, "Path", lambda value: FakeProcPath() if str(value) == "/proc/12345/stat" else Path(value))
+    assert runtime_module._is_executor_running(pid_path) is False
 
 
 def test_sync_founder_code_requests_from_api_raises_for_http_or_bad_payload(tmp_path, monkeypatch) -> None:
