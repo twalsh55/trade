@@ -43,6 +43,8 @@ export type AccountSettings = {
   telegram_enabled: boolean;
   crm_ai_prompt: string;
   crm_preferred_import_formats: string[];
+  crm_image_intake_channels: string[];
+  crm_image_intake_notes: string;
 };
 
 export type AlertHistoryEntry = {

@@ -20,6 +20,7 @@ class InMemoryPersonalizationRepository:
             settings,
             universe=list(settings.universe),
             crm_preferred_import_formats=list(settings.crm_preferred_import_formats),
+            crm_image_intake_channels=list(settings.crm_image_intake_channels),
         )
 
     def save_dashboard_settings(self, settings: UserDashboardSettings) -> UserDashboardSettings:
@@ -27,12 +28,14 @@ class InMemoryPersonalizationRepository:
             settings,
             universe=list(settings.universe),
             crm_preferred_import_formats=list(settings.crm_preferred_import_formats),
+            crm_image_intake_channels=list(settings.crm_image_intake_channels),
         )
         self._settings[stored.user_id] = stored
         return replace(
             stored,
             universe=list(stored.universe),
             crm_preferred_import_formats=list(stored.crm_preferred_import_formats),
+            crm_image_intake_channels=list(stored.crm_image_intake_channels),
         )
 
     def list_alert_history(self, user_id: UUID, limit: int) -> list[AlertHistoryEntry]:

@@ -34,6 +34,9 @@ export function SettingsEditor({
       crm_ai_prompt:
         "Focus on extracting follow-up-critical CRM fields from messy spreadsheets, files, and images. Prioritize lead name, company, owner, stage, next follow-up date, notes, and next step. Preserve evidence when uncertain.",
       crm_preferred_import_formats: ["csv", "google_sheets", "spreadsheet_screenshot"],
+      crm_image_intake_channels: ["upload", "telegram"],
+      crm_image_intake_notes:
+        "Default to uploads inside Brivoly, then use Telegram for note photos when mobile capture is easier.",
     },
   );
 
@@ -55,6 +58,8 @@ export function SettingsEditor({
       long_yield_symbol: form.long_yield_symbol.trim().toUpperCase(),
       crm_ai_prompt: form.crm_ai_prompt.trim(),
       crm_preferred_import_formats: form.crm_preferred_import_formats.map((item) => item.trim()).filter(Boolean),
+      crm_image_intake_channels: form.crm_image_intake_channels.map((item) => item.trim()).filter(Boolean),
+      crm_image_intake_notes: form.crm_image_intake_notes.trim(),
     };
     const validationErrors = validateForm(payload);
     setErrors(validationErrors);
@@ -179,6 +184,19 @@ export function SettingsEditor({
           />
           {errors.crm_preferred_import_formats ? <FieldError message={errors.crm_preferred_import_formats} /> : null}
         </Field>
+        <Field label="Image Intake Channels">
+          <input
+            className={inputClassName(Boolean(errors.crm_image_intake_channels))}
+            value={form.crm_image_intake_channels.join(", ")}
+            onChange={(event) =>
+              updateField(
+                "crm_image_intake_channels",
+                event.target.value.split(",").map((item) => item.trim()),
+              )
+            }
+          />
+          {errors.crm_image_intake_channels ? <FieldError message={errors.crm_image_intake_channels} /> : null}
+        </Field>
       </div>
 
       <Field label="AI Intake Prompt">
@@ -189,6 +207,15 @@ export function SettingsEditor({
           rows={5}
         />
         {errors.crm_ai_prompt ? <FieldError message={errors.crm_ai_prompt} /> : null}
+      </Field>
+      <Field label="Image Intake Routing Notes">
+        <textarea
+          className={inputClassName(Boolean(errors.crm_image_intake_notes))}
+          value={form.crm_image_intake_notes}
+          onChange={(event) => updateField("crm_image_intake_notes", event.target.value)}
+          rows={4}
+        />
+        {errors.crm_image_intake_notes ? <FieldError message={errors.crm_image_intake_notes} /> : null}
       </Field>
 
       <div className="flex flex-wrap items-center gap-3">
@@ -252,6 +279,12 @@ function validateForm(form: AccountSettings) {
   }
   if (form.crm_preferred_import_formats.length > 12) {
     nextErrors.crm_preferred_import_formats = "Keep preferred formats to 12 or fewer entries.";
+  }
+  if (form.crm_image_intake_channels.length > 12) {
+    nextErrors.crm_image_intake_channels = "Keep image intake channels to 12 or fewer entries.";
+  }
+  if (form.crm_image_intake_notes.length > 1000) {
+    nextErrors.crm_image_intake_notes = "Routing notes must be 1000 characters or fewer.";
   }
   return nextErrors;
 }

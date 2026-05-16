@@ -259,6 +259,8 @@ def test_account_settings_and_alert_history_dtos_serialize_values() -> None:
         telegram_enabled=True,
         crm_ai_prompt="Extract CRM fields from spreadsheets and screenshots.",
         crm_preferred_import_formats=["csv", "spreadsheet_screenshot"],
+        crm_image_intake_channels=["upload", "whatsapp", "telegram"],
+        crm_image_intake_notes="WhatsApp is the fallback when the founder is away from a laptop.",
     )
     alert = AlertHistoryEntry(
         occurred_at=datetime(2024, 5, 6, 12, 30, tzinfo=UTC),
@@ -274,6 +276,7 @@ def test_account_settings_and_alert_history_dtos_serialize_values() -> None:
     assert settings_payload["universe"] == ["SPY", "QQQ"]
     assert settings_payload["telegram_enabled"] is True
     assert settings_payload["crm_preferred_import_formats"] == ["csv", "spreadsheet_screenshot"]
+    assert settings_payload["crm_image_intake_channels"] == ["upload", "whatsapp", "telegram"]
     assert alert_payload["title"] == "Updated"
     assert alert_payload["occurred_at"] == "2024-05-06T12:30:00+00:00"
 
@@ -1148,6 +1151,8 @@ def test_account_use_cases_and_in_memory_repository_round_trip_settings_and_aler
         telegram_enabled=False,
         crm_ai_prompt="default prompt",
         crm_preferred_import_formats=["csv"],
+        crm_image_intake_channels=["upload"],
+        crm_image_intake_notes="Default to uploads.",
     )
     get_use_case = GetUserDashboardSettingsUseCase(repository=repository, default_factory=lambda user_id: defaults)
     update_use_case = UpdateUserDashboardSettingsUseCase(repository=repository)
@@ -1169,6 +1174,8 @@ def test_account_use_cases_and_in_memory_repository_round_trip_settings_and_aler
             telegram_enabled=True,
             crm_ai_prompt="Keep owner and next follow-up visible.",
             crm_preferred_import_formats=["pdf_export", "csv"],
+            crm_image_intake_channels=["whatsapp", "email"],
+            crm_image_intake_notes="Use WhatsApp for handwritten notes and email for scanned PDFs.",
         ),
     )
 
@@ -1198,6 +1205,7 @@ def test_dashboard_settings_helpers_normalize_defaults_and_build_config() -> Non
     assert defaults.universe == ["SPY", "QQQ", "IWM", "EFA", "EEM"]
     assert defaults.telegram_enabled is True
     assert "follow-up-critical CRM fields" in defaults.crm_ai_prompt
+    assert defaults.crm_image_intake_channels == ["upload", "telegram"]
 
     normalized = normalize_dashboard_settings(
         UserDashboardSettings(
@@ -1212,6 +1220,8 @@ def test_dashboard_settings_helpers_normalize_defaults_and_build_config() -> Non
             telegram_enabled=False,
             crm_ai_prompt="  Keep OCR evidence when uncertain.  ",
             crm_preferred_import_formats=[" CSV ", "csv", "Spreadsheet Screenshot"],
+            crm_image_intake_channels=[" Upload ", "whatsapp", "WhatsApp"],
+            crm_image_intake_notes="  Founder sends scans by WhatsApp.  ",
         )
     )
     assert normalized.universe == ["SPY", "QQQ"]
@@ -1219,6 +1229,8 @@ def test_dashboard_settings_helpers_normalize_defaults_and_build_config() -> Non
     assert normalized.vix_symbol == "^VIX"
     assert normalized.crm_ai_prompt == "Keep OCR evidence when uncertain."
     assert normalized.crm_preferred_import_formats == ["csv", "spreadsheet_screenshot"]
+    assert normalized.crm_image_intake_channels == ["upload", "whatsapp"]
+    assert normalized.crm_image_intake_notes == "Founder sends scans by WhatsApp."
 
     config = build_dashboard_config(normalized, end_date=date(2024, 5, 6))
     assert config.start_date == date(2022, 5, 7)
@@ -1395,6 +1407,8 @@ def test_account_settings_endpoints_and_alert_history_round_trip() -> None:
             "telegram_enabled": True,
             "crm_ai_prompt": "Prefer extracting next step and owner from screenshots.",
             "crm_preferred_import_formats": ["spreadsheet_screenshot", "pdf_export"],
+            "crm_image_intake_channels": ["whatsapp", "telegram"],
+            "crm_image_intake_notes": "WhatsApp is used by the founder. Telegram stays available for remote intake.",
         },
     )
     assert update_response.status_code == 200
@@ -1402,6 +1416,7 @@ def test_account_settings_endpoints_and_alert_history_round_trip() -> None:
     assert update_response.json()["universe"] == ["SPY", "QQQ"]
     assert update_response.json()["telegram_enabled"] is True
     assert update_response.json()["crm_preferred_import_formats"] == ["spreadsheet_screenshot", "pdf_export"]
+    assert update_response.json()["crm_image_intake_channels"] == ["whatsapp", "telegram"]
 
     alerts_response = client.get("/api/alerts/history", headers={"Authorization": "Bearer session-token"})
     assert alerts_response.status_code == 200
@@ -1738,6 +1753,8 @@ def test_account_settings_validation_and_alert_defaults_work() -> None:
             "telegram_enabled": False,
             "crm_ai_prompt": "",
             "crm_preferred_import_formats": [],
+            "crm_image_intake_channels": [],
+            "crm_image_intake_notes": "",
         },
     )
     assert invalid_update.status_code == 422

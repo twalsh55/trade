@@ -426,6 +426,8 @@ export function CRMFollowUpWorkspace({
           <RemoteImageCapturePanel
             intakeChannel={initialIntakeChannel}
             advancedAiUnlocked={advancedAiUnlocked}
+            preferredChannels={initialSettings?.crm_image_intake_channels ?? []}
+            routingNotes={initialSettings?.crm_image_intake_notes ?? ""}
           />
           <section className="rounded-[1.75rem] border bg-slate-950 p-6 text-slate-50 shadow-[0_24px_90px_-55px_rgba(15,23,42,0.9)]">
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300">Why This Slice</p>
@@ -445,9 +447,13 @@ export function CRMFollowUpWorkspace({
 function RemoteImageCapturePanel({
   intakeChannel,
   advancedAiUnlocked,
+  preferredChannels,
+  routingNotes,
 }: {
   intakeChannel: CRMRemoteIntakeChannel | null;
   advancedAiUnlocked: boolean;
+  preferredChannels: string[];
+  routingNotes: string;
 }) {
   return (
     <section className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm">
@@ -472,6 +478,12 @@ function RemoteImageCapturePanel({
         <p className="mt-2 text-sm leading-6 text-slate-600">
           {intakeChannel?.instructions ?? "Set the CRM intake secret and Telegram bot config to enable phone-first note capture."}
         </p>
+        {preferredChannels.length ? (
+          <p className="mt-3 text-sm text-slate-700">
+            Preferred channels for this account: <span className="font-medium">{preferredChannels.join(", ")}</span>
+          </p>
+        ) : null}
+        {routingNotes ? <p className="mt-2 text-sm leading-6 text-slate-600">{routingNotes}</p> : null}
         {intakeChannel?.intake_caption ? (
           <>
             <p className="mt-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Caption to send with the image</p>

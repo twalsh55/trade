@@ -194,6 +194,8 @@ Use this section to give the next session a fast, practical starting point. Refr
   - a paid-only AI Intake Profile foundation in CRM
   - per-user AI intake prompts stored with account settings
   - per-user preferred import-format memory stored with account settings
+  - per-user image-intake channel preferences stored with account settings
+  - per-user image-intake routing notes stored with account settings
   - paid AI note-image upload support inside the CRM import flow
   - remote Telegram note capture with per-user signed `/intake ...` captions
   - a clearer signed-in versus signed-out portal state

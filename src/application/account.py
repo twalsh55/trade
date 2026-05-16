@@ -22,6 +22,8 @@ class UserDashboardSettings:
     telegram_enabled: bool
     crm_ai_prompt: str
     crm_preferred_import_formats: list[str]
+    crm_image_intake_channels: list[str]
+    crm_image_intake_notes: str
 
 
 @dataclass(frozen=True)

@@ -99,6 +99,8 @@ class UserDashboardSettingsDTO:
     telegram_enabled: bool
     crm_ai_prompt: str
     crm_preferred_import_formats: list[str]
+    crm_image_intake_channels: list[str]
+    crm_image_intake_notes: str
 
 
 @dataclass(frozen=True)
@@ -305,6 +307,8 @@ def build_user_dashboard_settings_dto(settings: UserDashboardSettings) -> UserDa
         telegram_enabled=settings.telegram_enabled,
         crm_ai_prompt=settings.crm_ai_prompt,
         crm_preferred_import_formats=list(settings.crm_preferred_import_formats),
+        crm_image_intake_channels=list(settings.crm_image_intake_channels),
+        crm_image_intake_notes=settings.crm_image_intake_notes,
     )
 
 

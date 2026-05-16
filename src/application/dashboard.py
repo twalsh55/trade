@@ -28,6 +28,8 @@ def build_default_dashboard_settings(user_id: UUID, *, telegram_enabled: bool) -
         telegram_enabled=telegram_enabled,
         crm_ai_prompt="Focus on extracting follow-up-critical CRM fields from messy spreadsheets, files, and images. Prioritize lead name, company, owner, stage, next follow-up date, notes, and next step. Preserve evidence when uncertain.",
         crm_preferred_import_formats=["csv", "google_sheets", "spreadsheet_screenshot"],
+        crm_image_intake_channels=["upload", "telegram"],
+        crm_image_intake_notes="Default to uploads inside Brivoly, then use Telegram for note photos when mobile capture is easier.",
     )
 
 
@@ -42,6 +44,8 @@ def normalize_dashboard_settings(settings: UserDashboardSettings) -> UserDashboa
         long_yield_symbol=_normalize_symbol(settings.long_yield_symbol, DEFAULT_LONG_YIELD_SYMBOL),
         crm_ai_prompt=settings.crm_ai_prompt.strip(),
         crm_preferred_import_formats=_normalize_import_formats(settings.crm_preferred_import_formats),
+        crm_image_intake_channels=_normalize_import_formats(settings.crm_image_intake_channels),
+        crm_image_intake_notes=settings.crm_image_intake_notes.strip(),
     )
 
 

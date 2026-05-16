@@ -31,6 +31,8 @@ class PostgresPersonalizationRepository:
                         telegram_enabled BOOLEAN NOT NULL DEFAULT FALSE,
                         crm_ai_prompt TEXT NOT NULL DEFAULT '',
                         crm_preferred_import_formats TEXT[] NOT NULL DEFAULT '{}',
+                        crm_image_intake_channels TEXT[] NOT NULL DEFAULT '{}',
+                        crm_image_intake_notes TEXT NOT NULL DEFAULT '',
                         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
                     )
@@ -46,6 +48,18 @@ class PostgresPersonalizationRepository:
                     """
                     ALTER TABLE user_dashboard_settings
                     ADD COLUMN IF NOT EXISTS crm_preferred_import_formats TEXT[] NOT NULL DEFAULT '{}'
+                    """
+                )
+                cursor.execute(
+                    """
+                    ALTER TABLE user_dashboard_settings
+                    ADD COLUMN IF NOT EXISTS crm_image_intake_channels TEXT[] NOT NULL DEFAULT '{}'
+                    """
+                )
+                cursor.execute(
+                    """
+                    ALTER TABLE user_dashboard_settings
+                    ADD COLUMN IF NOT EXISTS crm_image_intake_notes TEXT NOT NULL DEFAULT ''
                     """
                 )
                 cursor.execute(
@@ -85,7 +99,9 @@ class PostgresPersonalizationRepository:
                         lookback_years,
                         telegram_enabled,
                         crm_ai_prompt,
-                        crm_preferred_import_formats
+                        crm_preferred_import_formats,
+                        crm_image_intake_channels,
+                        crm_image_intake_notes
                     FROM user_dashboard_settings
                     WHERE user_id = %(user_id)s
                     """,
@@ -114,6 +130,8 @@ class PostgresPersonalizationRepository:
                         telegram_enabled,
                         crm_ai_prompt,
                         crm_preferred_import_formats,
+                        crm_image_intake_channels,
+                        crm_image_intake_notes,
                         created_at,
                         updated_at
                     )
@@ -129,6 +147,8 @@ class PostgresPersonalizationRepository:
                         %(telegram_enabled)s,
                         %(crm_ai_prompt)s,
                         %(crm_preferred_import_formats)s,
+                        %(crm_image_intake_channels)s,
+                        %(crm_image_intake_notes)s,
                         NOW(),
                         NOW()
                     )
@@ -144,6 +164,8 @@ class PostgresPersonalizationRepository:
                         telegram_enabled = EXCLUDED.telegram_enabled,
                         crm_ai_prompt = EXCLUDED.crm_ai_prompt,
                         crm_preferred_import_formats = EXCLUDED.crm_preferred_import_formats,
+                        crm_image_intake_channels = EXCLUDED.crm_image_intake_channels,
+                        crm_image_intake_notes = EXCLUDED.crm_image_intake_notes,
                         updated_at = NOW()
                     RETURNING
                         user_id,
@@ -156,7 +178,9 @@ class PostgresPersonalizationRepository:
                         lookback_years,
                         telegram_enabled,
                         crm_ai_prompt,
-                        crm_preferred_import_formats
+                        crm_preferred_import_formats,
+                        crm_image_intake_channels,
+                        crm_image_intake_notes
                     """,
                     {
                         "user_id": settings.user_id,
@@ -170,6 +194,8 @@ class PostgresPersonalizationRepository:
                         "telegram_enabled": settings.telegram_enabled,
                         "crm_ai_prompt": settings.crm_ai_prompt,
                         "crm_preferred_import_formats": list(settings.crm_preferred_import_formats),
+                        "crm_image_intake_channels": list(settings.crm_image_intake_channels),
+                        "crm_image_intake_notes": settings.crm_image_intake_notes,
                     },
                 )
                 row = cursor.fetchone()
@@ -253,6 +279,10 @@ def _row_to_dashboard_settings(row: dict[str, object]) -> UserDashboardSettings:
         crm_preferred_import_formats=[
             str(item) for item in row.get("crm_preferred_import_formats", [])
         ] if isinstance(row.get("crm_preferred_import_formats"), list) else [],
+        crm_image_intake_channels=[
+            str(item) for item in row.get("crm_image_intake_channels", [])
+        ] if isinstance(row.get("crm_image_intake_channels"), list) else [],
+        crm_image_intake_notes=str(row.get("crm_image_intake_notes") or ""),
     )
 
 
