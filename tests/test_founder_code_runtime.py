@@ -10,6 +10,7 @@ from psycopg import OperationalError
 
 from src.adapters.founder_code import runtime as runtime_module
 from src.adapters.founder_code.runtime import (
+    collect_new_founder_code_progress_messages,
     build_founder_code_request_repository,
     finalize_founder_code_request_if_complete,
     launch_next_pending_founder_code_request,
@@ -572,6 +573,94 @@ def test_finalize_founder_code_request_if_complete_handles_missing_output_and_un
             return ""
 
     assert runtime_module._read_optional_text(EmptyPath()) == ""
+
+
+def test_collect_new_founder_code_progress_messages_reads_json_agent_messages(tmp_path, monkeypatch) -> None:
+    log_path = tmp_path / "run.log"
+    cursor_path = tmp_path / "cursor.txt"
+    active_path = tmp_path / "active.json"
+    log_path.write_text(
+        "\n".join(
+            [
+                "not-json",
+                json.dumps({"type": "thread.started"}),
+                json.dumps({"type": "item.completed", "item": {"type": "agent_message", "text": "First update"}}),
+                json.dumps({"type": "item.completed", "item": {"type": "tool_call", "text": "ignore"}}),
+                json.dumps({"type": "item.completed", "item": {"type": "agent_message", "text": "Second update"}}),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    active_path.write_text(
+        json.dumps({"log_path": str(log_path), "event_cursor_path": str(cursor_path)}),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("AUTONOMOUS_CODE_ACTIVE_FILE", str(active_path))
+
+    assert collect_new_founder_code_progress_messages() == ["First update", "Second update"]
+    assert cursor_path.read_text(encoding="utf-8") == "2"
+    assert collect_new_founder_code_progress_messages() == []
+
+
+def test_collect_new_founder_code_progress_messages_handles_missing_active_or_log(tmp_path, monkeypatch) -> None:
+    active_path = tmp_path / "active.json"
+    monkeypatch.setenv("AUTONOMOUS_CODE_ACTIVE_FILE", str(active_path))
+    assert collect_new_founder_code_progress_messages() == []
+
+    active_path.write_text(
+        json.dumps(
+            {
+                "log_path": str(tmp_path / "missing.log"),
+                "event_cursor_path": str(tmp_path / "cursor.txt"),
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert collect_new_founder_code_progress_messages() == []
+
+
+def test_collect_new_founder_code_progress_messages_recovers_from_invalid_cursor_and_sparse_events(tmp_path, monkeypatch) -> None:
+    log_path = tmp_path / "run.log"
+    cursor_path = tmp_path / "cursor.txt"
+    active_path = tmp_path / "active.json"
+    log_path.write_text(
+        "\n".join(
+            [
+                "{bad json",
+                json.dumps(["not-a-dict"]),
+                json.dumps({"type": "item.completed", "item": "not-a-dict"}),
+                json.dumps({"type": "item.completed", "item": {"type": "agent_message", "text": "Useful update"}}),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    cursor_path.write_text("oops", encoding="utf-8")
+    active_path.write_text(
+        json.dumps({"log_path": str(log_path), "event_cursor_path": str(cursor_path)}),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("AUTONOMOUS_CODE_ACTIVE_FILE", str(active_path))
+
+    assert collect_new_founder_code_progress_messages() == ["Useful update"]
+    assert cursor_path.read_text(encoding="utf-8") == "1"
+
+
+def test_extract_agent_messages_from_log_ignores_non_dict_json_payloads(tmp_path, monkeypatch) -> None:
+    log_path = tmp_path / "run.log"
+    log_path.write_text('{"type":"item.completed"}\n', encoding="utf-8")
+    real_loads = runtime_module.json.loads
+    seen = {"count": 0}
+
+    def fake_loads(raw: str):
+        seen["count"] += 1
+        if seen["count"] == 1:
+            return ["not-a-dict"]
+        return real_loads(raw)
+
+    monkeypatch.setattr(runtime_module.json, "loads", fake_loads)
+    assert runtime_module._extract_agent_messages_from_log(log_path) == []
 
 
 def test_launch_next_pending_founder_code_request_requires_codex_binary(tmp_path, monkeypatch) -> None:

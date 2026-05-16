@@ -16,6 +16,7 @@ from src.adapters.notifications.smtp_email_notifier import SMTPEmailNotifier
 from src.adapters.notifications.smtp_email_notifier import EmailNotificationError
 from src.adapters.notifications.telegram_notifier import TelegramNotificationError, TelegramNotifier
 from src.adapters.founder_code.runtime import (
+    collect_new_founder_code_progress_messages,
     finalize_founder_code_request_if_complete,
     launch_next_pending_founder_code_request,
     read_active_founder_code_request,
@@ -297,13 +298,25 @@ def _run_founder_code_execute_job() -> AutomationJobResult:
 
 def _run_founder_code_report_job() -> AutomationJobResult:
     try:
+        new_messages = collect_new_founder_code_progress_messages()
         result = finalize_founder_code_request_if_complete()
     except RuntimeError as exc:
         return AutomationJobResult(status="failed", detail=str(exc))
+    active = read_active_founder_code_request()
+    for message in new_messages:
+        _send_founder_code_progress_notification(
+            "update",
+            {
+                "command_text": active.get("command_text") if active else "(active run)",
+                "source_chat_id": active.get("source_chat_id") if active else "unknown",
+                "summary": message,
+            },
+        )
     if result is None:
-        active = read_active_founder_code_request()
         if active is None:
             return AutomationJobResult(status="ok", detail="no_active")
+        if new_messages:
+            return AutomationJobResult(status="ok", detail=f"updated={len(new_messages)}")
         return AutomationJobResult(status="ok", detail="running")
     _send_founder_code_progress_notification(str(result.get("status") or "finished"), result)
     return AutomationJobResult(status="ok", detail=f"reported={result.get('status', 'finished')}")
@@ -353,10 +366,10 @@ def _format_founder_code_progress_message(status: str, payload: dict[str, object
         f"Source: {source_chat_id}",
         f"Command: {command_text}",
     ]
-    if status in {"finished", "failed"}:
+    if status in {"finished", "failed", "update"}:
         summary = str(payload.get("summary") or "").strip()
         if summary:
-            lines.append("Summary:")
+            lines.append("Summary:" if status != "update" else "Message:")
             lines.append(summary[:1200])
     return "\n".join(lines)
 

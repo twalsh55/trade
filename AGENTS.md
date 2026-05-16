@@ -239,6 +239,7 @@ Use this section to give the next session a fast, practical starting point. Refr
 - This bridge has now been proven end to end with a live production `/prospect` run; the first mirrored `agent:prospect` prompt recommended `CSV and Google Sheets import`.
 - The local worker now also stages newly synced remote instructions into `var/founder_code_pending.jsonl` and writes the newest one to `var/founder_code_latest.json`, so remote requests are surfaced automatically instead of waiting for manual inbox inspection.
 - The local worker can now optionally launch one headless `codex exec` run at a time from that pending queue, tracked via `var/founder_code_active.json` and `var/founder_code_executor.pid`, so remote requests can become live autonomous work on this machine.
+- Headless remote Codex runs now use `codex exec --json`, and the local worker forwards mid-run `agent_message` events as progress updates so the founder can see more of what would normally appear in the local chat, not just `started` / `finished` / `failed`.
 
 ### Current Deployment Status
 

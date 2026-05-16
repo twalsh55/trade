@@ -170,11 +170,13 @@ def launch_next_pending_founder_code_request() -> str:
     run_dir.mkdir(parents=True, exist_ok=True)
     output_path = run_dir / f"{request_id}.last_message.txt"
     log_path = run_dir / f"{request_id}.log"
+    event_cursor_path = run_dir / f"{request_id}.event_cursor.txt"
 
     prompt = _build_codex_exec_prompt(next_request)
     command = [
         codex_bin,
         "exec",
+        "--json",
         "-C",
         str(workspace_root),
         "-s",
@@ -209,6 +211,7 @@ def launch_next_pending_founder_code_request() -> str:
                 "started_at": datetime.now().isoformat(),
                 "log_path": str(log_path),
                 "output_path": str(output_path),
+                "event_cursor_path": str(event_cursor_path),
             },
             sort_keys=True,
             indent=2,
@@ -264,6 +267,30 @@ def finalize_founder_code_request_if_complete() -> dict[str, object] | None:
     active_path.unlink(missing_ok=True)
     pid_path.unlink(missing_ok=True)
     return result
+
+
+def collect_new_founder_code_progress_messages() -> list[str]:
+    active = read_active_founder_code_request()
+    if active is None:
+        return []
+    log_path = Path(str(active.get("log_path") or ""))
+    cursor_path = Path(str(active.get("event_cursor_path") or ""))
+    if not str(log_path) or not log_path.exists():
+        return []
+    seen_count = 0
+    if str(cursor_path):
+        raw_seen = _read_last_seen_request_id(cursor_path)
+        if raw_seen:
+            try:
+                seen_count = int(raw_seen)
+            except ValueError:
+                seen_count = 0
+    messages = _extract_agent_messages_from_log(log_path)
+    new_messages = messages[seen_count:]
+    if new_messages and str(cursor_path):
+        cursor_path.parent.mkdir(parents=True, exist_ok=True)
+        cursor_path.write_text(str(len(messages)), encoding="utf-8")
+    return new_messages
 
 
 def parse_positive_int(name: str, default: int) -> int:
@@ -369,6 +396,31 @@ def _read_optional_text(path: Path) -> str:
         return path.read_text(encoding="utf-8")
     except OSError:
         return ""
+
+
+def _extract_agent_messages_from_log(path: Path) -> list[str]:
+    messages: list[str] = []
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line.startswith("{"):
+            continue
+        try:
+            payload = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(payload, dict):
+            continue
+        if payload.get("type") != "item.completed":
+            continue
+        item = payload.get("item")
+        if not isinstance(item, dict):
+            continue
+        if item.get("type") != "agent_message":
+            continue
+        text = item.get("text")
+        if isinstance(text, str) and text.strip():
+            messages.append(text.strip())
+    return messages
 
 
 def _pick_next_pending_request(requests: list[dict[str, object]]) -> dict[str, object]:

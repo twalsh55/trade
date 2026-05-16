@@ -321,11 +321,25 @@ def test_automation_job_runners_report_success_and_failure(monkeypatch) -> None:
     assert _run_founder_code_execute_job().status == "failed"
 
     monkeypatch.setattr("src.adapters.automation.runtime.finalize_founder_code_request_if_complete", lambda: None)
+    monkeypatch.setattr("src.adapters.automation.runtime.collect_new_founder_code_progress_messages", lambda: [])
     monkeypatch.setattr("src.adapters.automation.runtime.read_active_founder_code_request", lambda: None)
     assert _run_founder_code_report_job().detail == "no_active"
 
     monkeypatch.setattr("src.adapters.automation.runtime.read_active_founder_code_request", lambda: {"id": "1"})
     assert _run_founder_code_report_job().detail == "running"
+
+    forwarded: list[tuple[str, dict[str, object]]] = []
+    monkeypatch.setattr("src.adapters.automation.runtime.collect_new_founder_code_progress_messages", lambda: ["thinking", "done planning"])
+    monkeypatch.setattr(
+        "src.adapters.automation.runtime._send_founder_code_progress_notification",
+        lambda status, payload: forwarded.append((status, payload)),
+    )
+    monkeypatch.setattr(
+        "src.adapters.automation.runtime.read_active_founder_code_request",
+        lambda: {"id": "1", "command_text": "/code fix login", "source_chat_id": "123"},
+    )
+    assert _run_founder_code_report_job().detail == "updated=2"
+    assert forwarded[0][0] == "update"
 
     monkeypatch.setattr(
         "src.adapters.automation.runtime.finalize_founder_code_request_if_complete",
@@ -356,6 +370,7 @@ def test_automation_job_runners_report_success_and_failure(monkeypatch) -> None:
     assert _format_token_usage(None) == "template-mode"
     assert "Remote Codex update" in _format_founder_code_progress_message("started", {"command_text": "/code fix", "source_chat_id": "123"})
     assert "Summary:" in _format_founder_code_progress_message("finished", {"command_text": "/code fix", "source_chat_id": "123", "summary": "done"})
+    assert "Message:" in _format_founder_code_progress_message("update", {"command_text": "/code fix", "source_chat_id": "123", "summary": "still working"})
     monkeypatch.delenv("APP_OPENAI_API_KEY", raising=False)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.setattr("src.adapters.automation.runtime.run_prospecting_job", lambda: digest)
