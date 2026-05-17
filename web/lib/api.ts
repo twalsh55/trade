@@ -167,6 +167,20 @@ export async function exportAccountPrivacyData(options: ApiRequestOptions = {}):
   return apiRequest<AccountPrivacyExport>("/api/account/privacy/export", {}, options);
 }
 
+export async function eraseAccountPrivacyData(
+  payload: { scope: "relationship_memory" | "all_memory"; confirm: boolean },
+  options: ApiRequestOptions = {},
+): Promise<{ erased: boolean; scope: string }> {
+  return apiRequest<{ erased: boolean; scope: string }>(
+    "/api/account/privacy/erase",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+    options,
+  );
+}
+
 export async function getAlertHistory(options: ApiRequestOptions = {}): Promise<AlertHistoryResponse> {
   return apiRequest<AlertHistoryResponse>("/api/alerts/history", {}, options);
 }

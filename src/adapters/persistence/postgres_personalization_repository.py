@@ -43,6 +43,8 @@ class PostgresPersonalizationRepository:
                         preferred_locale TEXT NOT NULL DEFAULT 'en-US',
                         data_retention_days INTEGER NOT NULL DEFAULT 365,
                         allow_ai_processing BOOLEAN NOT NULL DEFAULT TRUE,
+                        privacy_consent_version TEXT NOT NULL DEFAULT 'v1',
+                        privacy_consent_granted_at TIMESTAMPTZ NULL,
                         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
                     )
@@ -134,6 +136,18 @@ class PostgresPersonalizationRepository:
                 )
                 cursor.execute(
                     """
+                    ALTER TABLE user_dashboard_settings
+                    ADD COLUMN IF NOT EXISTS privacy_consent_version TEXT NOT NULL DEFAULT 'v1'
+                    """
+                )
+                cursor.execute(
+                    """
+                    ALTER TABLE user_dashboard_settings
+                    ADD COLUMN IF NOT EXISTS privacy_consent_granted_at TIMESTAMPTZ NULL
+                    """
+                )
+                cursor.execute(
+                    """
                     CREATE TABLE IF NOT EXISTS alert_history (
                         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                         user_id UUID NOT NULL REFERENCES app_user(id) ON DELETE CASCADE,
@@ -181,7 +195,9 @@ class PostgresPersonalizationRepository:
                         preferred_language,
                         preferred_locale,
                         data_retention_days,
-                        allow_ai_processing
+                        allow_ai_processing,
+                        privacy_consent_version,
+                        privacy_consent_granted_at
                     FROM user_dashboard_settings
                     WHERE user_id = %(user_id)s
                     """,
@@ -222,6 +238,8 @@ class PostgresPersonalizationRepository:
                         preferred_locale,
                         data_retention_days,
                         allow_ai_processing,
+                        privacy_consent_version,
+                        privacy_consent_granted_at,
                         created_at,
                         updated_at
                     )
@@ -249,6 +267,8 @@ class PostgresPersonalizationRepository:
                         %(preferred_locale)s,
                         %(data_retention_days)s,
                         %(allow_ai_processing)s,
+                        %(privacy_consent_version)s,
+                        %(privacy_consent_granted_at)s,
                         NOW(),
                         NOW()
                     )
@@ -276,6 +296,8 @@ class PostgresPersonalizationRepository:
                         preferred_locale = EXCLUDED.preferred_locale,
                         data_retention_days = EXCLUDED.data_retention_days,
                         allow_ai_processing = EXCLUDED.allow_ai_processing,
+                        privacy_consent_version = EXCLUDED.privacy_consent_version,
+                        privacy_consent_granted_at = EXCLUDED.privacy_consent_granted_at,
                         updated_at = NOW()
                     RETURNING
                         user_id,
@@ -300,7 +322,9 @@ class PostgresPersonalizationRepository:
                         preferred_language,
                         preferred_locale,
                         data_retention_days,
-                        allow_ai_processing
+                        allow_ai_processing,
+                        privacy_consent_version,
+                        privacy_consent_granted_at
                     """,
                     {
                         "user_id": settings.user_id,
@@ -326,6 +350,8 @@ class PostgresPersonalizationRepository:
                         "preferred_locale": settings.preferred_locale,
                         "data_retention_days": settings.data_retention_days,
                         "allow_ai_processing": settings.allow_ai_processing,
+                        "privacy_consent_version": settings.privacy_consent_version,
+                        "privacy_consent_granted_at": settings.privacy_consent_granted_at,
                     },
                 )
                 row = cursor.fetchone()
@@ -423,6 +449,8 @@ def _row_to_dashboard_settings(row: dict[str, object]) -> UserDashboardSettings:
         preferred_locale=str(row.get("preferred_locale") or "en-US"),
         data_retention_days=int(row.get("data_retention_days") or 365),
         allow_ai_processing=bool(row.get("allow_ai_processing", True)),
+        privacy_consent_version=str(row.get("privacy_consent_version") or "v1"),
+        privacy_consent_granted_at=row.get("privacy_consent_granted_at") if isinstance(row.get("privacy_consent_granted_at"), datetime) else datetime.fromisoformat(str(row["privacy_consent_granted_at"])) if row.get("privacy_consent_granted_at") else None,
     )
 
 

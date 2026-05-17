@@ -924,6 +924,7 @@ class EmailThreadMessageInput:
     subject: str
     body_text: str
     snippet: str
+    external_message_id: str = ""
 
 
 class IngestLeadEmailThreadUseCase:
@@ -1036,6 +1037,88 @@ class DisconnectMailboxConnectionUseCase:
     def execute(self, user: User, connection_id: str) -> None:
         _require_mailbox_connection(self.repository.list_mailbox_connections(user), connection_id)
         self.repository.delete_mailbox_connection(user, connection_id)
+
+
+class EraseRelationshipMemoryUseCase:
+    def __init__(self, repository: LeadFollowUpRepositoryPort) -> None:
+        self.repository = repository
+
+    def execute(self, user: User, *, scope: str) -> None:
+        normalized_scope = scope.strip().lower()
+        if normalized_scope not in {"relationship_memory", "all_memory"}:
+            raise ValueError("Unsupported privacy erase scope.")
+        self.repository.clear_lead_follow_ups(user)
+        if normalized_scope == "all_memory":
+            for connection in list(self.repository.list_mailbox_connections(user)):
+                self.repository.delete_mailbox_connection(user, connection.id)
+
+
+class ProcessMailboxWatchEventUseCase:
+    def __init__(
+        self,
+        repository: LeadFollowUpRepositoryPort,
+        now: Callable[[], datetime],
+        mailbox_provider: MailboxProviderPort | None = None,
+    ) -> None:
+        self.repository = repository
+        self.now = now
+        self.mailbox_provider = mailbox_provider
+
+    def execute(
+        self,
+        user: User,
+        *,
+        provider: str,
+        connection_id: str | None = None,
+        external_account_id: str | None = None,
+        email_address: str | None = None,
+    ) -> MailboxSyncResult:
+        normalized_provider = provider.strip().lower()
+        normalized_connection_id = (connection_id or "").strip()
+        normalized_external_account_id = (external_account_id or "").strip()
+        normalized_email_address = (email_address or "").strip().lower()
+        connections = [
+            item
+            for item in self.repository.list_mailbox_connections(user)
+            if item.provider == normalized_provider and item.connection_mode == "oauth" and item.status == "connected"
+        ]
+        if normalized_connection_id:
+            connection = _require_mailbox_connection(connections, normalized_connection_id)
+        else:
+            connection = next(
+                (
+                    item
+                    for item in connections
+                    if (
+                        normalized_external_account_id
+                        and item.external_account_id.strip() == normalized_external_account_id
+                    )
+                    or (
+                        normalized_email_address
+                        and item.email_address.strip().lower() == normalized_email_address
+                    )
+                ),
+                None,
+            )
+            if connection is None:
+                raise KeyError(normalized_external_account_id or normalized_email_address or normalized_provider)
+
+        result = SyncMailboxConnectionUseCase(
+            repository=self.repository,
+            now=self.now,
+            mailbox_provider=self.mailbox_provider,
+        ).execute(user, connection.id)
+        saved_connection = self.repository.save_mailbox_connection(
+            user,
+            replace(
+                result.connection,
+                last_watch_event_at=self.now(),
+                watch_event_count=result.connection.watch_event_count + 1,
+                last_sync_status="watch_event",
+                last_sync_error="",
+            ),
+        )
+        return replace(result, connection=saved_connection)
 
 
 MAILBOX_PROVIDERS = {"gmail", "outlook"}
@@ -1166,6 +1249,7 @@ class SyncMailboxConnectionUseCase:
                     messages=[
                         EmailThreadMessageInput(
                             message_id=message.message_id,
+                            external_message_id=message.external_message_id,
                             sent_at=message.sent_at,
                             direction=message.direction,
                             from_email=message.from_email,
@@ -1192,6 +1276,7 @@ class SyncMailboxConnectionUseCase:
                     subject = _build_mailbox_sync_subject(lead)
                     message = EmailThreadMessageInput(
                         message_id=f"{connection.id}-{lead.id}-{current_time.strftime('%Y%m%d%H')}-{direction}",
+                        external_message_id=f"<{connection.id}-{lead.id}-{current_time.strftime('%Y%m%d%H')}-{direction}@brivoly.local>",
                         sent_at=current_time - timedelta(minutes=index * 12),
                         direction=direction,
                         from_email=lead.email_address.strip().lower() if direction == "inbound" else connection.email_address,
@@ -1217,6 +1302,7 @@ class SyncMailboxConnectionUseCase:
                     messages=[
                         EmailThreadMessageInput(
                             message_id=f"{connection.id}-{current_time.strftime('%Y%m%d%H')}-welcome",
+                            external_message_id=f"<{connection.id}-{current_time.strftime('%Y%m%d%H')}-welcome@brivoly.local>",
                             sent_at=current_time,
                             direction="inbound",
                             from_email=f"hello@{sample_domain}",
@@ -1316,6 +1402,14 @@ class SendLeadFollowUpEmailUseCase:
                 subject=normalized_subject,
                 body=normalized_body,
                 thread_id=resolved_thread_id,
+                reply_to_external_message_id=next(
+                    (
+                        item.last_external_message_id
+                        for item in lead.recent_email_threads
+                        if item.thread_id == resolved_thread_id and item.last_external_message_id.strip()
+                    ),
+                    "",
+                ) or None,
             )
             resolved_thread_id = receipt.thread_id
             outbound_message = receipt.message
@@ -1323,6 +1417,7 @@ class SendLeadFollowUpEmailUseCase:
         else:
             outbound_message = EmailThreadMessageInput(
                 message_id=f"{connection.id}-{lead.id}-{current_time.strftime('%Y%m%d%H%M%S')}",
+                external_message_id=f"<{connection.id}-{lead.id}-{current_time.strftime('%Y%m%d%H%M%S')}@brivoly.local>",
                 sent_at=current_time,
                 direction="outbound",
                 from_email=connection.email_address,
@@ -1341,6 +1436,7 @@ class SendLeadFollowUpEmailUseCase:
             messages=[
                 EmailThreadMessageInput(
                     message_id=outbound_message.message_id,
+                    external_message_id=outbound_message.external_message_id,
                     sent_at=outbound_message.sent_at,
                     direction=outbound_message.direction,
                     from_email=outbound_message.from_email,
@@ -1458,6 +1554,7 @@ def _normalize_email_message(message: EmailThreadMessageInput) -> EmailThreadMes
         raise ValueError("Each email message needs at least one recipient email.")
     return EmailThreadMessageInput(
         message_id=message_id,
+        external_message_id=message.external_message_id.strip(),
         sent_at=message.sent_at,
         direction=direction,
         from_email=from_email,
@@ -1604,6 +1701,8 @@ def _upsert_thread_summary(
         subject=latest_message.subject,
         counterpart_name=counterpart_name or _derive_name_from_email(counterpart_email),
         counterpart_email=counterpart_email,
+        last_message_id=latest_message.message_id,
+        last_external_message_id=latest_message.external_message_id,
         last_message_at=latest_message.sent_at,
         last_message_direction=latest_message.direction,
         message_count=(existing.message_count if existing else 0) + new_message_count if existing else len(messages),

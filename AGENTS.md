@@ -52,6 +52,7 @@ cd web && npm run e2e
   - `PATCH /api/crm/followups/{id}`
   - `POST /api/crm/inbox/mailboxes/oauth/start`
   - `POST /api/crm/inbox/mailboxes/oauth/complete`
+  - `POST /api/crm/inbox/watch-events/{provider}`
   - `POST /api/crm/import/preview`
   - `POST /api/crm/import`
   - `GET /api/crm/intake-channel`
@@ -63,7 +64,7 @@ cd web && npm run e2e
 - Railway deploys the API from repo root using `Dockerfile`, `railway.toml`, and `scripts/start_railway.sh`.
 - Vercel uses `web/` as project root.
 - Important envs:
-  - API: `DATABASE_URL`, Clerk vars, Stripe vars, Telegram vars, `APP_OPENAI_API_KEY`/`OPENAI_API_KEY`, `ALLOW_ANONYMOUS_CRM`, Google OAuth vars, Microsoft OAuth vars
+  - API: `DATABASE_URL`, Clerk vars, Stripe vars, Telegram vars, `APP_OPENAI_API_KEY`/`OPENAI_API_KEY`, `ALLOW_ANONYMOUS_CRM`, Google OAuth vars, Microsoft OAuth vars, `MAILBOX_WATCH_WEBHOOK_SECRET`
   - Web: `BRIVOLY_API_BASE_URL`, `APP_BASE_URL`, Clerk frontend vars
 - Preferred smoke checks:
   - `uv run pytest`
@@ -100,15 +101,16 @@ cd web && npm run e2e
   - Today priorities now collapse into one obvious `Start here` move, lighter `Needs care now` and `Freshest opening` summaries, direct draft/review actions, stronger upload-aware next-touch framing, and a clearer `Next move` cue on each priority so the daily home asks for less scanning
   - follow-up queue
   - inbox-native relationship page for auto-logging email threads and reconnect-aware next moves
-  - mailbox beta now includes real Gmail / Outlook OAuth-ready connection start/complete routes, provider-backed sync for OAuth-linked accounts, and provider-backed sending through Gmail API / Microsoft Graph when those accounts are connected
+  - mailbox beta now includes real Gmail / Outlook OAuth-ready connection start/complete routes, provider-backed sync for OAuth-linked accounts, provider-watch event callbacks, and provider-backed sending through Gmail API / Microsoft Graph when those accounts are connected
   - connected mailbox cards now support disconnecting accounts and pausing or resuming scheduled background sync per mailbox without losing the saved relationship memory
   - manual mailbox connection still exists as a fallback beta path when provider credentials are not configured yet
   - inbox cards now surface backend-driven relationship pulse, open-loop memory, thread continuity cues, `what changed` hints, unresolved-thread cues, a clearer long-thread `through-line`, and a carry-forward cue for longer threads, grouped into `Needs you now` and `Still warm`
   - email-thread ingestion that can auto-create/update contacts from inbox activity
-  - mailbox sync now feeds the same inbox-ingest path Brivoly already uses, so provider-synced email activity lands in relationship memory instead of a separate mailbox subsystem
-  - sending a drafted note now writes the outbound message back into the same relationship timeline and thread history, including notes sent through the provider-backed mailbox path
-  - account settings now include locale defaults, retention-window defaults, and an AI-processing toggle as the first localization/GDPR groundwork layer
+  - mailbox sync now feeds the same inbox-ingest path Brivoly already uses, so provider-synced email activity and provider watch callbacks land in relationship memory instead of a separate mailbox subsystem
+  - sending a drafted note now writes the outbound message back into the same relationship timeline and thread history, including notes sent through the provider-backed mailbox path, and now carries forward stored external message ids for better reply continuity
+  - account settings now include locale defaults, retention-window defaults, an AI-processing toggle, and privacy-consent metadata as the first localization/GDPR groundwork layer
   - `/api/account/privacy/export` and the settings export action can now download a JSON snapshot of account settings, connected mailboxes, and stored relationship memory for GDPR-oriented export groundwork
+  - `/api/account/privacy/erase` and the settings erase actions can now clear stored relationship memory or wipe memory plus connected mailbox links as an early GDPR delete/control path
   - attention view with reconnect-first guidance and direct draft actions
   - complete and snooze actions
   - relationship history + internal notes

@@ -252,8 +252,10 @@ class FakeMailboxProvider:
         subject: str,
         body: str,
         thread_id: str | None = None,
+        reply_to_external_message_id: str | None = None,
     ) -> MailboxSendReceipt:
         now = datetime(2024, 5, 6, 12, 30, tzinfo=UTC)
+        del reply_to_external_message_id
         return MailboxSendReceipt(
             connection=connection,
             thread_id=thread_id or "provider-thread",
@@ -336,6 +338,7 @@ def test_extract_session_token_falls_back_to_authorization_header_when_cookie_mi
 
 
 def test_account_settings_and_alert_history_dtos_serialize_values() -> None:
+    now = datetime(2024, 5, 6, 12, 30, tzinfo=UTC)
     settings = UserDashboardSettings(
         user_id=UUID("11111111-1111-1111-1111-111111111111"),
         universe=["SPY", "QQQ"],
@@ -360,6 +363,8 @@ def test_account_settings_and_alert_history_dtos_serialize_values() -> None:
         preferred_locale="en-US",
         data_retention_days=365,
         allow_ai_processing=True,
+        privacy_consent_version="v1",
+        privacy_consent_granted_at=now,
     )
     alert = AlertHistoryEntry(
         occurred_at=datetime(2024, 5, 6, 12, 30, tzinfo=UTC),
@@ -1737,6 +1742,8 @@ def test_account_use_cases_and_in_memory_repository_round_trip_settings_and_aler
         preferred_locale="en-US",
         data_retention_days=365,
         allow_ai_processing=True,
+        privacy_consent_version="v1",
+        privacy_consent_granted_at=None,
     )
     get_use_case = GetUserDashboardSettingsUseCase(repository=repository, default_factory=lambda user_id: defaults)
     update_use_case = UpdateUserDashboardSettingsUseCase(repository=repository)
@@ -1770,6 +1777,8 @@ def test_account_use_cases_and_in_memory_repository_round_trip_settings_and_aler
             preferred_locale="en-US",
             data_retention_days=365,
             allow_ai_processing=True,
+            privacy_consent_version="v1",
+            privacy_consent_granted_at=None,
         ),
     )
 
@@ -1794,6 +1803,7 @@ def test_account_use_cases_and_in_memory_repository_round_trip_settings_and_aler
 
 def test_dashboard_settings_helpers_normalize_defaults_and_build_config() -> None:
     user = make_user()
+    now = datetime(2024, 5, 6, 12, 30, tzinfo=UTC)
 
     defaults = build_default_dashboard_settings(user.id, telegram_enabled=True)
     assert defaults.universe == ["SPY", "QQQ", "IWM", "EFA", "EEM"]
@@ -1828,6 +1838,8 @@ def test_dashboard_settings_helpers_normalize_defaults_and_build_config() -> Non
             preferred_locale=" en_us ",
             data_retention_days=7,
             allow_ai_processing=True,
+            privacy_consent_version=" v2 ",
+            privacy_consent_granted_at=now,
         )
     )
     assert normalized.universe == ["SPY", "QQQ"]
@@ -2256,6 +2268,8 @@ def test_crm_followup_email_draft_endpoint_returns_designed_draft() -> None:
             preferred_locale="en-US",
             data_retention_days=365,
             allow_ai_processing=True,
+            privacy_consent_version="v1",
+            privacy_consent_granted_at=None,
         )
     )
     client = make_client(user=user, lead_follow_up_repository=repository, personalization_repository=personalization)

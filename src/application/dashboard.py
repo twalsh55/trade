@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from datetime import date, timedelta
+from datetime import UTC, date, timedelta
 from uuid import UUID
 
 from src.application.account import UserDashboardSettings
@@ -43,6 +43,8 @@ def build_default_dashboard_settings(user_id: UUID, *, telegram_enabled: bool) -
         preferred_locale=DEFAULT_PREFERRED_LOCALE,
         data_retention_days=DEFAULT_DATA_RETENTION_DAYS,
         allow_ai_processing=True,
+        privacy_consent_version="v1",
+        privacy_consent_granted_at=None,
     )
 
 
@@ -70,6 +72,8 @@ def normalize_dashboard_settings(settings: UserDashboardSettings) -> UserDashboa
         preferred_locale=_normalize_locale(settings.preferred_locale),
         data_retention_days=_normalize_retention_days(settings.data_retention_days),
         allow_ai_processing=bool(settings.allow_ai_processing),
+        privacy_consent_version=_normalize_consent_version(settings.privacy_consent_version),
+        privacy_consent_granted_at=_normalize_consent_granted_at(settings.privacy_consent_granted_at),
     )
 
 
@@ -141,3 +145,16 @@ def _normalize_locale(value: str) -> str:
 
 def _normalize_retention_days(value: int) -> int:
     return max(30, min(3650, int(value or DEFAULT_DATA_RETENTION_DAYS)))
+
+
+def _normalize_consent_version(value: str) -> str:
+    cleaned = value.strip()[:32]
+    return cleaned or "v1"
+
+
+def _normalize_consent_granted_at(value):
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)

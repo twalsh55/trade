@@ -42,6 +42,8 @@ class LeadEmailThreadSummary:
     snippet: str
     needs_reply: bool
     waiting_on_contact: bool
+    last_message_id: str = ""
+    last_external_message_id: str = ""
     memory_summary: str = ""
     next_touch_hint: str = ""
     open_loop: str = ""
@@ -111,6 +113,8 @@ class MailboxConnection:
     last_synced_thread_count: int = 0
     sent_message_count: int = 0
     background_sync_enabled: bool = True
+    last_watch_event_at: datetime | None = None
+    watch_event_count: int = 0
 
 
 @dataclass(frozen=True)
@@ -124,6 +128,7 @@ class MailboxThreadMessage:
     subject: str
     body_text: str
     snippet: str
+    external_message_id: str = ""
 
 
 @dataclass(frozen=True)

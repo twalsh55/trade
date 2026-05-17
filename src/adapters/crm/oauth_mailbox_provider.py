@@ -197,6 +197,7 @@ class OAuthMailboxProviderAdapter(MailboxProviderPort):
         subject: str,
         body: str,
         thread_id: str | None = None,
+        reply_to_external_message_id: str | None = None,
     ) -> MailboxSendReceipt:
         hydrated = self.refresh_connection(connection)
         normalized_to = to_email.strip().lower()
@@ -211,6 +212,11 @@ class OAuthMailboxProviderAdapter(MailboxProviderPort):
             message["From"] = f"{hydrated.display_name} <{hydrated.email_address}>"
             message["To"] = f"{to_name.strip() or normalized_to} <{normalized_to}>"
             message["Subject"] = subject
+            generated_message_id = f"<gmail-{uuid4().hex[:18]}@brivoly.mail>"
+            message["Message-ID"] = generated_message_id
+            if reply_to_external_message_id:
+                message["In-Reply-To"] = reply_to_external_message_id
+                message["References"] = reply_to_external_message_id
             message.set_content(body)
             raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode("utf-8")
             request_payload: dict[str, object] = {"raw": raw_message}
@@ -223,7 +229,9 @@ class OAuthMailboxProviderAdapter(MailboxProviderPort):
             )
             resolved_thread_id = _optional_string(response_payload.get("threadId")) or thread_id or f"gmail-{uuid4().hex[:12]}"
             message_id = _optional_string(response_payload.get("id")) or f"gmail-sent-{uuid4().hex[:12]}"
+            external_message_id = generated_message_id
         else:
+            external_message_id = f"<outlook-{uuid4().hex[:18]}@brivoly.mail>"
             self._post_json(
                 "https://graph.microsoft.com/v1.0/me/sendMail",
                 {
@@ -232,6 +240,17 @@ class OAuthMailboxProviderAdapter(MailboxProviderPort):
                         "body": {"contentType": "Text", "content": body},
                         "toRecipients": [
                             {"emailAddress": {"address": normalized_to, "name": to_name.strip() or normalized_to}}
+                        ],
+                        "internetMessageHeaders": [
+                            {"name": "Message-ID", "value": external_message_id},
+                            *(
+                                [
+                                    {"name": "In-Reply-To", "value": reply_to_external_message_id},
+                                    {"name": "References", "value": reply_to_external_message_id},
+                                ]
+                                if reply_to_external_message_id
+                                else []
+                            ),
                         ],
                     },
                     "saveToSentItems": True,
@@ -244,6 +263,7 @@ class OAuthMailboxProviderAdapter(MailboxProviderPort):
 
         sent_message = MailboxThreadMessage(
             message_id=message_id,
+            external_message_id=external_message_id,
             sent_at=now,
             direction="outbound",
             from_email=hydrated.email_address,
@@ -283,7 +303,7 @@ class OAuthMailboxProviderAdapter(MailboxProviderPort):
             details = self._get_json(
                 f"https://gmail.googleapis.com/gmail/v1/users/me/messages/{message_id}",
                 access_token=connection.access_token,
-                params={"format": "metadata", "metadataHeaders": ["From", "To", "Subject", "Date"]},
+                params={"format": "metadata", "metadataHeaders": ["From", "To", "Subject", "Date", "Message-ID"]},
             )
             payload_headers = ((details.get("payload") or {}).get("headers") if isinstance(details.get("payload"), dict) else []) or []
             headers = _gmail_headers_to_dict(payload_headers)
@@ -297,6 +317,7 @@ class OAuthMailboxProviderAdapter(MailboxProviderPort):
             threads.setdefault(thread_id, []).append(
                 MailboxThreadMessage(
                     message_id=message_id,
+                    external_message_id=headers.get("Message-ID", "").strip(),
                     sent_at=sent_at,
                     direction=direction,
                     from_email=from_email,
@@ -354,6 +375,7 @@ class OAuthMailboxProviderAdapter(MailboxProviderPort):
             threads.setdefault(thread_id, []).append(
                 MailboxThreadMessage(
                     message_id=message_id,
+                    external_message_id=_optional_string(item.get("internetMessageId")) or "",
                     sent_at=sent_at or self.now(),
                     direction=direction,
                     from_email=from_email,

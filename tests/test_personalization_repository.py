@@ -41,6 +41,8 @@ def make_settings() -> UserDashboardSettings:
         preferred_locale="en-US",
         data_retention_days=365,
         allow_ai_processing=True,
+        privacy_consent_version="v1",
+        privacy_consent_granted_at=datetime(2024, 5, 6, 12, 30, tzinfo=UTC),
     )
 
 
@@ -145,7 +147,7 @@ def test_postgres_personalization_repository_ensure_schema(monkeypatch) -> None:
     repository = PostgresPersonalizationRepository("postgres://example")
     repository.ensure_schema()
 
-    assert len(cursor.executed) == 17
+    assert len(cursor.executed) == 19
     assert "user_dashboard_settings" in cursor.executed[0][0]
     assert "ALTER TABLE user_dashboard_settings" in cursor.executed[1][0]
     assert "ALTER TABLE user_dashboard_settings" in cursor.executed[2][0]
@@ -160,8 +162,10 @@ def test_postgres_personalization_repository_ensure_schema(monkeypatch) -> None:
     assert "ALTER TABLE user_dashboard_settings" in cursor.executed[11][0]
     assert "ALTER TABLE user_dashboard_settings" in cursor.executed[12][0]
     assert "ALTER TABLE user_dashboard_settings" in cursor.executed[13][0]
-    assert "alert_history" in cursor.executed[15][0]
-    assert "alert_history_user_occurred_at_idx" in cursor.executed[16][0]
+    assert "ALTER TABLE user_dashboard_settings" in cursor.executed[14][0]
+    assert "ALTER TABLE user_dashboard_settings" in cursor.executed[15][0]
+    assert "alert_history" in cursor.executed[17][0]
+    assert "alert_history_user_occurred_at_idx" in cursor.executed[18][0]
     assert connection.committed is True
 
 
@@ -193,6 +197,8 @@ def test_postgres_personalization_repository_get_and_save_settings(monkeypatch) 
                 "preferred_locale": "en-US",
                 "data_retention_days": 365,
                 "allow_ai_processing": True,
+                "privacy_consent_version": "v1",
+                "privacy_consent_granted_at": datetime(2024, 5, 6, 12, 30, tzinfo=UTC),
             }
         )
     )
@@ -220,6 +226,8 @@ def test_postgres_personalization_repository_get_and_save_settings(monkeypatch) 
         "preferred_locale": "en-US",
         "data_retention_days": 365,
         "allow_ai_processing": True,
+        "privacy_consent_version": "v1",
+        "privacy_consent_granted_at": datetime(2024, 5, 6, 12, 30, tzinfo=UTC),
     }
     saved_connection = FakeConnection(FakeCursor(fetchone_result=saved_row))
     calls = [missing_connection, existing_connection, saved_connection]

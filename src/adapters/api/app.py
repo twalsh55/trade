@@ -74,8 +74,10 @@ from src.application.crm import (
     DisconnectMailboxConnectionUseCase,
     DesignLeadFollowUpEmailUseCase,
     EmailThreadMessageInput,
+    EraseRelationshipMemoryUseCase,
     IngestLeadEmailThreadUseCase,
     ListMailboxConnectionsUseCase,
+    ProcessMailboxWatchEventUseCase,
     SendLeadFollowUpEmailUseCase,
     SnoozeLeadFollowUpUseCase,
     SyncMailboxConnectionUseCase,
@@ -121,6 +123,7 @@ from src.env_utils import get_first_configured_env, load_env_file
 api_logger = logging.getLogger("brivoly.api")
 ANONYMOUS_CRM_USER_ID = UUID("00000000-0000-0000-0000-00000000c0de")
 MAILBOX_OAUTH_STATE_TTL_SECONDS = 15 * 60
+MAILBOX_WATCH_SECRET_HEADER = "x-brivoly-watch-secret"
 
 
 @dataclass(frozen=True)
@@ -158,6 +161,8 @@ class UserDashboardSettingsPayload(BaseModel):
     preferred_locale: str = Field(default="en-US", max_length=24)
     data_retention_days: int = Field(default=365, ge=30, le=3650)
     allow_ai_processing: bool = True
+    privacy_consent_version: str = Field(default="v1", max_length=32)
+    privacy_consent_granted_at: datetime | None = None
 
 
 class BillingSessionPayload(BaseModel):
@@ -189,6 +194,7 @@ class LeadFollowUpEmailDraftPayload(BaseModel):
 
 class CRMInboxThreadMessagePayload(BaseModel):
     message_id: str = Field(min_length=1, max_length=255)
+    external_message_id: str = Field(default="", max_length=255)
     sent_at: datetime
     direction: str = Field(pattern="^(inbound|outbound)$")
     from_email: str = Field(min_length=3, max_length=255)
@@ -223,6 +229,17 @@ class MailboxOAuthCompletePayload(BaseModel):
 
 class MailboxConnectionUpdatePayload(BaseModel):
     background_sync_enabled: bool
+
+
+class AccountPrivacyErasePayload(BaseModel):
+    scope: str = Field(default="all_memory", pattern="^(relationship_memory|all_memory)$")
+    confirm: bool
+
+
+class MailboxWatchEventPayload(BaseModel):
+    external_account_id: str | None = Field(default=None, max_length=255)
+    email_address: str | None = Field(default=None, max_length=255)
+    connection_id: str | None = Field(default=None, max_length=255)
 
 
 class MailboxSendPayload(BaseModel):
@@ -298,6 +315,20 @@ def _validate_mailbox_oauth_state(user: User, provider: str, state: str, current
     issued_at = datetime.fromtimestamp(int(timestamp_text), tz=UTC)
     if current_time - issued_at > timedelta(seconds=MAILBOX_OAUTH_STATE_TTL_SECONDS):
         raise ValueError("Mailbox OAuth state expired. Please try connecting again.")
+
+
+def _get_mailbox_watch_secret() -> str:
+    return (
+        os.getenv("MAILBOX_WATCH_WEBHOOK_SECRET", "").strip()
+        or os.getenv("CRM_INTAKE_SECRET", "").strip()
+        or os.getenv("INTERNAL_CRON_SECRET", "").strip()
+    )
+
+
+def _validate_mailbox_watch_secret(provided_secret: str | None) -> None:
+    expected_secret = _get_mailbox_watch_secret()
+    if not expected_secret or provided_secret != expected_secret:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid mailbox watch secret.")
 
 
 def create_app(dependencies: ApiDependencies | None = None) -> FastAPI:
@@ -383,6 +414,7 @@ def create_app(dependencies: ApiDependencies | None = None) -> FastAPI:
         settings = UpdateUserDashboardSettingsUseCase(repository=repository).execute(
             user,
             normalize_dashboard_settings(
+                # Capture the first explicit privacy acknowledgement the moment these settings are saved with AI processing enabled.
                 UserDashboardSettings(
                 user_id=user.id,
                 universe=payload.universe,
@@ -407,6 +439,8 @@ def create_app(dependencies: ApiDependencies | None = None) -> FastAPI:
                 preferred_locale=payload.preferred_locale,
                 data_retention_days=payload.data_retention_days,
                 allow_ai_processing=payload.allow_ai_processing,
+                privacy_consent_version=payload.privacy_consent_version,
+                privacy_consent_granted_at=payload.privacy_consent_granted_at or (deps.now() if payload.allow_ai_processing else None),
                 )
             ),
         )
@@ -443,6 +477,22 @@ def create_app(dependencies: ApiDependencies | None = None) -> FastAPI:
             "mailboxes": [dto_to_dict(build_mailbox_connection_dto(item)) for item in connections],
             "relationship_memory": dto_to_dict(build_lead_follow_up_overview_dto(overview)),
         }
+
+    @app.post("/api/account/privacy/erase")
+    def account_privacy_erase(
+        payload: AccountPrivacyErasePayload,
+        authorization: str | None = Header(default=None),
+        session_cookie: str | None = Cookie(default=None, alias=CLERK_SESSION_COOKIE),
+    ) -> dict[str, object]:
+        if not payload.confirm:
+            raise HTTPException(status_code=422, detail="Privacy erase requires explicit confirmation.")
+        user = _require_crm_user(deps, authorization, session_cookie)
+        repository = deps.lead_follow_up_repository_factory()
+        try:
+            EraseRelationshipMemoryUseCase(repository=repository).execute(user, scope=payload.scope)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {"erased": True, "scope": payload.scope}
 
     @app.get("/api/alerts/history")
     def alerts_history(
@@ -553,6 +603,7 @@ def create_app(dependencies: ApiDependencies | None = None) -> FastAPI:
                 messages=[
                     EmailThreadMessageInput(
                         message_id=item.message_id,
+                        external_message_id=item.external_message_id,
                         sent_at=item.sent_at,
                         direction=item.direction,
                         from_email=item.from_email,
@@ -568,6 +619,46 @@ def create_app(dependencies: ApiDependencies | None = None) -> FastAPI:
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         return dto_to_dict(build_lead_follow_up_overview_dto(overview))
+
+    @app.post("/api/crm/inbox/watch-events/{provider}")
+    def crm_mailbox_watch_event(
+        provider: str,
+        payload: MailboxWatchEventPayload,
+        watch_secret: str | None = Header(default=None, alias=MAILBOX_WATCH_SECRET_HEADER),
+    ) -> dict[str, object]:
+        _validate_mailbox_watch_secret(watch_secret)
+        repository = deps.lead_follow_up_repository_factory()
+        user_repository = deps.user_repository_factory()
+        if user_repository is None or not callable(getattr(repository, "list_mailbox_connection_user_ids", None)):
+            raise HTTPException(status_code=503, detail="Mailbox watch handling is unavailable.")
+
+        matched_result = None
+        for user_id in repository.list_mailbox_connection_user_ids():
+            user = user_repository.get_user_by_id(user_id)
+            if user is None:
+                continue
+            try:
+                matched_result = ProcessMailboxWatchEventUseCase(
+                    repository=repository,
+                    now=deps.now,
+                    mailbox_provider=deps.mailbox_provider_factory(),
+                ).execute(
+                    user,
+                    provider=provider,
+                    connection_id=payload.connection_id,
+                    external_account_id=payload.external_account_id,
+                    email_address=payload.email_address,
+                )
+                break
+            except KeyError:
+                continue
+            except ValueError as exc:
+                raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+        if matched_result is None:
+            raise HTTPException(status_code=404, detail="No matching mailbox connection was found for this watch event.")
+
+        return dto_to_dict(build_mailbox_sync_result_dto(matched_result))
 
     @app.get("/api/crm/inbox/mailboxes")
     def crm_mailbox_connections(
@@ -945,6 +1036,8 @@ def create_app(dependencies: ApiDependencies | None = None) -> FastAPI:
                 preferred_locale="en-US",
                 data_retention_days=365,
                 allow_ai_processing=True,
+                privacy_consent_version="v1",
+                privacy_consent_granted_at=None,
             )
         )
         if universe is None:

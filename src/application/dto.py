@@ -125,6 +125,8 @@ class UserDashboardSettingsDTO:
     preferred_locale: str
     data_retention_days: int
     allow_ai_processing: bool
+    privacy_consent_version: str
+    privacy_consent_granted_at: str | None
 
 
 @dataclass(frozen=True)
@@ -231,6 +233,8 @@ class LeadEmailThreadSummaryDTO:
     subject: str
     counterpart_name: str
     counterpart_email: str
+    last_message_id: str
+    last_external_message_id: str
     last_message_at: str
     last_message_direction: str
     message_count: int
@@ -292,6 +296,8 @@ class MailboxConnectionDTO:
     last_synced_thread_count: int
     sent_message_count: int
     background_sync_enabled: bool
+    last_watch_event_at: str | None
+    watch_event_count: int
 
 
 @dataclass(frozen=True)
@@ -519,6 +525,8 @@ def build_user_dashboard_settings_dto(settings: UserDashboardSettings) -> UserDa
         preferred_locale=settings.preferred_locale,
         data_retention_days=settings.data_retention_days,
         allow_ai_processing=settings.allow_ai_processing,
+        privacy_consent_version=settings.privacy_consent_version,
+        privacy_consent_granted_at=settings.privacy_consent_granted_at.isoformat() if settings.privacy_consent_granted_at else None,
     )
 
 
@@ -682,6 +690,8 @@ def build_lead_email_thread_summary_dto(thread: LeadEmailThreadSummary) -> LeadE
         subject=thread.subject,
         counterpart_name=thread.counterpart_name,
         counterpart_email=thread.counterpart_email,
+        last_message_id=thread.last_message_id,
+        last_external_message_id=thread.last_external_message_id,
         last_message_at=thread.last_message_at.isoformat(),
         last_message_direction=thread.last_message_direction,
         message_count=thread.message_count,
@@ -732,6 +742,8 @@ def build_mailbox_connection_dto(connection: MailboxConnection) -> MailboxConnec
         last_synced_thread_count=connection.last_synced_thread_count,
         sent_message_count=connection.sent_message_count,
         background_sync_enabled=connection.background_sync_enabled,
+        last_watch_event_at=connection.last_watch_event_at.isoformat() if connection.last_watch_event_at else None,
+        watch_event_count=connection.watch_event_count,
     )
 
 

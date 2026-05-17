@@ -56,6 +56,8 @@ def build_seed_follow_ups(current_time: datetime) -> tuple[LeadFollowUp, ...]:
                     subject="Re: discovery recap",
                     counterpart_name="Amber Flores",
                     counterpart_email="amber@northstarstudio.com",
+                    last_message_id="msg-amber-recap-4",
+                    last_external_message_id="<amber-recap-4@northstarstudio.com>",
                     last_message_at=current_time - timedelta(hours=4),
                     last_message_direction="inbound",
                     message_count=4,
@@ -102,6 +104,8 @@ def build_seed_follow_ups(current_time: datetime) -> tuple[LeadFollowUp, ...]:
                     subject="Proposal follow-up",
                     counterpart_name="Marcus Chen",
                     counterpart_email="marcus@riverbridgeops.com",
+                    last_message_id="msg-riverbridge-proposal-3",
+                    last_external_message_id="<riverbridge-proposal-3@riverbridgeops.com>",
                     last_message_at=current_time - timedelta(days=2),
                     last_message_direction="outbound",
                     message_count=3,
@@ -148,6 +152,8 @@ def build_seed_follow_ups(current_time: datetime) -> tuple[LeadFollowUp, ...]:
                     subject="Spreadsheet workflow question",
                     counterpart_name="Priya Nair",
                     counterpart_email="priya@latticelane.com",
+                    last_message_id="msg-lattice-qualification-2",
+                    last_external_message_id="<lattice-qualification-2@latticelane.com>",
                     last_message_at=current_time - timedelta(days=1),
                     last_message_direction="inbound",
                     message_count=2,
@@ -192,6 +198,8 @@ def build_seed_follow_ups(current_time: datetime) -> tuple[LeadFollowUp, ...]:
                     subject="Checking timing on the pilot",
                     counterpart_name="Jordan Pike",
                     counterpart_email="jordan@cedarpeakagency.com",
+                    last_message_id="msg-cedar-pilot-5",
+                    last_external_message_id="<cedar-pilot-5@cedarpeakagency.com>",
                     last_message_at=current_time - timedelta(days=9),
                     last_message_direction="outbound",
                     message_count=5,
@@ -246,6 +254,10 @@ class InMemoryLeadFollowUpRepository:
         for item in follow_ups:
             self._items[item.id] = replace(item)
         return len(follow_ups)
+
+    def clear_lead_follow_ups(self, user: User) -> None:
+        del user
+        self._items.clear()
 
     def list_mailbox_connections(self, user: User) -> list[MailboxConnection]:
         return [replace(item) for item in self._mailbox_connections.values()]

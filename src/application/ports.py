@@ -84,6 +84,9 @@ class LeadFollowUpRepositoryPort(Protocol):
     def import_lead_follow_ups(self, user: User, follow_ups: list[LeadFollowUp]) -> int:
         """Insert imported follow-ups and return how many were stored."""
 
+    def clear_lead_follow_ups(self, user: User) -> None:
+        """Remove all stored relationship memory for one user."""
+
     def list_mailbox_connections(self, user: User) -> list[MailboxConnection]:
         """Return connected inbox accounts for the authenticated user."""
 
@@ -122,6 +125,7 @@ class MailboxProviderPort(Protocol):
         subject: str,
         body: str,
         thread_id: str | None = None,
+        reply_to_external_message_id: str | None = None,
     ) -> MailboxSendReceipt:
         """Send one outbound note through the provider and return a receipt."""
 

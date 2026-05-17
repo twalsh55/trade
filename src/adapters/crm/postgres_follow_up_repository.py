@@ -110,6 +110,18 @@ class PostgresLeadFollowUpRepository:
             self._upsert_follow_up(user.id, item)
         return len(follow_ups)
 
+    def clear_lead_follow_ups(self, user: User) -> None:
+        with connect(self.database_url) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    DELETE FROM crm_lead_follow_up
+                    WHERE user_id = %(user_id)s
+                    """,
+                    {"user_id": user.id},
+                )
+            connection.commit()
+
     def list_mailbox_connections(self, user: User) -> list[MailboxConnection]:
         with connect(self.database_url, row_factory=dict_row) as connection:
             with connection.cursor() as cursor:
@@ -330,6 +342,8 @@ def _payload_to_thread(payload: dict[str, Any]) -> LeadEmailThreadSummary:
         subject=str(payload["subject"]),
         counterpart_name=str(payload["counterpart_name"]),
         counterpart_email=str(payload["counterpart_email"]),
+        last_message_id=str(payload.get("last_message_id", "")),
+        last_external_message_id=str(payload.get("last_external_message_id", "")),
         last_message_at=_require_datetime(payload["last_message_at"]),
         last_message_direction=str(payload["last_message_direction"]),
         message_count=int(payload["message_count"]),
@@ -369,6 +383,8 @@ def _payload_to_mailbox_connection(payload: dict[str, Any]) -> MailboxConnection
         last_synced_thread_count=int(payload.get("last_synced_thread_count", 0) or 0),
         sent_message_count=int(payload.get("sent_message_count", 0) or 0),
         background_sync_enabled=bool(payload.get("background_sync_enabled", True)),
+        last_watch_event_at=_parse_datetime(payload.get("last_watch_event_at")),
+        watch_event_count=int(payload.get("watch_event_count", 0) or 0),
     )
 
 

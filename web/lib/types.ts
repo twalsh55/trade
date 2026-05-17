@@ -55,6 +55,8 @@ export type AccountSettings = {
   preferred_locale: string;
   data_retention_days: number;
   allow_ai_processing: boolean;
+  privacy_consent_version: string;
+  privacy_consent_granted_at: string | null;
 };
 
 export type AlertHistoryEntry = {
@@ -144,6 +146,8 @@ export type CRMEmailThreadSummary = {
   subject: string;
   counterpart_name: string;
   counterpart_email: string;
+  last_message_id: string;
+  last_external_message_id: string;
   last_message_at: string;
   last_message_direction: "inbound" | "outbound" | string;
   message_count: number;
@@ -227,6 +231,8 @@ export type CRMMailboxConnection = {
   last_synced_thread_count: number;
   sent_message_count: number;
   background_sync_enabled: boolean;
+  last_watch_event_at: string | null;
+  watch_event_count: number;
 };
 
 export type AccountPrivacyExport = {

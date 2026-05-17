@@ -34,6 +34,8 @@ class UserDashboardSettings:
     preferred_locale: str
     data_retention_days: int
     allow_ai_processing: bool
+    privacy_consent_version: str
+    privacy_consent_granted_at: datetime | None
 
 
 @dataclass(frozen=True)

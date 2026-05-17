@@ -285,6 +285,8 @@ def test_design_lead_follow_up_email_uses_lead_context_and_business_profile() ->
         preferred_locale=settings.preferred_locale,
         data_retention_days=settings.data_retention_days,
         allow_ai_processing=settings.allow_ai_processing,
+        privacy_consent_version=settings.privacy_consent_version,
+        privacy_consent_granted_at=settings.privacy_consent_granted_at,
     )
 
     draft = DesignLeadFollowUpEmailUseCase(

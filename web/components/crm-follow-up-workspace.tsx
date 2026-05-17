@@ -1205,6 +1205,7 @@ export function CRMFollowUpWorkspace({
                           <MiniFlag label={`${connection.sent_message_count} sent`} tone="neutral" />
                           <MiniFlag label={`${connection.last_synced_thread_count} synced`} tone="warning" />
                           <MiniFlag label={connection.background_sync_enabled ? "background sync on" : "background sync paused"} tone={connection.background_sync_enabled ? "neutral" : "warning"} />
+                          <MiniFlag label={`${connection.watch_event_count} watch event${connection.watch_event_count === 1 ? "" : "s"}`} tone="neutral" />
                           <Button type="button" variant="outline" disabled={isMailboxPending} onClick={() => toggleMailboxBackgroundSync(connection)}>
                             {connection.background_sync_enabled ? "Pause sync" : "Resume sync"}
                           </Button>
@@ -1216,6 +1217,9 @@ export function CRMFollowUpWorkspace({
                           </Button>
                         </div>
                       </div>
+                      {connection.last_watch_event_at ? (
+                        <p className="mt-3 text-xs text-slate-500">Last watch-triggered sync {formatDateTime(connection.last_watch_event_at)}.</p>
+                      ) : null}
                     </div>
                   ))
                 ) : (

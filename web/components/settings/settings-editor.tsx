@@ -49,6 +49,8 @@ export function SettingsEditor({
       preferred_locale: "en-US",
       data_retention_days: 365,
       allow_ai_processing: true,
+      privacy_consent_version: "v1",
+      privacy_consent_granted_at: null,
     },
   );
 
@@ -101,6 +103,8 @@ export function SettingsEditor({
       preferred_locale: form.preferred_locale.trim(),
       data_retention_days: Number(form.data_retention_days),
       allow_ai_processing: form.allow_ai_processing,
+      privacy_consent_version: form.privacy_consent_version.trim(),
+      privacy_consent_granted_at: form.privacy_consent_granted_at,
     };
     const validationErrors = validateForm(payload);
     setErrors(validationErrors);
@@ -151,6 +155,24 @@ export function SettingsEditor({
     anchor.click();
     URL.revokeObjectURL(url);
     setStatus("Account export downloaded.");
+  }
+
+  async function handlePrivacyErase(scope: "relationship_memory" | "all_memory") {
+    setStatus(scope === "all_memory" ? "Erasing saved relationship memory and mailbox links..." : "Erasing saved relationship memory...");
+    const response = await fetch("/api/account/privacy/erase", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ scope, confirm: true }),
+    });
+    const body = (await response.json().catch(() => null)) as { erased?: boolean; error?: string } | null;
+    if (!response.ok || !body?.erased) {
+      setStatus((body && body.error) || "Unable to erase account data.");
+      return;
+    }
+    setStatus(scope === "all_memory" ? "Relationship memory and mailbox links were erased." : "Relationship memory was erased.");
+    startTransition(() => {
+      router.refresh();
+    });
   }
 
   return (
@@ -404,10 +426,30 @@ export function SettingsEditor({
               Let Brivoly use AI to summarize relationship memory and draft notes.
             </label>
           </Field>
+          <Field label="Privacy consent version">
+            <input
+              className={inputClassName(Boolean(errors.privacy_consent_version))}
+              value={form.privacy_consent_version}
+              onChange={(event) => updateField("privacy_consent_version", event.target.value)}
+              placeholder="v1"
+            />
+            {errors.privacy_consent_version ? <FieldError message={errors.privacy_consent_version} /> : null}
+            <p className="text-xs text-slate-500">
+              {form.privacy_consent_granted_at
+                ? `Consent last recorded ${new Date(form.privacy_consent_granted_at).toLocaleString()}.`
+                : "Consent has not been recorded yet for this account."}
+            </p>
+          </Field>
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <Button type="button" variant="outline" onClick={handlePrivacyExport}>
             Download account export
+          </Button>
+          <Button type="button" variant="outline" onClick={() => handlePrivacyErase("relationship_memory")}>
+            Erase relationship memory
+          </Button>
+          <Button type="button" variant="outline" onClick={() => handlePrivacyErase("all_memory")}>
+            Erase memory and mailbox links
           </Button>
           <p className="text-sm text-slate-500">Includes settings, connected mailboxes, and saved relationship memory.</p>
         </div>
@@ -504,6 +546,9 @@ function validateForm(form: AccountSettings) {
   }
   if (form.data_retention_days < 30 || form.data_retention_days > 3650) {
     nextErrors.data_retention_days = "Retention window must be between 30 and 3650 days.";
+  }
+  if (!form.privacy_consent_version || form.privacy_consent_version.length > 32) {
+    nextErrors.privacy_consent_version = "Consent version must be between 1 and 32 characters.";
   }
   return nextErrors;
 }
