@@ -574,7 +574,7 @@ def test_crm_helper_branches_cover_thread_memory_and_timing_paths() -> None:
     assert _build_thread_continuity_memory(empty_lead, quiet_thread) == ""
     assert "Best next touch from the new context" in _build_upload_follow_through_hint(upload_for_next_step, now)
     assert "fold the new client context" in _build_upload_follow_through_hint(upload_waiting_lead, now)
-    assert "A short recap" in _build_upload_follow_through_hint(upload_context_lead, now)
+    assert "Use the new client context while it is still fresh" in _build_upload_follow_through_hint(upload_context_lead, now)
     assert "Keep the new client context in view" in _build_upload_follow_through_hint(stale_upload_follow_up, now)
 
 
@@ -646,6 +646,10 @@ def test_crm_helper_branches_cover_reconnect_guidance() -> None:
     drifting_lead = build_follow_up(now=now, relationship_state="drifting")
     plain_lead = build_follow_up(now=now, relationship_state="warm", reminders=(), last_meaningful_interaction_at=None, next_step="   ")
     plain_without_company = replace(plain_lead, company_name="   ")
+    timeline_only_lead = replace(
+        plain_without_company,
+        timeline=(LeadTimelineEntry(id="timeline-only", occurred_at=now - timedelta(days=3), kind="email", channel="email", summary="shared updated rollout notes"),),
+    )
     waiting_thread = LeadEmailThreadSummary(
         thread_id="thread-reconnect",
         subject="Checking in",
@@ -667,6 +671,7 @@ def test_crm_helper_branches_cover_reconnect_guidance() -> None:
     assert "momentum is starting to fade" in _build_reconnect_why_now(drifting_lead, now)
     assert _build_reconnect_why_now(reminder_lead, now) == "Send Nina an update."
     assert _build_reconnect_why_now(plain_lead, now) == "Brivoly is keeping a low-pressure reconnect path ready."
+    assert "holding context around Shared updated rollout notes" in _build_reconnect_why_now(timeline_only_lead, now)
 
     assert "referencing Nina" in _build_reconnect_next_move(reminder_lead, now)
     assert "Pick back up from the last note" in _build_reconnect_next_move(thread_lead, now)
@@ -675,6 +680,7 @@ def test_crm_helper_branches_cover_reconnect_guidance() -> None:
     assert "last meaningful touch" in _build_reconnect_next_move(build_follow_up(now=now, next_step="   ", last_meaningful_interaction_at=now - timedelta(days=12), threads=()), now)
     assert "where things stand with Example Co" in _build_reconnect_next_move(plain_lead, now)
     assert _build_reconnect_next_move(plain_without_company, now) == "Keep it simple: acknowledge the gap, offer context, and make the next move easy."
+    assert "saved context around shared updated rollout notes" in _build_reconnect_next_move(timeline_only_lead, now).lower()
 
     assert "introduction from Nina" in _build_reconnect_message_hint(reminder_lead, now)
     assert "lighter pilot option" in _build_reconnect_message_hint(thread_lead, now)
@@ -683,7 +689,8 @@ def test_crm_helper_branches_cover_reconnect_guidance() -> None:
     assert "Pricing concerns and rollout timing" in _build_reconnect_message_hint(context_lead, now)
     assert "12 days ago" in _build_reconnect_message_hint(build_follow_up(now=now, next_step="   ", last_meaningful_interaction_at=now - timedelta(days=12)), now)
     assert "check back in on Example Co" in _build_reconnect_message_hint(plain_lead, now)
-    assert "check back in" in _build_reconnect_message_hint(plain_without_company, now)
+    assert "check back in and see if this is worth picking up again" in _build_reconnect_message_hint(plain_without_company, now)
+    assert "Wanted to circle back on shared updated rollout notes" in _build_reconnect_message_hint(timeline_only_lead, now)
 
 
 def test_crm_helper_branches_cover_email_ingest_validation_and_email_variants() -> None:

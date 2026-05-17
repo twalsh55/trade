@@ -1313,7 +1313,7 @@ function TodayPrioritiesPanel({
                 {primaryPriority.actionLabel ?? "Open"}
               </Button>
               <Button asChild variant="outline" className="border-white/20 bg-transparent text-white hover:bg-white/10 hover:text-white">
-                <Link href={primaryPriority.href}>Open context</Link>
+                <Link href={primaryPriority.href}>Open relationship</Link>
               </Button>
             </div>
           </div>
@@ -1938,16 +1938,13 @@ function InboxNextMovePanel({
           <p className="mt-2 text-sm leading-6 text-slate-600">{latestThread.memory_summary}</p>
         </div>
       ) : null}
-      {latestThread?.continuity_memory ? (
+      {latestThread?.continuity_memory || latestThread?.recent_change_hint || latestThread?.carry_forward_hint || latestThread?.open_loop ? (
         <div className="mt-4 rounded-[1.2rem] border bg-slate-50/80 px-4 py-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Thread through-line</p>
-          <p className="mt-2 text-sm leading-6 text-slate-600">{latestThread.continuity_memory}</p>
-        </div>
-      ) : null}
-      {latestThread?.carry_forward_hint ? (
-        <div className="mt-4 rounded-[1.2rem] border bg-slate-50/80 px-4 py-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Carry forward</p>
-          <p className="mt-2 text-sm leading-6 text-slate-600">{latestThread.carry_forward_hint}</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Conversation memory</p>
+          {latestThread?.continuity_memory ? <p className="mt-2 text-sm leading-6 text-slate-600">{latestThread.continuity_memory}</p> : null}
+          {latestThread?.recent_change_hint ? <p className="mt-2 text-sm leading-6 text-slate-600">{latestThread.recent_change_hint}</p> : null}
+          {latestThread?.carry_forward_hint ? <p className="mt-2 text-sm leading-6 text-slate-700">{latestThread.carry_forward_hint}</p> : null}
+          {latestThread?.open_loop ? <p className="mt-2 text-sm leading-6 text-slate-700">{latestThread.open_loop}</p> : null}
         </div>
       ) : null}
       {latestThread?.unresolved_hint ? (
@@ -1956,23 +1953,12 @@ function InboxNextMovePanel({
           <p className="mt-2 text-sm leading-6 text-slate-600">{latestThread.unresolved_hint}</p>
         </div>
       ) : null}
-      {latestThread?.recent_change_hint ? (
-        <div className="mt-4 rounded-[1.2rem] border bg-slate-50/80 px-4 py-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">What changed</p>
-          <p className="mt-2 text-sm leading-6 text-slate-600">{latestThread.recent_change_hint}</p>
-        </div>
-      ) : null}
-      {latestThread?.open_loop ? (
-        <div className="mt-4 rounded-[1.2rem] border bg-slate-50/80 px-4 py-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Open loop</p>
-          <p className="mt-2 text-sm leading-6 text-slate-600">{latestThread.open_loop}</p>
-        </div>
-      ) : null}
       {lead.relationship_recent_upload_summary ? (
         <div className="mt-4 rounded-[1.2rem] border bg-slate-50/80 px-4 py-4">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Fresh client context</p>
           <p className="mt-2 text-sm leading-6 text-slate-600">{lead.relationship_recent_upload_summary}</p>
           {lead.relationship_upload_follow_through_hint ? <p className="mt-3 text-sm leading-6 text-slate-700">{lead.relationship_upload_follow_through_hint}</p> : null}
+          {lead.relationship_meeting_prep_summary ? <p className="mt-3 text-sm leading-6 text-slate-600">{lead.relationship_meeting_prep_summary}</p> : null}
           <div className="mt-4 flex flex-wrap gap-3">
             <Button
               type="button"
@@ -1987,7 +1973,7 @@ function InboxNextMovePanel({
                 })
               }
             >
-              Use this in a draft
+              Turn this into a note
             </Button>
           </div>
         </div>
@@ -1996,6 +1982,7 @@ function InboxNextMovePanel({
         <div className="mt-4 rounded-[1.2rem] border bg-slate-50/80 px-4 py-4">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Gentle re-entry</p>
           <p className="mt-2 text-sm leading-6 text-slate-600">{lead.relationship_reconnect_why_now || lead.relationship_timing_nudge}</p>
+          {lead.relationship_reconnect_next_move ? <p className="mt-3 text-sm leading-6 text-slate-700">{lead.relationship_reconnect_next_move}</p> : null}
           <p className="mt-3 text-sm leading-6 text-slate-700">{lead.relationship_reconnect_message_hint || "Keep it warm, brief, and easy to answer."}</p>
         </div>
       ) : null}
@@ -2047,7 +2034,7 @@ function RemoteImageCapturePanel({
       <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Client handoff</p>
       <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Give clients an easy place to send updates.</h2>
       <p className="mt-3 text-sm leading-6 text-slate-600">
-        Brivoly gives you a simple no-login handoff page for screenshots, whiteboard photos, and note images. Set it once, then let clients send context from their phone whenever something changes.
+        Brivoly gives you a simple no-login handoff page for screenshots, whiteboard photos, and note images. Set the defaults once, then let clients send context from their phone whenever something changes.
       </p>
 
       {!advancedAiUnlocked ? (
@@ -2104,7 +2091,7 @@ function RemoteImageCapturePanel({
                 Copy handoff text
               </Button>
             </div>
-            <p className="mt-3 text-xs text-slate-500">Share that link with a client or open it yourself on mobile. No login is required.</p>
+            <p className="mt-3 text-xs text-slate-500">Share that link once, then reuse it whenever a client has something new to send. No login is required.</p>
             {shareStatus ? <p className="mt-2 text-sm text-slate-600">{shareStatus}</p> : null}
           </>
         ) : null}
@@ -2248,7 +2235,7 @@ function IntakeRoutingPanel({
             }}
             className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
           >
-            Use calm default
+            Use recommended
           </button>
           {[
             { label: "Shared link + email", value: "upload, magic_link, email" },
@@ -2272,7 +2259,7 @@ function IntakeRoutingPanel({
             }
             className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
           >
-            Use recommended note
+            Fill in the note
           </button>
         </div>
         <label className="block">
@@ -2288,7 +2275,7 @@ function IntakeRoutingPanel({
 
       <div className="mt-5 flex items-center gap-3">
         <Button onClick={onSave} disabled={isSaving || !canPersistSettings}>
-          {isSaving ? "Saving..." : "Save once"}
+          {isSaving ? "Saving..." : "Save defaults"}
         </Button>
         {saveStatus ? <p className="text-sm text-slate-500">{saveStatus}</p> : null}
       </div>
@@ -2366,7 +2353,7 @@ function AIIntakePanel({
             }}
             className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
           >
-            Use calm default
+            Use recommended
           </button>
           {[
             { label: "Sheets + screenshots", value: "csv, google_sheets, spreadsheet_screenshot" },
@@ -2391,7 +2378,7 @@ function AIIntakePanel({
             }
             className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
           >
-            Use recommended prompt
+            Fill in the prompt
           </button>
         </div>
         <label className="block">
@@ -2407,7 +2394,7 @@ function AIIntakePanel({
 
       <div className="mt-5 flex items-center gap-3">
         <Button onClick={onSave} disabled={isSaving || !canPersistSettings}>
-          {isSaving ? "Saving..." : "Save once"}
+          {isSaving ? "Saving..." : "Save defaults"}
         </Button>
         {saveStatus ? <p className="text-sm text-slate-500">{saveStatus}</p> : null}
       </div>
@@ -2859,7 +2846,7 @@ function LeadMemoryPanel({
           <p className="mt-2 text-sm leading-6 text-slate-700">{activeMemoryPanel.body}</p>
         </div>
         <div className="mt-4 rounded-[1.2rem] border bg-white px-4 py-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Latest raw context</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Latest saved context</p>
           <p className="mt-2 text-sm leading-6 text-slate-700">{lead.notes}</p>
         </div>
         {lead.relationship_recent_upload_summary ? (
@@ -2953,7 +2940,7 @@ function LeadMemoryPanel({
 
         <div className="mt-5 flex flex-wrap items-center gap-3">
           <Button onClick={() => onGenerateEmailDraft()} disabled={isGeneratingEmail}>
-            {isGeneratingEmail ? "Designing..." : emailDraft ? "Redesign draft" : "Design email"}
+            {isGeneratingEmail ? "Drafting..." : emailDraft ? "Refresh draft" : "Draft note"}
           </Button>
           {launchHref ? (
             <a
@@ -3053,9 +3040,6 @@ function RelationshipSignalsPanel({ summary }: { summary: NonNullable<CRMFollowU
     <section className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm">
       <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Client momentum</p>
       <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">A calmer read on which relationships are steady and which ones need warmth.</h2>
-      <p className="mt-3 text-sm leading-6 text-slate-600">
-        Instead of a dashboard full of counters, Brivoly keeps a short read on what is healthy, what is slipping, and where a thoughtful touch could reopen momentum.
-      </p>
       <div className="mt-5 space-y-3">
         <TimelineTile
           label="Holding steady"

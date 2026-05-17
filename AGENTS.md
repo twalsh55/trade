@@ -104,7 +104,7 @@ cd web && npm run e2e
   - complete and snooze actions
   - relationship history + internal notes
   - relationship memory summaries that blend email, notes, uploads, reconnect cues, and recent upload context
-  - recent client-shared context now has its own memory view, can be pulled straight into the next drafted note, generates a backend-driven follow-through hint, and now creates a more natural reconnect path plus fresher meeting-prep context
+  - recent client-shared context now has its own memory view, can be pulled straight into the next drafted note, generates a backend-driven follow-through hint, creates a more natural reconnect path, and now plays a bigger role in meeting prep and follow-through guidance
   - auto email designer for reconnects and follow-ups with in-app draft editing
   - last meaningful interaction tracking
   - dormant client detection
@@ -130,11 +130,12 @@ cd web && npm run e2e
   - client-facing upload flow with lighter no-login handoff copy, simpler share-link language, and camera-friendly mobile capture
   - relationship history now visually calls out client-shared upload context instead of burying it in generic activity
   - intake setup now has calmer set-once defaults for channels, handoff notes, source formats, and AI memory prompts to reduce typing and configuration
-  - reconnect guidance now includes a clearer `why it can still land` read plus a starter line for reopening stale, drifting, and at-risk relationships, with gentler company-aware fallbacks when Brivoly has thinner history
+  - reconnect guidance now includes a clearer `why it can still land` read plus a starter line for reopening stale, drifting, and at-risk relationships, with gentler company-aware and saved-context fallbacks when Brivoly has thinner history
   - intake and attention copy now lean further into relationship continuity and away from setup / pipeline language
   - text-heavy card layouts now prefer wider 2-column patterns so copy does not collapse into cramped narrow cards
   - shell, taskbar, import, relationship-memory, and handoff copy now consistently point to Client OS instead of older workspace/portal language
-  - overview density is calmer now, with lighter warm-intro panels, a simpler relationship continuity read, and a less dashboard-like fallback shell
+  - overview density is calmer now, with lighter warm-intro panels, a simpler relationship continuity read, a lighter conversation-memory stack in inbox follow-through, and a less dashboard-like fallback shell
+  - intake defaults now read more like set-it-and-forget-it guidance, with recommended presets and `Save defaults` actions instead of configuration-heavy language
 
 ### Relationship OS Todo
 
