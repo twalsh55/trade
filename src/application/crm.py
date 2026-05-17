@@ -566,8 +566,8 @@ def _build_reconnect_why_now(item: LeadFollowUp, current_time: datetime) -> str:
         return f"Brivoly is still holding context around {_sentence_case(latest_entries[0].summary.rstrip('.'))}, so this does not need to feel like a cold restart."
     if _has_thin_reconnect_context(item):
         if item.company_name.strip():
-            return f"There is not much saved context here yet, which makes a brief check-in with {item.company_name} the cleanest way back in."
-        return "There is not much saved context here yet, so a simple low-pressure restart is the right move."
+            return f"A brief check-in with {item.company_name} is still a natural way to reopen this without overexplaining the gap."
+        return "A brief low-pressure check-in is still enough to reopen this naturally."
     return "Brivoly is keeping a low-pressure reconnect path ready."
 
 
@@ -596,7 +596,7 @@ def _build_reconnect_next_move(item: LeadFollowUp, current_time: datetime) -> st
     if item.last_meaningful_interaction_at:
         return f"Reference the last meaningful touch from {_relative_days(item.last_meaningful_interaction_at, current_time).lower()} and suggest one small next step."
     if item.company_name.strip() and _has_thin_reconnect_context(item):
-        return f"Send a short check-in to {item.company_name}, keep the gap low-pressure, and offer one easy next step."
+        return f"Send a short check-in to {item.company_name}, keep it easy, and offer one simple next step."
     if item.company_name.strip():
         return f"Keep it light: ask where things stand with {item.company_name} and offer one easy next step."
     latest_entries = sorted(item.timeline, key=lambda entry: entry.occurred_at, reverse=True)[:1]
@@ -630,14 +630,14 @@ def _build_reconnect_message_hint(item: LeadFollowUp, current_time: datetime) ->
     if item.last_meaningful_interaction_at:
         return f'Quick angle: "Wanted to reconnect after {_relative_days(item.last_meaningful_interaction_at, current_time).lower()} and make the next step easy from here."'
     if item.company_name.strip() and _has_thin_reconnect_context(item):
-        return f'Quick angle: "Wanted to check in on {item.company_name} and see if it makes sense to pick this back up."'
+        return f'Quick angle: "Wanted to check in on {item.company_name} and see if now is a good time to pick this back up."'
     if item.company_name.strip():
         return f'Quick angle: "Wanted to check back in on {item.company_name} and see if this is worth picking back up."'
     latest_entries = sorted(item.timeline, key=lambda entry: entry.occurred_at, reverse=True)[:1]
     if latest_entries:
         return f'Quick angle: "Wanted to circle back on {_truncate_sentence(latest_entries[0].summary.strip(), 90)} and see if it makes sense to pick this up again."'
     if _has_thin_reconnect_context(item):
-        return 'Quick angle: "Wanted to check in briefly and see if it makes sense to pick this back up."'
+        return 'Quick angle: "Wanted to check in briefly and see if now is a good time to pick this back up."'
     return 'Quick angle: "Wanted to check back in and see if this is worth picking up again."'
 
 
