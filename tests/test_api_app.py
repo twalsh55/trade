@@ -1655,6 +1655,45 @@ def test_account_settings_endpoints_and_alert_history_round_trip() -> None:
     assert updated_dashboard.json()["config"]["universe"] == ["SPY", "QQQ"]
 
 
+def test_account_settings_can_run_in_anonymous_crm_mode() -> None:
+    repository = InMemoryPersonalizationRepository()
+    client = make_client(user=None, personalization_repository=repository)
+
+    os.environ["ALLOW_ANONYMOUS_CRM"] = "true"
+    try:
+        settings_response = client.get("/api/account/settings")
+        assert settings_response.status_code == 200
+        assert settings_response.json()["benchmark"] == "SPY"
+
+        update_response = client.put(
+            "/api/account/settings",
+            json={
+                "universe": ["spy"],
+                "benchmark": "spy",
+                "vix_symbol": "^vix",
+                "risk_proxy": "hyg",
+                "short_yield_symbol": "^irx",
+                "long_yield_symbol": "^tnx",
+                "lookback_years": 4,
+                "telegram_enabled": False,
+                "business_name": "Guest Studio",
+                "business_website": "",
+                "outbound_sender_name": "Guest",
+                "profile_alias": "",
+                "business_logo_data_url": "",
+                "onboarding_profile_deferred": True,
+                "crm_ai_prompt": "",
+                "crm_preferred_import_formats": ["csv"],
+                "crm_image_intake_channels": ["upload"],
+                "crm_image_intake_notes": "",
+            },
+        )
+        assert update_response.status_code == 200
+        assert update_response.json()["business_name"] == "Guest Studio"
+    finally:
+        os.environ.pop("ALLOW_ANONYMOUS_CRM", None)
+
+
 def test_crm_followups_endpoint_requires_auth_and_returns_queue() -> None:
     client = make_client(user=make_user())
 
@@ -1673,6 +1712,19 @@ def test_crm_followups_endpoint_requires_auth_and_returns_queue() -> None:
     assert payload["items"][0]["last_meaningful_interaction_at"]
     assert payload["relationship_summary"]["warm_intro_connections"]
     assert payload["pipeline_summary"]["stage_summaries"]
+
+
+def test_crm_followups_endpoint_can_run_without_auth_in_anonymous_mode() -> None:
+    client = make_client(user=None)
+    os.environ["ALLOW_ANONYMOUS_CRM"] = "true"
+    try:
+        response = client.get("/api/crm/followups")
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["total_open"] == 4
+        assert payload["items"][0]["lead_name"] == "Amber Flores"
+    finally:
+        os.environ.pop("ALLOW_ANONYMOUS_CRM", None)
 
 
 def test_crm_followups_endpoint_supports_complete_snooze_and_notes() -> None:

@@ -11,10 +11,6 @@ export async function PATCH(request: NextRequest, context: Context) {
   const { id } = await context.params;
   const { sessionToken, cookieHeader } = await getServerApiAuthOptions();
 
-  if (!sessionToken && !cookieHeader) {
-    return NextResponse.json({ error: "Authentication required." }, { status: 401 });
-  }
-
   const payload = (await request.json().catch(() => null)) as
     | { action?: "complete" | "snooze" | "note"; snooze_hours?: number; note_body?: string }
     | null;

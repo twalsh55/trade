@@ -6,9 +6,6 @@ import type { AccountSettings } from "@/lib/types";
 
 export async function GET() {
   const { sessionToken, cookieHeader } = await getServerApiAuthOptions();
-  if (!sessionToken && !cookieHeader) {
-    return NextResponse.json({ error: "Authentication required." }, { status: 401 });
-  }
 
   try {
     const settings = await getAccountSettings({ sessionToken, cookieHeader });
@@ -21,9 +18,6 @@ export async function GET() {
 
 export async function PUT(request: Request) {
   const { sessionToken, cookieHeader } = await getServerApiAuthOptions();
-  if (!sessionToken && !cookieHeader) {
-    return NextResponse.json({ error: "Authentication required." }, { status: 401 });
-  }
 
   const payload = (await request.json().catch(() => null)) as AccountSettings | null;
   if (!payload) {

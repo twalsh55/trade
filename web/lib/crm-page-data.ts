@@ -35,14 +35,12 @@ export async function loadCRMPageData(): Promise<CRMPageData> {
   ]);
 
   const user = session?.user;
-  const [followUps, accountSettings, billing, intakeChannel] = user
-    ? await Promise.all([
-        getCrmFollowUpOverview({ sessionToken, cookieHeader }).catch(() => null),
-        getAccountSettings({ sessionToken, cookieHeader }).catch(() => null),
-        getBillingOverview({ sessionToken, cookieHeader }).catch(() => null),
-        getCrmRemoteIntakeChannel({ sessionToken, cookieHeader }).catch(() => null),
-      ])
-    : [null, null, null, null];
+  const [followUps, accountSettings, billing, intakeChannel] = await Promise.all([
+    getCrmFollowUpOverview({ sessionToken, cookieHeader }).catch(() => null),
+    getAccountSettings({ sessionToken, cookieHeader }).catch(() => null),
+    getBillingOverview({ sessionToken, cookieHeader }).catch(() => null),
+    getCrmRemoteIntakeChannel({ sessionToken, cookieHeader }).catch(() => null),
+  ]);
 
   return {
     bootstrap,

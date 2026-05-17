@@ -5,9 +5,6 @@ import { getServerApiAuthOptions } from "@/lib/server-auth";
 
 export async function GET() {
   const { sessionToken, cookieHeader } = await getServerApiAuthOptions();
-  if (!sessionToken && !cookieHeader) {
-    return NextResponse.json({ error: "Authentication required." }, { status: 401 });
-  }
 
   try {
     const billing = await getBillingOverview({ sessionToken, cookieHeader });

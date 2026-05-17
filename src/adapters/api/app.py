@@ -99,11 +99,12 @@ from src.application.dto import (
     dto_to_dict,
 )
 from src.application.use_cases import BuildCrashDashboardUseCase
-from src.domain.auth import User
+from src.domain.auth import ExternalIdentity, User
 from src.domain.models import DEFAULT_UNIVERSE
 from src.env_utils import get_first_configured_env, load_env_file
 
 api_logger = logging.getLogger("brivoly.api")
+ANONYMOUS_CRM_USER_ID = UUID("00000000-0000-0000-0000-00000000c0de")
 
 
 @dataclass(frozen=True)
@@ -268,7 +269,7 @@ def create_app(dependencies: ApiDependencies | None = None) -> FastAPI:
         authorization: str | None = Header(default=None),
         session_cookie: str | None = Cookie(default=None, alias=CLERK_SESSION_COOKIE),
     ) -> dict[str, object]:
-        user = _require_authenticated_user(deps, authorization, session_cookie)
+        user = _require_crm_user(deps, authorization, session_cookie)
         repository = deps.personalization_repository_factory()
         settings = GetUserDashboardSettingsUseCase(
             repository=repository,
@@ -282,7 +283,7 @@ def create_app(dependencies: ApiDependencies | None = None) -> FastAPI:
         authorization: str | None = Header(default=None),
         session_cookie: str | None = Cookie(default=None, alias=CLERK_SESSION_COOKIE),
     ) -> dict[str, object]:
-        user = _require_authenticated_user(deps, authorization, session_cookie)
+        user = _require_crm_user(deps, authorization, session_cookie)
         repository = deps.personalization_repository_factory()
         settings = UpdateUserDashboardSettingsUseCase(repository=repository).execute(
             user,
@@ -328,7 +329,7 @@ def create_app(dependencies: ApiDependencies | None = None) -> FastAPI:
         session_cookie: str | None = Cookie(default=None, alias=CLERK_SESSION_COOKIE),
         limit: int = Query(default=20, ge=1, le=100),
     ) -> dict[str, object]:
-        user = _require_authenticated_user(deps, authorization, session_cookie)
+        user = _require_crm_user(deps, authorization, session_cookie)
         entries = ListAlertHistoryUseCase(repository=deps.personalization_repository_factory()).execute(user, limit=limit)
         return {
             "items": [dto_to_dict(build_alert_history_entry_dto(entry)) for entry in entries],
@@ -340,7 +341,7 @@ def create_app(dependencies: ApiDependencies | None = None) -> FastAPI:
         authorization: str | None = Header(default=None),
         session_cookie: str | None = Cookie(default=None, alias=CLERK_SESSION_COOKIE),
     ) -> dict[str, object]:
-        user = _require_authenticated_user(deps, authorization, session_cookie)
+        user = _require_crm_user(deps, authorization, session_cookie)
         overview = GetLeadFollowUpOverviewUseCase(
             repository=deps.lead_follow_up_repository_factory(),
             now=deps.now,
@@ -354,7 +355,7 @@ def create_app(dependencies: ApiDependencies | None = None) -> FastAPI:
         authorization: str | None = Header(default=None),
         session_cookie: str | None = Cookie(default=None, alias=CLERK_SESSION_COOKIE),
     ) -> dict[str, object]:
-        user = _require_authenticated_user(deps, authorization, session_cookie)
+        user = _require_crm_user(deps, authorization, session_cookie)
         repository = deps.lead_follow_up_repository_factory()
         try:
             if payload.action == "complete":
@@ -392,7 +393,7 @@ def create_app(dependencies: ApiDependencies | None = None) -> FastAPI:
         authorization: str | None = Header(default=None),
         session_cookie: str | None = Cookie(default=None, alias=CLERK_SESSION_COOKIE),
     ) -> dict[str, object]:
-        user = _require_authenticated_user(deps, authorization, session_cookie)
+        user = _require_crm_user(deps, authorization, session_cookie)
         repository = deps.lead_follow_up_repository_factory()
         personalization_repository = deps.personalization_repository_factory()
         try:
@@ -421,7 +422,7 @@ def create_app(dependencies: ApiDependencies | None = None) -> FastAPI:
         authorization: str | None = Header(default=None),
         session_cookie: str | None = Cookie(default=None, alias=CLERK_SESSION_COOKIE),
     ) -> dict[str, object]:
-        user = _require_authenticated_user(deps, authorization, session_cookie)
+        user = _require_crm_user(deps, authorization, session_cookie)
         repository = deps.lead_follow_up_repository_factory()
         try:
             overview = IngestLeadEmailThreadUseCase(repository=repository, now=deps.now).execute(
@@ -453,7 +454,7 @@ def create_app(dependencies: ApiDependencies | None = None) -> FastAPI:
         authorization: str | None = Header(default=None),
         session_cookie: str | None = Cookie(default=None, alias=CLERK_SESSION_COOKIE),
     ) -> dict[str, object]:
-        user = _require_authenticated_user(deps, authorization, session_cookie)
+        user = _require_crm_user(deps, authorization, session_cookie)
         repository = deps.lead_follow_up_repository_factory()
         try:
             csv_content, source_label, source_type = _resolve_crm_import_source(payload, user, deps)
@@ -484,7 +485,7 @@ def create_app(dependencies: ApiDependencies | None = None) -> FastAPI:
         authorization: str | None = Header(default=None),
         session_cookie: str | None = Cookie(default=None, alias=CLERK_SESSION_COOKIE),
     ) -> dict[str, object]:
-        user = _require_authenticated_user(deps, authorization, session_cookie)
+        user = _require_crm_user(deps, authorization, session_cookie)
         repository = deps.lead_follow_up_repository_factory()
         try:
             csv_content, source_label, source_type = _resolve_crm_import_source(payload, user, deps)
@@ -524,7 +525,7 @@ def create_app(dependencies: ApiDependencies | None = None) -> FastAPI:
         authorization: str | None = Header(default=None),
         session_cookie: str | None = Cookie(default=None, alias=CLERK_SESSION_COOKIE),
     ) -> dict[str, object]:
-        user = _require_authenticated_user(deps, authorization, session_cookie)
+        user = _require_crm_user(deps, authorization, session_cookie)
         secret = _get_crm_intake_secret()
         if not secret:
             dto = CRMRemoteIntakeDTO(
@@ -572,6 +573,9 @@ def create_app(dependencies: ApiDependencies | None = None) -> FastAPI:
         authorization: str | None = Header(default=None),
         session_cookie: str | None = Cookie(default=None, alias=CLERK_SESSION_COOKIE),
     ) -> dict[str, object]:
+        session_token = _extract_session_token(authorization, session_cookie)
+        if not session_token and _is_anonymous_crm_enabled():
+            return dto_to_dict(build_billing_overview_dto(GetBillingOverviewUseCase(_DisabledBillingPort()).execute(_build_anonymous_crm_user(deps))))
         user = _require_authenticated_user(deps, authorization, session_cookie)
         billing = deps.billing_port_factory()
         if billing is None:
@@ -835,6 +839,55 @@ def _require_authenticated_user(
     if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required.")
     return user
+
+
+def _is_anonymous_crm_enabled() -> bool:
+    return os.getenv("ALLOW_ANONYMOUS_CRM", "false").strip().lower() == "true"
+
+
+def _build_anonymous_crm_user(deps: ApiDependencies) -> User:
+    user_repository = deps.user_repository_factory()
+    if user_repository is not None and callable(getattr(user_repository, "upsert_authenticated_user", None)):
+        return user_repository.upsert_authenticated_user(
+            ExternalIdentity(
+                provider="anonymous",
+                issuer="brivoly.local",
+                subject="guest-crm",
+                session_id=None,
+                email=None,
+                given_name="Guest",
+                family_name=None,
+                display_name="Guest",
+            )
+        )
+    current_time = deps.now()
+    return User(
+        id=ANONYMOUS_CRM_USER_ID,
+        auth_provider="anonymous",
+        auth_issuer="brivoly.local",
+        auth_subject="guest-crm",
+        stripe_customer_id=None,
+        email=None,
+        given_name="Guest",
+        family_name=None,
+        display_name="Guest",
+        created_at=current_time,
+        updated_at=current_time,
+        last_login_at=current_time,
+    )
+
+
+def _require_crm_user(
+    deps: ApiDependencies,
+    authorization: str | None,
+    session_cookie: str | None,
+) -> User:
+    session_token = _extract_session_token(authorization, session_cookie)
+    if session_token:
+        return _require_authenticated_user(deps, authorization, session_cookie)
+    if _is_anonymous_crm_enabled():
+        return _build_anonymous_crm_user(deps)
+    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required.")
 
 
 def _build_default_dashboard_settings(user_id: UUID) -> UserDashboardSettings:

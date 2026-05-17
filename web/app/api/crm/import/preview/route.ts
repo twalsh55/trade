@@ -6,10 +6,6 @@ import { getServerApiAuthOptions } from "@/lib/server-auth";
 export async function POST(request: NextRequest) {
   const { sessionToken, cookieHeader } = await getServerApiAuthOptions();
 
-  if (!sessionToken && !cookieHeader) {
-    return NextResponse.json({ error: "Authentication required." }, { status: 401 });
-  }
-
   try {
     const payload = await buildImportPayload(request);
     const preview = await previewCrmImport(payload, { sessionToken, cookieHeader });

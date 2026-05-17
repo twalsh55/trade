@@ -61,7 +61,7 @@ cd web && npm run e2e
 - Railway deploys the API from repo root using `Dockerfile`, `railway.toml`, and `scripts/start_railway.sh`.
 - Vercel uses `web/` as project root.
 - Important envs:
-  - API: `DATABASE_URL`, Clerk vars, Stripe vars, Telegram vars, `APP_OPENAI_API_KEY`/`OPENAI_API_KEY`
+  - API: `DATABASE_URL`, Clerk vars, Stripe vars, Telegram vars, `APP_OPENAI_API_KEY`/`OPENAI_API_KEY`, `ALLOW_ANONYMOUS_CRM`
   - Web: `BRIVOLY_API_BASE_URL`, `APP_BASE_URL`, Clerk frontend vars
 - Preferred smoke checks:
   - `uv run pytest`
@@ -89,7 +89,7 @@ cd web && npm run e2e
 
 ### CRM State
 
-- `/crm` is authenticated and production live.
+- `/crm` is production live and currently allows anonymous guest access when `ALLOW_ANONYMOUS_CRM=true`.
 - Current CRM capabilities:
   - left taskbar with dedicated CRM pages
   - follow-up queue

@@ -15,7 +15,7 @@ const items = [
   { href: "/crm/intake", label: "Dropzones", body: "Client upload links and routing" },
 ];
 
-export function CRMTaskbar() {
+export function CRMTaskbar({ authenticated = false }: { authenticated?: boolean }) {
   const pathname = usePathname();
   const [isSigningOut, setIsSigningOut] = useState(false);
 
@@ -56,16 +56,18 @@ export function CRMTaskbar() {
           );
         })}
       </nav>
-      <div className="mt-6 border-t border-white/10 pt-4">
-        <button
-          type="button"
-          onClick={handleSignOut}
-          disabled={isSigningOut}
-          className="w-full rounded-[1.1rem] border border-white/10 bg-white/5 px-4 py-3 text-left text-sm text-slate-200 transition hover:border-white/25 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {isSigningOut ? "Signing out..." : "Sign out"}
-        </button>
-      </div>
+      {authenticated ? (
+        <div className="mt-6 border-t border-white/10 pt-4">
+          <button
+            type="button"
+            onClick={handleSignOut}
+            disabled={isSigningOut}
+            className="w-full rounded-[1.1rem] border border-white/10 bg-white/5 px-4 py-3 text-left text-sm text-slate-200 transition hover:border-white/25 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isSigningOut ? "Signing out..." : "Sign out"}
+          </button>
+        </div>
+      ) : null}
     </aside>
   );
 }
