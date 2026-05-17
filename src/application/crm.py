@@ -1013,34 +1013,59 @@ def _build_ambient_memory_summary(
     paused_memory_count = paused_mailbox_count + paused_calendar_count
     attention_count = attention_mailbox_count + attention_calendar_count
 
-    suggested_action_route = "/clientos/inbox"
+    suggested_action_route = "/clientos/inbox?connections=all"
+    suggested_action_note = ""
     if active_mailbox_count and not active_calendar_count:
         waiting_action_label = "Open inbox"
+        waiting_action_route = "/clientos/inbox?connections=mailbox"
+        waiting_action_note = "A fresh inbox event should be enough to warm the next thread back up."
     elif active_calendar_count and not active_mailbox_count:
         waiting_action_label = "Check meeting context"
+        waiting_action_route = "/clientos/follow-ups?memory=meeting_prep"
+        waiting_action_note = "Open meeting prep and Brivoly will hold onto the saved context you already have."
     else:
         waiting_action_label = "Open inbox"
+        waiting_action_route = "/clientos/inbox?connections=all"
+        waiting_action_note = "One quick check is enough to see whether new inbox or meeting context has landed."
 
     if paused_mailbox_count and not paused_calendar_count:
         paused_action_label = "Resume inbox memory"
+        paused_action_route = "/clientos/inbox?connections=mailbox"
+        paused_action_note = "Turn inbox memory back on when you want Brivoly to quietly hold email context again."
     elif paused_calendar_count and not paused_mailbox_count:
         paused_action_label = "Resume meeting memory"
+        paused_action_route = "/clientos/inbox?connections=calendar"
+        paused_action_note = "Turn meeting memory back on when you want Brivoly to quietly prep upcoming conversations again."
     else:
         paused_action_label = "Resume memory"
+        paused_action_route = "/clientos/inbox?connections=all"
+        paused_action_note = "Resume one source and Brivoly can start holding more of the relationship context again."
 
     if attention_mailbox_count and not attention_calendar_count:
         attention_action_label = "Check inboxes"
+        attention_action_route = "/clientos/inbox?connections=mailbox"
+        attention_action_note = "Reconnect one inbox and the thread memory should settle back down."
     elif attention_calendar_count and not attention_mailbox_count:
         attention_action_label = "Check calendars"
+        attention_action_route = "/clientos/inbox?connections=calendar"
+        attention_action_note = "Reconnect one calendar and Brivoly can warm meeting context quietly again."
     else:
         attention_action_label = "Check connections"
+        attention_action_route = "/clientos/inbox?connections=all"
+        attention_action_note = "A quick connection check should restore the parts of Brivoly that are losing context."
 
     if active_mailbox_count and not active_calendar_count:
         disconnected_action_label = "Connect an inbox"
+        disconnected_action_route = "/clientos/inbox?connections=mailbox"
+        disconnected_action_note = "One inbox connection is enough for Brivoly to start holding onto email context for you."
     elif active_calendar_count and not active_mailbox_count:
         disconnected_action_label = "Connect a calendar"
+        disconnected_action_route = "/clientos/inbox?connections=calendar"
+        disconnected_action_note = "One calendar connection is enough for Brivoly to start holding onto meeting context for you."
     else:
         disconnected_action_label = "Connect one source"
+        disconnected_action_route = "/clientos/inbox?connections=all"
+        disconnected_action_note = "Connect whichever source you already live in most and Brivoly can start holding onto the relationship for you."
 
     if attention_count:
         continuity_state = "attention_needed"
@@ -1051,6 +1076,8 @@ def _build_ambient_memory_summary(
             else f"{attention_count} connection{'s' if attention_count != 1 else ''} need attention before Brivoly can hold relationship memory quietly again."
         )
         suggested_action_label = attention_action_label
+        suggested_action_route = attention_action_route
+        suggested_action_note = attention_action_note
     elif event_ready_mailbox_count or warm_calendar_count:
         continuity_state = "warm"
         continuity_summary = (
@@ -1059,6 +1086,7 @@ def _build_ambient_memory_summary(
         )
         suggested_action_label = ""
         suggested_action_route = ""
+        suggested_action_note = ""
     elif active_memory_count:
         continuity_state = "waiting"
         continuity_summary = (
@@ -1066,6 +1094,8 @@ def _build_ambient_memory_summary(
             f"and {active_calendar_count} calendar{'s' if active_calendar_count != 1 else ''}, and Brivoly is waiting for the next live context to land."
         )
         suggested_action_label = waiting_action_label
+        suggested_action_route = waiting_action_route
+        suggested_action_note = waiting_action_note
     elif paused_memory_count:
         continuity_state = "paused"
         continuity_summary = (
@@ -1073,10 +1103,14 @@ def _build_ambient_memory_summary(
             f"and {paused_calendar_count} calendar{'s' if paused_calendar_count != 1 else ''}. Resume one if you want quieter continuity."
         )
         suggested_action_label = paused_action_label
+        suggested_action_route = paused_action_route
+        suggested_action_note = paused_action_note
     else:
         continuity_state = "disconnected"
         continuity_summary = "Connect an inbox or calendar once and Brivoly can keep more of this context warm for you."
         suggested_action_label = disconnected_action_label
+        suggested_action_route = disconnected_action_route
+        suggested_action_note = disconnected_action_note
 
     return LeadAmbientMemorySummary(
         continuity_state=continuity_state,
@@ -1091,6 +1125,7 @@ def _build_ambient_memory_summary(
         warm_calendar_count=warm_calendar_count,
         suggested_action_label=suggested_action_label,
         suggested_action_route=suggested_action_route,
+        suggested_action_note=suggested_action_note,
         warm_source_labels=warm_source_labels,
         quiet_source_labels=quiet_source_labels,
         attention_source_labels=attention_source_labels,

@@ -171,6 +171,7 @@ cd web && npm run e2e
   - that ambient memory summary now also suggests the calmest next recovery move, so Today and Attention can offer one small fix such as checking connections, resuming memory, or connecting a source instead of just describing the state
   - that shared ambient memory summary now also carries specific paused and attention-needed source labels, so Today and Attention can quietly point to the exact inboxes or calendars thinning Brivoly's memory layer without adding a new admin surface
   - that shared ambient memory summary now also carries warm and quiet source labels, and its recovery actions are more specific about whether Brivoly wants the user to check inboxes, calendars, or resume one kind of memory instead of showing one generic fix for every continuity state
+  - those ambient-memory recovery actions now also carry a short Python-owned note and route through in-app navigation, so Today and Attention can explain the smallest useful fix without bouncing the user through a full page reload
 
 ### Relationship OS Todo
 

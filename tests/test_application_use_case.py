@@ -455,6 +455,7 @@ def test_follow_up_overview_enriches_relationship_intelligence() -> None:
     assert overview.ambient_memory_summary.warm_calendar_count >= 0
     assert isinstance(overview.ambient_memory_summary.suggested_action_label, str)
     assert isinstance(overview.ambient_memory_summary.suggested_action_route, str)
+    assert isinstance(overview.ambient_memory_summary.suggested_action_note, str)
     assert isinstance(overview.ambient_memory_summary.warm_source_labels, tuple)
     assert isinstance(overview.ambient_memory_summary.quiet_source_labels, tuple)
     assert isinstance(overview.ambient_memory_summary.attention_source_labels, tuple)

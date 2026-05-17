@@ -728,6 +728,10 @@ export function CRMFollowUpWorkspace({
     router.push(nextRoute);
   }
 
+  function openAmbientMemoryAction(route: string) {
+    router.push(route);
+  }
+
   function syncInboxThread() {
     setInboxStatus("Syncing the email thread into Brivoly...");
     startInboxTransition(async () => {
@@ -1247,6 +1251,7 @@ export function CRMFollowUpWorkspace({
             onSelectLead={setSelectedLeadId}
             onRunAction={runTodayPriorityAction}
             ambientMemorySummary={overview.ambient_memory_summary}
+            onOpenAmbientMemoryAction={openAmbientMemoryAction}
           />
         </div>
       ) : null}
@@ -1797,6 +1802,7 @@ export function CRMFollowUpWorkspace({
             inboxSummary={overview.inbox_summary}
             onRunAction={runTodayPriorityAction}
             ambientMemorySummary={overview.ambient_memory_summary}
+            onOpenAmbientMemoryAction={openAmbientMemoryAction}
           />
           {overview.relationship_summary ? <RelationshipContinuityPanel summary={overview.relationship_summary} /> : null}
         </section>
@@ -1866,11 +1872,13 @@ function TodayPrioritiesPanel({
   inboxSummary,
   onRunAction,
   ambientMemorySummary,
+  onOpenAmbientMemoryAction,
 }: {
   items: CRMLeadFollowUp[];
   inboxSummary: CRMFollowUpOverview["inbox_summary"];
   onRunAction: (leadId: string, route: string, preset?: TodayDraftPreset, memoryView?: "meeting_prep", threadId?: string | null) => void;
   ambientMemorySummary: CRMFollowUpOverview["ambient_memory_summary"];
+  onOpenAmbientMemoryAction: (route: string) => void;
 }) {
   const replyLead = [...items]
     .filter((item) => item.recent_email_threads.some((thread) => thread.needs_reply))
@@ -2099,11 +2107,14 @@ function TodayPrioritiesPanel({
         <div className="mt-3">
           <button
             type="button"
-            onClick={() => window.location.assign(ambientMemorySummary.suggested_action_route)}
+            onClick={() => onOpenAmbientMemoryAction(ambientMemorySummary.suggested_action_route)}
             className="rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-700 transition hover:border-slate-400 hover:bg-white hover:text-slate-950"
           >
             {ambientMemorySummary.suggested_action_label}
           </button>
+          {ambientMemorySummary.suggested_action_note ? (
+            <p className="mt-2 text-xs leading-5 text-slate-500">{ambientMemorySummary.suggested_action_note}</p>
+          ) : null}
         </div>
       ) : null}
       <div className="mt-4 flex flex-wrap gap-2">
@@ -2311,6 +2322,7 @@ function PipelineBoardPanel({
   onSelectLead,
   onRunAction,
   ambientMemorySummary,
+  onOpenAmbientMemoryAction,
 }: {
   summary: CRMPipelineStageSummary[];
   items: CRMLeadFollowUp[];
@@ -2318,6 +2330,7 @@ function PipelineBoardPanel({
   onSelectLead: (leadId: string) => void;
   onRunAction: (leadId: string, route: string, preset?: TodayDraftPreset) => void;
   ambientMemorySummary: CRMFollowUpOverview["ambient_memory_summary"];
+  onOpenAmbientMemoryAction: (route: string) => void;
 }) {
   const itemsByStage = new Map<string, CRMLeadFollowUp[]>();
   for (const item of items) {
@@ -2380,11 +2393,14 @@ function PipelineBoardPanel({
             <div className="mt-3">
               <button
                 type="button"
-                onClick={() => window.location.assign(ambientMemorySummary.suggested_action_route)}
+                onClick={() => onOpenAmbientMemoryAction(ambientMemorySummary.suggested_action_route)}
                 className="rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-700 transition hover:border-slate-400 hover:bg-white hover:text-slate-950"
               >
                 {ambientMemorySummary.suggested_action_label}
               </button>
+              {ambientMemorySummary.suggested_action_note ? (
+                <p className="mt-2 text-xs leading-5 text-slate-500">{ambientMemorySummary.suggested_action_note}</p>
+              ) : null}
             </div>
           ) : null}
         </div>

@@ -107,6 +107,7 @@ class LeadAmbientMemorySummary:
     warm_calendar_count: int
     suggested_action_label: str = ""
     suggested_action_route: str = ""
+    suggested_action_note: str = ""
     warm_source_labels: tuple[str, ...] = ()
     quiet_source_labels: tuple[str, ...] = ()
     attention_source_labels: tuple[str, ...] = ()
