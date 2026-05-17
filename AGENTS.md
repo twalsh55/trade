@@ -93,10 +93,10 @@ cd web && npm run e2e
 - `/crm` remains as a compatibility alias.
 - Current Client OS capabilities:
   - left taskbar with dedicated Client OS pages
-  - Today priorities with a clear `Start here` focus card, direct draft/review actions, quick-start pills, calmer 2-column summary layouts, and stronger upload-aware next-touch framing
+  - Today priorities with a clear `Start here` focus card, direct draft/review actions, action-labeled quick-start pills, calmer 2-column summary layouts, and stronger upload-aware next-touch framing
   - follow-up queue
   - inbox-native relationship page for auto-logging email threads and reconnect-aware next moves
-  - inbox cards now surface backend-driven relationship pulse, open-loop memory, thread continuity cues, `what changed` hints, and a carry-forward cue for longer threads, grouped into `Needs you now` and `Still warm`
+  - inbox cards now surface backend-driven relationship pulse, open-loop memory, thread continuity cues, `what changed` hints, unresolved-thread cues, and a carry-forward cue for longer threads, grouped into `Needs you now` and `Still warm`
   - email-thread ingestion that can auto-create/update contacts from inbox activity
   - attention view with reconnect-first guidance and direct draft actions
   - complete and snooze actions
@@ -112,6 +112,7 @@ cd web && npm run e2e
   - relationship health scoring
   - CSV/XLSX/XLS/Google Sheets import
   - guided field mapping
+  - import wording now leans further into memory recovery, lighter `next touch` language, and cleaner `Google Sheets` labels
   - import now preserves mapped priority, contact channel, and next step from source sheets instead of replacing them with generic defaults
   - import preview now shows the actual staged priority, channel, and next step before commit
   - duplicate detection + validation preview
@@ -197,7 +198,7 @@ cd web && npm run e2e
 - Highest-conviction Client OS next steps:
   - finish the last relationship-OS copy cleanup across remaining user-facing surfaces
   - keep sharpening `Today` so the daily home feels instantly actionable without reading around
-  - deepen inbox-native memory around unresolved threads, recent changes, and multi-message continuity across longer conversations
+  - deepen inbox-native memory around recent changes and multi-message continuity across longer conversations
   - let client-shared uploads influence even more suggested next moves, meeting prep, and follow-through guidance
   - embed AI follow-up intelligence into `Today`, inbox, and relationship views as calm timing nudges
   - add ambient conversation memory that summarizes emails, notes, uploads, and timeline events into concise relationship context

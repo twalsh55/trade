@@ -110,6 +110,7 @@ def _build_enriched_threads(item: LeadFollowUp, current_time: datetime) -> list[
             continuity_span=_build_thread_continuity_span(thread, current_time),
             recent_change_hint=_build_thread_recent_change_hint(item, thread, current_time),
             carry_forward_hint=_build_thread_carry_forward_hint(item, thread),
+            unresolved_hint=_build_thread_unresolved_hint(item, thread),
         )
         for thread in item.recent_email_threads
     ]
@@ -207,6 +208,26 @@ def _build_thread_carry_forward_hint(item: LeadFollowUp, thread: LeadEmailThread
         return f"Weave in the new client context: {upload_context}"
     if item.relationship_context_summary.strip() and item.relationship_context_summary != "Brivoly has not captured enough relationship context yet.":
         return f"Carry forward the context around {_truncate_sentence(item.relationship_context_summary, 95)}"
+    return ""
+
+
+def _build_thread_unresolved_hint(item: LeadFollowUp, thread: LeadEmailThreadSummary) -> str:
+    snippet = thread.snippet.strip().rstrip(".")
+    if thread.needs_reply and snippet:
+        return f"Still waiting on your reply about {_truncate_sentence(_sentence_case(snippet), 100)}"
+    if thread.needs_reply and item.next_step.strip():
+        return f"Your reply should move {_ensure_sentence(item.next_step)}"
+    if thread.waiting_on_contact and snippet:
+        return f"If they come back, restart from {_truncate_sentence(_sentence_case(snippet), 100)}"
+    if thread.waiting_on_contact and item.next_step.strip():
+        return f"If they reply, come back to {_ensure_sentence(item.next_step)}"
+    if thread.message_count >= 4 and snippet:
+        return f"This thread already has enough context around {_truncate_sentence(_sentence_case(snippet), 100)}"
+    upload_context = _build_upload_memory_snippet(item)
+    if upload_context:
+        return f"Keep the new client context tied to this thread: {upload_context}"
+    if item.relationship_recent_changes_summary.strip():
+        return f"Carry forward what changed: {_truncate_sentence(item.relationship_recent_changes_summary.strip(), 100)}"
     return ""
 
 

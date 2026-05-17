@@ -644,7 +644,7 @@ export function CRMFollowUpWorkspace({
                   setImportError(null);
                 }}
               >
-                Google Sheet
+                Google Sheets
               </Button>
             </div>
 
@@ -669,7 +669,7 @@ export function CRMFollowUpWorkspace({
                   }}
                 />
                 <p className="mt-3 text-xs text-slate-500">
-                  Supported uploads: CSV, XLSX, XLS, PNG, JPG, JPEG, and WEBP. Note images use paid AI intake. Helpful columns include contact, company, owner, current status, next follow-up, and notes.
+                  Supported uploads: CSV, XLSX, XLS, PNG, JPG, JPEG, and WEBP. Note images use paid AI intake. Helpful columns include contact, company, owner, current status, next touch, and notes.
                 </p>
                 {selectedFile ? <p className="mt-2 text-sm font-medium text-slate-700">{selectedFile.name}</p> : null}
                 {selectedFile && isImageFile(selectedFile.name) ? (
@@ -1252,7 +1252,7 @@ function TodayPrioritiesPanel({
             }}
             className="rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-700 transition hover:border-slate-400 hover:bg-white hover:text-slate-950"
           >
-            {item.eyebrow}
+            {item.actionLabel ?? item.eyebrow}
           </button>
         ))}
       </div>
@@ -1291,6 +1291,7 @@ function TodayPrioritiesPanel({
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">Start here</p>
               <p className="mt-2 text-2xl font-semibold tracking-tight">{primaryPriority.title}</p>
               <p className="mt-3 text-sm leading-6 text-slate-200">{primaryPriority.body}</p>
+              <p className="mt-3 text-sm leading-6 text-slate-300">Take the smallest next step here first, then let Brivoly hold the rest of the context in place.</p>
               <p className="mt-4 text-xs text-slate-300">{primaryPriority.meta}</p>
               <p className="mt-3 text-xs uppercase tracking-[0.16em] text-slate-400">{primaryPriority.eyebrow}</p>
             </div>
@@ -1774,6 +1775,7 @@ function InboxThreadCard({
             <p className="mt-2 text-sm leading-6 text-slate-600">{thread.continuity_span}</p>
             <p className="mt-3 text-sm leading-6 text-slate-600">{thread.memory_summary}</p>
             {thread.carry_forward_hint ? <p className="mt-3 text-sm leading-6 text-slate-700">{thread.carry_forward_hint}</p> : null}
+            {thread.unresolved_hint ? <p className="mt-3 text-sm leading-6 text-slate-700">{thread.unresolved_hint}</p> : null}
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {thread.needs_reply ? <MiniFlag tone="critical" label="Reply" /> : null}
@@ -1899,6 +1901,12 @@ function InboxNextMovePanel({
         <div className="mt-4 rounded-[1.2rem] border bg-slate-50/80 px-4 py-4">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Carry forward</p>
           <p className="mt-2 text-sm leading-6 text-slate-600">{latestThread.carry_forward_hint}</p>
+        </div>
+      ) : null}
+      {latestThread?.unresolved_hint ? (
+        <div className="mt-4 rounded-[1.2rem] border bg-slate-50/80 px-4 py-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Still unresolved</p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">{latestThread.unresolved_hint}</p>
         </div>
       ) : null}
       {latestThread?.recent_change_hint ? (
@@ -3350,6 +3358,8 @@ function matchesInboxThread(
       relationship_pulse: string;
       recent_change_hint: string;
       continuity_span: string;
+      carry_forward_hint: string;
+      unresolved_hint: string;
       waiting_on_contact: boolean;
       needs_reply: boolean;
       last_message_at: string;
@@ -3374,6 +3384,8 @@ function matchesInboxThread(
       item.thread.relationship_pulse,
       item.thread.recent_change_hint,
       item.thread.continuity_span,
+      item.thread.carry_forward_hint,
+      item.thread.unresolved_hint,
     ]
       .join(" ")
       .toLowerCase()

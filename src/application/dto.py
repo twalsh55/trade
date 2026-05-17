@@ -237,6 +237,7 @@ class LeadEmailThreadSummaryDTO:
     continuity_span: str
     recent_change_hint: str
     carry_forward_hint: str
+    unresolved_hint: str
 
 
 @dataclass(frozen=True)
@@ -643,6 +644,7 @@ def build_lead_email_thread_summary_dto(thread: LeadEmailThreadSummary) -> LeadE
         continuity_span=thread.continuity_span,
         recent_change_hint=thread.recent_change_hint,
         carry_forward_hint=thread.carry_forward_hint,
+        unresolved_hint=thread.unresolved_hint,
     )
 
 

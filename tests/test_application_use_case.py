@@ -39,6 +39,7 @@ from src.application.crm import (
     _build_thread_open_loop,
     _build_thread_relationship_pulse,
     _build_thread_carry_forward_hint,
+    _build_thread_unresolved_hint,
     _build_thread_recent_change_hint,
     _build_thread_continuity_span,
     _compute_relationship_health_score,
@@ -333,6 +334,7 @@ def test_follow_up_overview_enriches_relationship_intelligence() -> None:
     assert amber.recent_email_threads[0].continuity_span
     assert amber.recent_email_threads[0].recent_change_hint
     assert amber.recent_email_threads[0].carry_forward_hint
+    assert amber.recent_email_threads[0].unresolved_hint
     assert overview.relationship_summary is not None
     assert overview.relationship_summary.stale_count >= 1
     assert overview.relationship_summary.referral_reminder_count >= 1
@@ -547,6 +549,14 @@ def test_crm_helper_branches_cover_thread_memory_and_timing_paths() -> None:
     context_only_lead = replace(empty_lead, relationship_context_summary="Pricing concerns and rollout timing")
     assert "Carry forward the context around" in _build_thread_carry_forward_hint(context_only_lead, quiet_thread)
     assert _build_thread_carry_forward_hint(empty_lead, quiet_thread) == ""
+    assert "Still waiting on your reply" in _build_thread_unresolved_hint(next_step_lead, reply_snippet_thread)
+    assert "Your reply should move" in _build_thread_unresolved_hint(next_step_lead, reply_thread)
+    assert "If they come back, restart from" in _build_thread_unresolved_hint(notes_lead, waiting_snippet_thread)
+    assert "If they reply, come back to" in _build_thread_unresolved_hint(build_follow_up(now=now, next_step="send the recap", notes="   ", threads=(waiting_thread,)), waiting_thread)
+    assert "This thread already has enough context" in _build_thread_unresolved_hint(empty_lead, active_snippet_thread)
+    assert "Keep the new client context tied to this thread" in _build_thread_unresolved_hint(upload_context_lead, light_thread)
+    assert "Carry forward what changed" in _build_thread_unresolved_hint(replace(empty_lead, relationship_recent_changes_summary="Something shifted recently."), quiet_thread)
+    assert _build_thread_unresolved_hint(empty_lead, quiet_thread) == ""
     assert "Best next touch from the new context" in _build_upload_follow_through_hint(upload_for_next_step, now)
     assert "fold the new client context" in _build_upload_follow_through_hint(upload_waiting_lead, now)
     assert "A short recap" in _build_upload_follow_through_hint(upload_context_lead, now)
