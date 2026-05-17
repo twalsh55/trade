@@ -8,10 +8,10 @@ import { BrandMark } from "@/components/brand-mark";
 
 const items = [
   { href: "/clientos", label: "Today", body: "Relationship priorities at a glance" },
-  { href: "/clientos/follow-ups", label: "Relationships", body: "Memory, notes, and next actions" },
-  { href: "/clientos/inbox", label: "Inbox", body: "Auto-log threads and keep contacts up to date" },
-  { href: "/clientos/pipeline", label: "Health", body: "Stale, at-risk, and overdue relationships" },
-  { href: "/clientos/import", label: "Quick Intake", body: "Low-admin spreadsheet and note intake" },
+  { href: "/clientos/follow-ups", label: "Relationships", body: "Memory, warmth, and the next touch" },
+  { href: "/clientos/inbox", label: "Inbox", body: "Quietly keep context current from email" },
+  { href: "/clientos/pipeline", label: "Attention", body: "See who is slipping before they go cold" },
+  { href: "/clientos/import", label: "Context", body: "Bring client context in without extra cleanup" },
   { href: "/clientos/intake", label: "Dropzones", body: "Client upload links and routing" },
 ];
 

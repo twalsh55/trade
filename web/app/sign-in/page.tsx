@@ -38,12 +38,10 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
                 Open Brivoly Client OS.
               </h1>
             </div>
-            <p className="mt-5 text-base leading-7 text-slate-600">
-              Sign in to access your client workspace and continue where you left off.
-            </p>
+            <p className="mt-5 text-base leading-7 text-slate-600">Sign in to pick up every client relationship where you left it.</p>
             <div className="mt-6 space-y-3">
-              <SimpleAccessRow label="Opens" value="Follow-ups, pipeline, imports, and intake" />
-              <SimpleAccessRow label="After sign-in" value="Brivoly returns you to Client OS automatically" />
+              <SimpleAccessRow label="Inside" value="Today, relationships, inbox memory, and dropzones" />
+              <SimpleAccessRow label="After sign-in" value="Brivoly brings you straight back to Client OS" />
             </div>
             <div className="mt-8 flex flex-wrap gap-3">
               {bootstrap?.clerk_sign_up_url ? (

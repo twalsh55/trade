@@ -75,30 +75,31 @@ cd web && npm run e2e
 
 - Brivoly has two live surfaces:
   - `crash-monitor`
-  - `crm`
+  - `clientos`
 - Standing product constraint:
   - optimize for near-zero pain
   - avoid copy/paste and unnecessary typing
   - prefer strong recommendations and acceptance flows over blank forms
-- Current main focus: CRM.
-- Current CRM wedge:
+- Current main focus: Client OS.
+- Current Client OS wedge:
   - follow-up-first
   - spreadsheet-friendly
   - relationship-memory oriented
-  - aimed at operators, agencies, and SMB service workflows
+  - aimed at freelancers, consultants, agencies, and SMB service workflows
 
-### CRM State
+### Client OS State
 
-- `/crm` is production live and currently allows anonymous guest access when `ALLOW_ANONYMOUS_CRM=true`.
-- Current CRM capabilities:
-  - left taskbar with dedicated CRM pages
+- `/clientos` is the primary production route and currently allows anonymous guest access when `ALLOW_ANONYMOUS_CRM=true`.
+- `/crm` remains as a compatibility alias.
+- Current Client OS capabilities:
+  - left taskbar with dedicated Client OS pages
   - follow-up queue
-  - inbox-native CRM page for auto-logging email threads
+  - inbox-native relationship page for auto-logging email threads
   - email-thread ingestion that can auto-create/update contacts from inbox activity
-  - pipeline board view by stage
+  - attention board view by relationship stage
   - complete and snooze actions
-  - contact timeline + internal notes
-  - auto email designer for CRM follow-ups with in-app draft editing
+  - relationship history + internal notes
+  - auto email designer for reconnects and follow-ups with in-app draft editing
   - last meaningful interaction tracking
   - dormant client detection
   - warm intro graph
@@ -119,6 +120,30 @@ cd web && npm run e2e
   - first-login business onboarding with skip-for-now path
   - paid image-note intake
   - magic-link remote note capture for phone image uploads
+
+### Relationship OS Todo
+
+- Positioning and language:
+  - [ ] replace remaining visible CRM/pipeline/workflow language with relationship-first language
+  - [ ] make `Today` feel like the default home for daily attention, not a dashboard
+  - [ ] keep copy focused on memory, continuity, warmth, follow-through, and reduced mental overhead
+- Relationship continuity:
+  - [ ] strengthen the `Today’s relationship priorities` surface around reply, reconnect, proposal follow-up, and new uploads
+  - [ ] make stale and at-risk relationships more prominent than generic stage progress
+  - [ ] improve dormant conversation reopening flows and suggested reconnect actions
+- Inbox-native behavior:
+  - [ ] deepen auto-create/update from email so the inbox feels like the default relationship memory source
+  - [ ] improve AI summaries for threads so recent context is easier to trust at a glance
+  - [ ] add faster inbox search and quick actions with minimal manual entry
+- Client Dropzones:
+  - [ ] keep no-login upload links extremely mobile-friendly and low-friction
+  - [ ] attach uploaded files, screenshots, and notes more clearly to relationship history
+  - [ ] continue removing any operator-heavy intake language from the capture flow
+- UX constraints:
+  - [ ] reduce equal-weight panels, counters, and dashboard-style density
+  - [ ] keep the interface calm, lightweight, and fast on both desktop and mobile
+  - [ ] favor strong defaults and guidance over configuration-heavy controls
+  - [ ] keep Brivoly feeling like a quiet background assistant instead of management software
 
 ### Agent / Automation State
 
@@ -153,7 +178,11 @@ cd web && npm run e2e
 
 ### Next Likely Moves
 
-- Highest-conviction CRM next steps:
+- Highest-conviction Client OS next steps:
+  - finish the relationship-OS copy cleanup across remaining user-facing surfaces
+  - make `Today` the clearest expression of who needs attention right now
+  - deepen inbox-native memory and thread summaries
+  - make dropzones feel more like lightweight client handoff pages and less like intake tooling
   - deeper AI-assisted messy file / image intake behind the paid gate
   - richer stage memory / handoff history
   - spreadsheet cleanup and field-mapping controls after preview

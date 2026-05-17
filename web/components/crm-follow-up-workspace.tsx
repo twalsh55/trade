@@ -549,10 +549,10 @@ export function CRMFollowUpWorkspace({
       <section className="mt-6 rounded-[1.75rem] border bg-white/85 p-6 shadow-sm">
         <div className="grid gap-6 xl:grid-cols-[0.92fr_1.08fr]">
           <section>
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Spreadsheet Import</p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Bring your lead sheet in without retyping it.</h2>
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Context Intake</p>
+            <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Bring relationship context in without retyping it.</h2>
             <p className="mt-3 text-sm leading-6 text-slate-600">
-              Upload a CSV, XLSX, XLS, or note image, or paste a Google Sheets link. Brivoly normalizes messy headers, flags validation problems, and skips duplicates before anything enters the follow-up queue.
+              Upload a CSV, XLSX, XLS, or note image, or paste a Google Sheets link. Brivoly cleans up messy headers, spots missing context, and keeps only what is ready to support better follow-through.
             </p>
 
             <div className="mt-5 flex flex-wrap gap-3">
@@ -569,7 +569,7 @@ export function CRMFollowUpWorkspace({
                   setImportError(null);
                 }}
               >
-                Spreadsheet file
+                File upload
               </Button>
               <Button
                 variant={sourceType === "google_sheets" ? "default" : "outline"}
@@ -584,13 +584,13 @@ export function CRMFollowUpWorkspace({
                   setImportError(null);
                 }}
               >
-                Google Sheets
+                Google Sheet
               </Button>
             </div>
 
             {sourceType === "file_upload" ? (
               <section className="mt-5 rounded-[1.4rem] border bg-slate-50/80 p-5">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Spreadsheet file</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">File upload</p>
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -609,7 +609,7 @@ export function CRMFollowUpWorkspace({
                   }}
                 />
                 <p className="mt-3 text-xs text-slate-500">
-                  Supported uploads: CSV, XLSX, XLS, PNG, JPG, JPEG, and WEBP. Note images use paid AI intake. Suggested spreadsheet columns: contact, company, owner, status, next follow-up, and notes.
+                  Supported uploads: CSV, XLSX, XLS, PNG, JPG, JPEG, and WEBP. Note images use paid AI intake. Helpful columns include contact, company, owner, current status, next follow-up, and notes.
                 </p>
                 {selectedFile ? <p className="mt-2 text-sm font-medium text-slate-700">{selectedFile.name}</p> : null}
                 {selectedFile && isImageFile(selectedFile.name) ? (
@@ -620,7 +620,7 @@ export function CRMFollowUpWorkspace({
               </section>
             ) : (
               <section className="mt-5 rounded-[1.4rem] border bg-slate-50/80 p-5">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Google Sheets URL</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Google Sheets link</p>
                 <input
                   value={sheetUrl}
                   onChange={(event) => {
@@ -642,7 +642,7 @@ export function CRMFollowUpWorkspace({
 
             <div className="mt-5 flex flex-wrap gap-3">
               <Button disabled={isImportPending} onClick={() => requestImportPreview()}>
-                {isImportPending ? "Checking..." : importPreview ? "Refresh preview" : "Preview import"}
+                  {isImportPending ? "Checking..." : importPreview ? "Refresh preview" : "Preview context"}
               </Button>
               <Button
                 variant="outline"
@@ -655,7 +655,7 @@ export function CRMFollowUpWorkspace({
                 }
                 onClick={commitImport}
               >
-                {isImportPending ? "Importing..." : "Import rows"}
+                {isImportPending ? "Importing..." : "Keep these rows"}
               </Button>
             </div>
 
@@ -698,9 +698,9 @@ export function CRMFollowUpWorkspace({
       <section className="mt-6 grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
         <section className="rounded-[1.75rem] border bg-white/80 p-6 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Relationship Memory</p>
-          <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Keep client context close to the next action.</h2>
+          <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Keep context close to the next touch.</h2>
           <p className="mt-3 text-sm leading-6 text-slate-600">
-            Search fast, spot stale relationships, and work the next follow-up without losing the last meaningful interaction.
+            Search fast, spot quiet relationships, and move the next touch forward without losing the last meaningful interaction.
           </p>
           {error ? <p className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p> : null}
           <div className="mt-5 rounded-[1.4rem] border bg-slate-50/80 p-4">
@@ -714,8 +714,8 @@ export function CRMFollowUpWorkspace({
               <div className="flex flex-wrap gap-2">
                 {[
                   { value: "all", label: "All" },
-                  { value: "due", label: "Due now" },
-                  { value: "stale", label: "Stale" },
+                  { value: "due", label: "Today" },
+                  { value: "stale", label: "Reconnect" },
                   { value: "at_risk", label: "At risk" },
                 ].map((item) => (
                   <button
@@ -734,7 +734,7 @@ export function CRMFollowUpWorkspace({
               </div>
             </div>
             <p className="mt-3 text-xs text-slate-500">
-              {filteredFollowUps.length} relationship{filteredFollowUps.length === 1 ? "" : "s"} match the current view.
+              {filteredFollowUps.length} relationship{filteredFollowUps.length === 1 ? "" : "s"} match this view.
             </p>
           </div>
           <div className="mt-6 space-y-4">
@@ -762,30 +762,30 @@ export function CRMFollowUpWorkspace({
                         <PriorityBadge priority={item.priority} />
                       </div>
                     </div>
-                    <p className="mt-4 text-sm font-medium text-slate-700">Next step</p>
+                    <p className="mt-4 text-sm font-medium text-slate-700">Suggested next touch</p>
                     <p className="mt-1 text-sm leading-6 text-slate-600">{item.next_step}</p>
                     <div className="mt-5 grid gap-3 md:grid-cols-2">
-                      <TimelineTile label="Last touched" value={formatDateTime(item.last_contacted_at)} />
-                      <TimelineTile label="Next follow-up" value={formatDateTime(item.next_follow_up_at)} />
+                      <TimelineTile label="Last touch" value={formatDateTime(item.last_contacted_at)} />
+                      <TimelineTile label="Next reminder" value={formatDateTime(item.next_follow_up_at)} />
                     </div>
                   </button>
                   <div className="mt-5 flex flex-wrap gap-3">
                     <Button disabled={rowPending} onClick={() => runAction(item.id, { action: "complete" })}>
-                      {rowPending ? "Updating..." : "Complete"}
+                      {rowPending ? "Updating..." : "Done"}
                     </Button>
                     <Button
                       variant="outline"
                       disabled={rowPending}
                       onClick={() => runAction(item.id, { action: "snooze", snooze_hours: 24 })}
                     >
-                      Snooze 1 day
+                      Tomorrow
                     </Button>
                     <Button
                       variant="outline"
                       disabled={rowPending}
                       onClick={() => runAction(item.id, { action: "snooze", snooze_hours: 72 })}
                     >
-                      Snooze 3 days
+                      Later this week
                     </Button>
                   </div>
                 </article>
@@ -825,12 +825,12 @@ export function CRMFollowUpWorkspace({
             />
           ) : null}
           <section className="rounded-[1.75rem] border bg-slate-950 p-6 text-slate-50 shadow-[0_24px_90px_-55px_rgba(15,23,42,0.9)]">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300">North Star</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300">Why Brivoly</p>
             <h2 className="mt-3 text-3xl font-semibold tracking-tight">Brivoly remembers relationships so freelancers do not have to.</h2>
             <ul className="mt-5 space-y-3 text-sm leading-6 text-slate-300">
-              <li>Every note, touchpoint, and reminder should lower cognitive load instead of adding admin work.</li>
-              <li>Fast search and lightweight actions matter more than heavyweight CRM structure.</li>
-              <li>The goal is consistent follow-up and stronger client memory, not enterprise complexity.</li>
+              <li>Every note, reminder, and suggested message should lower mental overhead instead of adding admin.</li>
+              <li>Brivoly should help you stay warm, responsive, and top-of-mind without more software work.</li>
+              <li>The goal is continuity and follow-through, not pipeline management.</li>
             </ul>
           </section>
         </section>
@@ -840,27 +840,22 @@ export function CRMFollowUpWorkspace({
       {showingInbox ? (
         <section className="mt-6 grid gap-6 xl:grid-cols-[0.92fr_1.08fr]">
           <section className="rounded-[1.75rem] border bg-white/85 p-6 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Inbox Automation</p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Auto-log threads and let Brivoly keep contact memory current.</h2>
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Inbox Memory</p>
+            <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Let Brivoly keep relationship context current from email.</h2>
             <p className="mt-3 text-sm leading-6 text-slate-600">
-              Brivoly turns email activity into relationship memory: it matches contacts by email, creates missing contacts automatically, and logs the thread back onto the right timeline.
+              Brivoly turns email activity into living relationship memory: it matches contacts by email, creates missing contacts automatically, and keeps the right conversation attached to the right person.
             </p>
 
-            <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              <CompactMetricLight label="Connected contacts" value={String(overview.inbox_summary?.connected_contact_count ?? 0)} tone="neutral" />
-              <CompactMetricLight label="Needs your reply" value={String(overview.inbox_summary?.needs_reply_count ?? 0)} tone="critical" />
-              <CompactMetricLight label="Waiting on contact" value={String(overview.inbox_summary?.waiting_on_contact_count ?? 0)} tone="warning" />
-            </div>
-            <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              <CompactMetricLight label="Active threads" value={String(overview.inbox_summary?.active_thread_count ?? 0)} tone="neutral" />
-              <CompactMetricLight label="Stale threads" value={String(overview.inbox_summary?.stale_thread_count ?? 0)} tone="warning" />
-              <CompactMetricLight label="Auto-created contacts" value={String(overview.inbox_summary?.auto_created_contact_count ?? 0)} tone="neutral" />
+            <div className="mt-6 grid gap-4 md:grid-cols-3">
+              <CompactMetricLight label="Reply soon" value={String(overview.inbox_summary?.needs_reply_count ?? 0)} tone="critical" />
+              <CompactMetricLight label="Waiting on them" value={String(overview.inbox_summary?.waiting_on_contact_count ?? 0)} tone="warning" />
+              <CompactMetricLight label="Quiet threads" value={String(overview.inbox_summary?.stale_thread_count ?? 0)} tone="neutral" />
             </div>
 
             <section className="mt-6 rounded-[1.4rem] border bg-slate-50/80 p-5">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Thread sync tester</p>
               <p className="mt-2 text-sm leading-6 text-slate-600">
-                Use this to simulate a provider sync while we wire real inbox connections. The same API route is ready for Gmail or Outlook style thread events.
+                Use this to simulate inbox sync while we wire real provider connections. The same API route is ready for Gmail- or Outlook-style thread events.
               </p>
               <div className="mt-4 grid gap-3 md:grid-cols-2">
                 <input value={inboxThreadId} onChange={(event) => setInboxThreadId(event.target.value)} placeholder="Thread ID (optional)" className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400" />
@@ -948,22 +943,12 @@ export function CRMFollowUpWorkspace({
 
       {showingOverview ? (
         <section className="mt-6 grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
-          <OverviewQuickLinks
-            pipelineStages={overview.pipeline_summary?.stage_summaries ?? []}
+          <TodayPrioritiesPanel
+            items={overview.items}
             selectedLead={selectedLead}
-            intakeChannel={initialIntakeChannel}
             inboxSummary={overview.inbox_summary}
           />
-          <section className="space-y-6">
-            {overview.pipeline_summary?.stage_summaries?.length ? (
-              <PipelineBoardPanel
-                summary={overview.pipeline_summary.stage_summaries}
-                items={overview.items.slice(0, 4)}
-                selectedLeadId={selectedLead?.id ?? null}
-                onSelectLead={setSelectedLeadId}
-              />
-            ) : null}
-          </section>
+          {overview.relationship_summary ? <RelationshipContinuityPanel summary={overview.relationship_summary} /> : null}
         </section>
       ) : null}
     </div>
@@ -973,34 +958,34 @@ export function CRMFollowUpWorkspace({
 function CRMViewHeader({ view }: { view: CRMWorkspaceView }) {
   const copy = {
     overview: {
-      eyebrow: "Client OS",
-      title: "Keep client relationships moving without extra admin.",
-      body: "Brivoly is a low-admin workspace for relationship memory, follow-up discipline, and client intake.",
+      eyebrow: "Today",
+      title: "Today’s relationship priorities.",
+      body: "See who needs your attention, what is slipping, and where a warm follow-through will matter most.",
     },
     followups: {
       eyebrow: "Relationship Memory",
-      title: "Work the next follow-up with the full relationship in view.",
-      body: "Keep notes, last contact, relationship health, and the next action together so freelancers do not have to hold it all in their head.",
+      title: "Never lose track of where a relationship stands.",
+      body: "Keep notes, context, and the next touch together so client continuity does not depend on your memory alone.",
     },
     inbox: {
-      eyebrow: "Inbox-Native CRM",
-      title: "Let email threads update relationship memory automatically.",
-      body: "Use this page to keep contacts current from email activity, surface reply pressure quickly, and reduce manual CRM entry to almost nothing.",
+      eyebrow: "Inbox Memory",
+      title: "Let email quietly keep relationship memory up to date.",
+      body: "Brivoly turns inbox activity into context, summaries, and follow-through without asking you to log everything by hand.",
     },
     pipeline: {
-      eyebrow: "Relationship Health",
-      title: "See which client relationships need attention before they slip.",
-      body: "Use this page to spot dormant threads, at-risk relationships, and the follow-up pressure building across your client base.",
+      eyebrow: "Attention",
+      title: "See who is slipping before opportunities go cold.",
+      body: "Use this page to spot quiet relationships, reopening opportunities, and where a gentle reconnect is due.",
     },
     import: {
-      eyebrow: "Quick Intake",
-      title: "Bring client context into Brivoly with as little admin as possible.",
-      body: "Upload spreadsheets and raw note images, clean them up quickly, and only commit once the relationship data looks right.",
+      eyebrow: "Context Intake",
+      title: "Bring client context into Brivoly without extra cleanup.",
+      body: "Upload spreadsheets and raw note images, let Brivoly make sense of them, and only keep what supports better follow-through.",
     },
     intake: {
       eyebrow: "Client Dropzones",
-      title: "Share simple intake paths without making clients learn your system.",
-      body: "Split dropzone setup into AI profile, routing preferences, and no-login upload links so intake stays mobile-friendly and low-friction.",
+      title: "Make it easy for clients to send context when it matters.",
+      body: "Use no-login upload links, light routing rules, and mobile-first capture so updates land where the relationship already lives.",
     },
   }[view];
 
@@ -1026,47 +1011,45 @@ function resolveIntakeTask(pathname: string): CRMIntakeTask {
   return "hub";
 }
 
-function OverviewQuickLinks({
-  pipelineStages,
+function TodayPrioritiesPanel({
+  items,
   selectedLead,
-  intakeChannel,
   inboxSummary,
 }: {
-  pipelineStages: CRMPipelineStageSummary[];
+  items: CRMLeadFollowUp[];
   selectedLead: CRMLeadFollowUp | null;
-  intakeChannel: CRMRemoteIntakeChannel | null;
   inboxSummary: CRMFollowUpOverview["inbox_summary"];
 }) {
+  const priorities = items.slice(0, 4).map((item) => ({
+    id: item.id,
+    href: "/clientos/follow-ups",
+    title: summarizePriority(item),
+    body: item.next_step,
+    meta: `${item.lead_name} · ${formatDateTime(item.next_follow_up_at)}`,
+  }));
+  if ((inboxSummary?.needs_reply_count ?? 0) > 0) {
+    priorities.unshift({
+      id: "needs-reply",
+      href: "/clientos/inbox",
+      title: `Reply to ${selectedLead?.lead_name ?? "the next contact"}`,
+      body: `${inboxSummary?.needs_reply_count} conversation${inboxSummary?.needs_reply_count === 1 ? "" : "s"} need a response.`,
+      meta: "Inbox memory",
+    });
+  }
+
   return (
     <section className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm">
-      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Workspace Map</p>
-      <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Jump into the right client workflow.</h2>
-      <div className="mt-5 grid gap-4 md:grid-cols-2">
-        <QuickLinkCard
-          href="/clientos/follow-ups"
-          title="Relationships"
-          body={selectedLead ? `Next relationship ready: ${selectedLead.lead_name} at ${selectedLead.company_name}.` : "Work live follow-ups and relationship memory."}
-        />
-        <QuickLinkCard
-          href="/clientos/pipeline"
-          title="Health"
-          body={pipelineStages.length ? `${pipelineStages.length} relationship stages are active right now.` : "See stale, overdue, and at-risk relationships."}
-        />
-        <QuickLinkCard
-          href="/clientos/inbox"
-          title="Inbox"
-          body={inboxSummary?.needs_reply_count ? `${inboxSummary.needs_reply_count} thread${inboxSummary.needs_reply_count === 1 ? "" : "s"} need your reply.` : "Auto-log email threads and keep contacts current."}
-        />
-        <QuickLinkCard
-          href="/clientos/import"
-          title="Quick Intake"
-          body="Bring in spreadsheets, rescue messy headers, and validate relationship rows before commit."
-        />
-        <QuickLinkCard
-          href="/clientos/intake"
-          title="Dropzones"
-          body={intakeChannel?.magic_link_url ? "No-login client upload links are configured." : "Set up AI intake guidance and client dropzones."}
-        />
+      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Today’s priorities</p>
+      <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Where attention is needed right now.</h2>
+      <div className="mt-5 space-y-3">
+        {priorities.slice(0, 4).map((item) => (
+          <PriorityCard key={item.id} href={item.href} title={item.title} body={item.body} meta={item.meta} />
+        ))}
+      </div>
+      <div className="mt-5 grid gap-4 md:grid-cols-3">
+        <QuickLinkCard href="/clientos/follow-ups" title="Relationship memory" body="Never lose track of where a client relationship stands." />
+        <QuickLinkCard href="/clientos/inbox" title="Inbox continuity" body="Keep context current without logging every conversation by hand." />
+        <QuickLinkCard href="/clientos/intake" title="Client dropzones" body="Make it easy for clients to send context when it matters." />
       </div>
     </section>
   );
@@ -1077,6 +1060,34 @@ function QuickLinkCard({ href, title, body }: { href: string; title: string; bod
     <Link href={href} className="block rounded-[1.35rem] border bg-slate-50/80 px-5 py-5 transition hover:border-slate-400 hover:bg-white">
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{title}</p>
       <p className="mt-3 text-sm leading-6 text-slate-700">{body}</p>
+    </Link>
+  );
+}
+
+function RelationshipContinuityPanel({ summary }: { summary: NonNullable<CRMFollowUpOverview["relationship_summary"]> }) {
+  return (
+    <section className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm">
+      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Relationship continuity</p>
+      <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Stay warm without holding everything in your head.</h2>
+      <div className="mt-5 grid gap-3 md:grid-cols-3">
+        <CompactMetricLight label="Steady" value={String(summary.healthy_count)} tone="positive" />
+        <CompactMetricLight label="Needs care" value={String(summary.watch_count)} tone="warning" />
+        <CompactMetricLight label="Slipping" value={String(summary.dormant_count + summary.at_risk_count)} tone="critical" />
+      </div>
+      <div className="mt-4 space-y-3">
+        <TimelineTile label="Warm re-entry paths" value={`${summary.warm_intro_connections.length} contact${summary.warm_intro_connections.length === 1 ? "" : "s"} could help reopen a thread`} />
+        <TimelineTile label="Personal reminders" value={`${summary.referral_reminder_count + summary.milestone_reminder_count} moment${summary.referral_reminder_count + summary.milestone_reminder_count === 1 ? "" : "s"} worth a thoughtful touch`} />
+      </div>
+    </section>
+  );
+}
+
+function PriorityCard({ href, title, body, meta }: { href: string; title: string; body: string; meta: string }) {
+  return (
+    <Link href={href} className="block rounded-[1.35rem] border bg-slate-50/80 px-5 py-5 transition hover:border-slate-400 hover:bg-white">
+      <p className="text-lg font-semibold tracking-tight text-slate-950">{title}</p>
+      <p className="mt-2 text-sm leading-6 text-slate-600">{body}</p>
+      <p className="mt-3 text-xs text-slate-500">{meta}</p>
     </Link>
   );
 }
@@ -1103,16 +1114,16 @@ function PipelineBoardPanel({
       <section className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm xl:col-span-2">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="max-w-2xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Relationship Health</p>
-          <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Stale and at-risk relationships</h2>
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Where attention is needed</p>
+          <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">See where each relationship stands.</h2>
           <p className="mt-3 text-sm leading-6 text-slate-600">
-            Review client relationships by stage, urgency, and dormant risk.
+            Review which relationships feel warm, which need a reconnect, and where momentum is slipping.
           </p>
         </div>
         <div className="grid gap-3 sm:grid-cols-3">
-          <CompactMetricLight label="Stages" value={String(summary.length)} tone="neutral" />
-          <CompactMetricLight label="Overdue across pipeline" value={String(summary.reduce((total, stage) => total + stage.overdue_count, 0))} tone="warning" />
-          <CompactMetricLight label="High priority in flow" value={String(summary.reduce((total, stage) => total + stage.high_priority_count, 0))} tone="critical" />
+          <CompactMetricLight label="Quiet relationships" value={String(summary.reduce((total, stage) => total + stage.dormant_count, 0))} tone="warning" />
+          <CompactMetricLight label="Needs a touch" value={String(summary.reduce((total, stage) => total + stage.overdue_count, 0))} tone="critical" />
+          <CompactMetricLight label="Due soon" value={String(summary.reduce((total, stage) => total + stage.due_this_week_count, 0))} tone="neutral" />
         </div>
       </div>
 
@@ -1126,7 +1137,7 @@ function PipelineBoardPanel({
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Stage</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Where it stands</p>
                   <h3 className="mt-2 text-xl font-semibold tracking-tight text-slate-950">{stage.stage}</h3>
                 </div>
                 <div className="rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-semibold text-slate-700">
@@ -1135,10 +1146,10 @@ function PipelineBoardPanel({
               </div>
 
               <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                <TimelineTile label="Overdue" value={String(stage.overdue_count)} />
-                <TimelineTile label="Due in 7 days" value={String(stage.due_this_week_count)} />
-                <TimelineTile label="High priority" value={String(stage.high_priority_count)} />
-                <TimelineTile label="Dormant" value={String(stage.dormant_count)} />
+                <TimelineTile label="Needs a touch" value={String(stage.overdue_count)} />
+                <TimelineTile label="Due soon" value={String(stage.due_this_week_count)} />
+                <TimelineTile label="Warm" value={String(stage.high_priority_count)} />
+                <TimelineTile label="Quiet" value={String(stage.dormant_count)} />
               </div>
 
               <div className="mt-4 space-y-3">
@@ -1162,9 +1173,9 @@ function PipelineBoardPanel({
                         </div>
                         <PriorityBadge priority={item.priority} />
                       </div>
-                      <p className="mt-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Next follow-up</p>
+                      <p className="mt-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Next reminder</p>
                       <p className="mt-1 text-sm text-slate-700">{formatDateTime(item.next_follow_up_at)}</p>
-                      <p className="mt-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Next step</p>
+                      <p className="mt-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Suggested next touch</p>
                       <p className="mt-1 text-sm leading-6 text-slate-600">{item.next_step}</p>
                     </button>
                   );
@@ -1199,8 +1210,8 @@ function InboxActivityPanel({
 
   return (
     <section className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm">
-      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Recent Threads</p>
-      <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Email activity that Brivoly is holding onto for you.</h2>
+      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Relationship activity</p>
+      <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Recent conversations Brivoly is keeping warm.</h2>
       <div className="mt-6 space-y-4">
         {threads.map(({ leadId, leadName, companyName, stage, thread }) => (
           <button
@@ -1212,7 +1223,7 @@ function InboxActivityPanel({
             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                  {stage} · {thread.last_message_direction === "inbound" ? "Needs your reply" : "Waiting on contact"}
+                  {formatStageLabel(stage)} · {thread.last_message_direction === "inbound" ? "Needs your reply" : "Waiting on them"}
                 </p>
                 <h3 className="mt-2 text-xl font-semibold tracking-tight text-slate-950">{thread.subject}</h3>
                 <p className="mt-1 text-sm text-slate-600">
@@ -1221,8 +1232,8 @@ function InboxActivityPanel({
                 <p className="mt-3 text-sm leading-6 text-slate-600">{thread.snippet}</p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                {thread.needs_reply ? <MiniFlag tone="critical" label="Reply" /> : null}
-                {thread.waiting_on_contact ? <MiniFlag tone="warning" label="Waiting" /> : null}
+                  {thread.needs_reply ? <MiniFlag tone="critical" label="Reply" /> : null}
+                  {thread.waiting_on_contact ? <MiniFlag tone="warning" label="Waiting" /> : null}
                 <div className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">
                   {thread.message_count} msg
                 </div>
@@ -1236,7 +1247,7 @@ function InboxActivityPanel({
         ))}
         {!threads.length ? (
           <div className="rounded-[1.35rem] border border-dashed bg-slate-50/70 p-6 text-sm leading-6 text-slate-600">
-            No synced email threads yet. Once inbox automation starts flowing, this page becomes the low-admin record of who said what and who needs a reply.
+            No synced email threads yet. Once inbox sync is flowing, this becomes the quiet memory layer for who said what and who needs a reply.
           </div>
         ) : null}
       </div>
@@ -1262,7 +1273,7 @@ function RemoteImageCapturePanel({
       <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Client Dropzones</p>
       <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Share a no-login upload link with clients.</h2>
       <p className="mt-3 text-sm leading-6 text-slate-600">
-        Brivoly gives freelancers a simple mobile-first dropzone for files, screenshots, and note images. Clients can upload without logging in, and the intake lands back in your relationship workflow.
+        Brivoly gives freelancers a simple mobile-first dropzone for files, screenshots, and note images. Clients can upload without logging in, and that context lands back in the relationship timeline.
       </p>
 
       {!advancedAiUnlocked ? (
@@ -1316,7 +1327,7 @@ function IntakeTaskNav({ activeTask }: { activeTask: CRMIntakeTask }) {
 
   return (
     <section className="rounded-[1.75rem] border bg-white/90 p-5 shadow-sm">
-      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Dropzone Tasks</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Dropzone Setup</p>
       <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         {items.map((item) => {
           const active = item.task === activeTask;
@@ -1353,19 +1364,19 @@ function IntakeTaskHub({
     <section className="grid gap-6 xl:grid-cols-3">
       <TaskSummaryCard
         href="/clientos/intake/profile"
-        eyebrow="Task 1"
-        title="Set the AI profile"
+        eyebrow="Step 1"
+        title="Teach Brivoly your source material"
         body={advancedAiUnlocked ? "Your paid AI intake tools are available. Keep the prompt and common formats current." : "Unlock the paid AI intake layer before relying on note-image and messy-file interpretation."}
       />
       <TaskSummaryCard
         href="/clientos/intake/routing"
-        eyebrow="Task 2"
-        title="Define routing rules"
+        eyebrow="Step 2"
+        title="Decide how context should arrive"
         body={normalizedChannels.length ? `Preferred channels are set: ${normalizedChannels.join(", ")}.` : "Add preferred intake channels and operator notes so the team knows where raw material should come from."}
       />
       <TaskSummaryCard
         href="/clientos/intake/capture"
-        eyebrow="Task 3"
+        eyebrow="Step 3"
         title="Share the client dropzone"
         body={hasMagicLink ? "A signed no-login upload link is live and ready to share with clients." : "Finish setup so the client upload path can be used from a phone."}
       />
@@ -1415,9 +1426,9 @@ function IntakeRoutingPanel({
   return (
     <section className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm">
       <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Intake Routing</p>
-      <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Tell the team how raw intake should arrive.</h2>
+      <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Decide how relationship context should arrive.</h2>
       <p className="mt-3 text-sm leading-6 text-slate-600">
-        Use this task to define preferred image-intake channels and the operator notes that explain when each path should be used.
+        Use this task to define the preferred intake paths and the notes that explain when each one should be used.
       </p>
 
       <div className="mt-5 space-y-4">
@@ -1484,9 +1495,9 @@ function AIIntakePanel({
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">AI Intake Profile</p>
-          <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Teach Brivoly your messy files.</h2>
+          <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Teach Brivoly the context you usually receive.</h2>
           <p className="mt-3 text-sm leading-6 text-slate-600">
-            Store a custom prompt and common source formats per user so future AI-assisted spreadsheet, file, and image interpretation can stay close to how that team actually works.
+            Store a custom prompt and common source formats per user so future AI-assisted spreadsheet, file, and image interpretation stays close to how you actually work.
           </p>
         </div>
         <div className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${advancedAiUnlocked ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-amber-50 text-amber-800"}`}>
@@ -1854,9 +1865,9 @@ function LeadMemoryPanel({
       <p className="mt-1 text-sm text-slate-600">{lead.company_name}</p>
 
       <div className="mt-5 grid gap-3 md:grid-cols-3">
-        <TimelineTile label="Current stage" value={lead.stage} />
-        <TimelineTile label="Primary channel" value={lead.contact_channel} />
-        <TimelineTile label="Owner" value={lead.owner_name} />
+        <TimelineTile label="Where it stands" value={formatStageLabel(lead.stage)} />
+        <TimelineTile label="Best channel" value={lead.contact_channel} />
+        <TimelineTile label="Point person" value={lead.owner_name} />
       </div>
 
       <div className="mt-4 grid gap-3 md:grid-cols-3">
@@ -1867,7 +1878,7 @@ function LeadMemoryPanel({
 
       {lead.referral_source_name || lead.birthday || lead.company_milestone_date || lead.relationship_reminders.length ? (
         <section className="mt-6 rounded-[1.5rem] border bg-amber-50/70 p-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">Relationship Signals</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">Keep this relationship warm</p>
           <div className="mt-3 grid gap-3 md:grid-cols-2">
             <TimelineTile label="Warm intro source" value={lead.referral_source_name || "No warm intro mapped yet"} />
             <TimelineTile
@@ -1900,9 +1911,9 @@ function LeadMemoryPanel({
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <p className="ui-eyebrow">Follow-Up Intelligence</p>
-            <h3 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">Draft the next client message without starting from zero.</h3>
+            <h3 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">Draft the next reconnect without starting from zero.</h3>
             <p className="mt-2 text-sm leading-6 text-slate-600">
-              Brivoly uses the relationship stage, next step, and your saved business profile to suggest a follow-up you can edit before sending.
+              Brivoly uses the latest context, suggested next touch, and your saved business profile to suggest a message you can edit before sending.
             </p>
           </div>
           <div className="rounded-[1.2rem] border bg-slate-50 px-4 py-3 text-sm text-slate-600 lg:max-w-xs">
@@ -2001,7 +2012,7 @@ function LeadMemoryPanel({
       </section>
 
       <section className="mt-6 rounded-[1.5rem] border bg-white p-5">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Add internal note</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Add context</p>
         <textarea
           value={noteDraft}
           onChange={(event) => onNoteDraftChange(event.target.value)}
@@ -2009,7 +2020,7 @@ function LeadMemoryPanel({
           className="mt-3 min-h-28 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:bg-white"
         />
         <div className="mt-4 flex items-center justify-between gap-4">
-          <p className="text-xs text-slate-500">Keep notes lightweight and operational. This is for memory, not prose.</p>
+          <p className="text-xs text-slate-500">Keep notes light. This is here to preserve context, not create more work.</p>
           <Button disabled={isSavingNote || !noteDraft.trim()} onClick={onSaveNote}>
             {isSavingNote ? "Saving..." : "Save note"}
           </Button>
@@ -2017,7 +2028,7 @@ function LeadMemoryPanel({
       </section>
 
       <section className="mt-6">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Timeline</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Relationship history</p>
         <div className="mt-4 space-y-4">
           {lead.timeline.map((entry) => (
             <div key={entry.id} className="rounded-[1.35rem] border bg-slate-50/80 p-4">
@@ -2039,8 +2050,8 @@ function LeadMemoryPanel({
 function RelationshipSignalsPanel({ summary }: { summary: NonNullable<CRMFollowUpOverview["relationship_summary"]> }) {
   return (
     <section className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm">
-      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Relationship Intelligence</p>
-      <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">See who is slipping, not just who is due.</h2>
+      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Client momentum</p>
+      <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">See who is slipping before the relationship cools.</h2>
       <div className="mt-5 grid gap-3 md:grid-cols-3">
         <CompactMetricLight label="Healthy" value={String(summary.healthy_count)} tone="positive" />
         <CompactMetricLight label="Watch" value={String(summary.watch_count)} tone="warning" />
@@ -2058,10 +2069,10 @@ function RelationshipSignalsPanel({ summary }: { summary: NonNullable<CRMFollowU
 function WarmIntroGraphPanel({ summary }: { summary: NonNullable<CRMFollowUpOverview["relationship_summary"]> }) {
   return (
     <section className="rounded-[1.75rem] border bg-slate-950 p-6 text-slate-50 shadow-[0_24px_80px_-55px_rgba(15,23,42,0.9)]">
-      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300">Warm Intro Graph</p>
-      <h2 className="mt-3 text-3xl font-semibold tracking-tight">Keep track of who can reopen a thread.</h2>
+      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300">Warm paths back in</p>
+      <h2 className="mt-3 text-3xl font-semibold tracking-tight">Know who can help reopen a quiet conversation.</h2>
       <p className="mt-3 text-sm leading-6 text-slate-300">
-        Brivoly maps referral-backed relationships so follow-up pressure can turn into a warmer path instead of another cold nudge.
+        Brivoly keeps track of referral-backed relationships so a reconnect can come through a warmer path instead of another cold nudge.
       </p>
       <div className="mt-5 space-y-3">
         {summary.warm_intro_connections.length ? (
@@ -2207,6 +2218,42 @@ function TimelineTileDark({ label, value }: { label: string; value: string }) {
       <p className="mt-2 text-sm text-slate-200">{value}</p>
     </div>
   );
+}
+
+function summarizePriority(item: CRMLeadFollowUp) {
+  if (item.recent_email_threads.some((thread) => thread.needs_reply)) {
+    return `Reply to ${item.lead_name}`;
+  }
+  if (item.dormant) {
+    return `Reconnect with ${item.lead_name}`;
+  }
+  if (item.relationship_health_label === "at_risk") {
+    return `${item.lead_name} needs a warmer touch`;
+  }
+  return `${formatStageLabel(item.stage)} for ${item.lead_name}`;
+}
+
+function formatStageLabel(stage: string) {
+  const normalized = stage.trim().toLowerCase();
+  if (normalized === "new lead") {
+    return "Just getting started";
+  }
+  if (normalized === "contacted") {
+    return "Conversation open";
+  }
+  if (normalized === "proposal sent") {
+    return "Proposal in play";
+  }
+  if (normalized === "negotiation") {
+    return "Working through details";
+  }
+  if (normalized === "active client") {
+    return "Active client";
+  }
+  if (normalized === "awaiting response") {
+    return "Waiting on them";
+  }
+  return stage;
 }
 
 function formatDateTime(value: string | null) {
