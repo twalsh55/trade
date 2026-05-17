@@ -135,7 +135,7 @@ cd web && npm run e2e
   - text-heavy card layouts now prefer wider 2-column patterns so copy does not collapse into cramped narrow cards
   - shell, taskbar, import, relationship-memory, and handoff copy now consistently point to Client OS instead of older workspace/portal language
   - overview density is calmer now, with lighter warm-intro panels, a simpler relationship continuity read, a lighter conversation-memory stack in inbox follow-through, a less repetitive relationship-memory panel, and a less dashboard-like fallback shell
-  - intake defaults now read more like set-it-and-forget-it guidance, with recommended presets, quieter `Client dropzone` language, lighter `Usual paths` / `What Brivoly should notice` wording, `Default 1/2/3` task framing, and `Save defaults` actions instead of configuration-heavy language
+  - intake defaults now read more like set-it-and-forget-it guidance, with quieter `Client dropzone` language, lighter `Usual paths` / `What Brivoly should notice` wording, `Default 1/2/3` task framing, `Use usual setup` / `Use usual note` helper actions, and `Save defaults` actions instead of configuration-heavy language
 
 ### Relationship OS Todo
 

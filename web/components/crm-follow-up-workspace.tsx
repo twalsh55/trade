@@ -2069,7 +2069,7 @@ function RemoteImageCapturePanel({
       <div className="mt-5 rounded-[1.3rem] border bg-slate-50 px-4 py-4">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Ready to share</p>
         <p className="mt-2 text-sm font-medium text-slate-900">
-          {intakeChannel?.magic_link_url ? "No-login update page is live." : "The client update page is not ready yet."}
+          {intakeChannel?.magic_link_url ? "Your client link is ready." : "The client link is not ready yet."}
         </p>
         <p className="mt-2 text-sm leading-6 text-slate-600">
           {intakeChannel?.instructions ?? "Turn this on once so clients have a phone-friendly page they can keep using whenever something changes."}
@@ -2099,7 +2099,7 @@ function RemoteImageCapturePanel({
                 Copy share note
               </Button>
             </div>
-            <p className="mt-3 text-xs text-slate-500">Share the link once, then reuse it whenever a client has something new to send. No login is required.</p>
+            <p className="mt-3 text-xs text-slate-500">Share the link once, then keep reusing it. No login is required.</p>
             {shareStatus ? <p className="mt-2 text-sm text-slate-600">{shareStatus}</p> : null}
           </>
         ) : null}
@@ -2162,7 +2162,7 @@ function IntakeTaskHub({
       <TaskSummaryCard
         href="/clientos/intake/routing"
         eyebrow="Default 2"
-        title="Choose the easiest default path"
+        title="Choose the easiest path"
         body={normalizedChannels.length ? `Default paths are set: ${normalizedChannels.join(", ")}.` : "Set one path and one short note so sending updates feels obvious."}
       />
       <TaskSummaryCard
@@ -2216,7 +2216,7 @@ function IntakeRoutingPanel({
 }) {
   return (
     <section className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm">
-      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Default handoff path</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Default path</p>
       <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Set the easiest path once.</h2>
       <p className="mt-3 text-sm leading-6 text-slate-600">
         Keep this simple: choose the usual paths for this account and leave one short note so every new update lands in the right place.
@@ -2228,7 +2228,7 @@ function IntakeRoutingPanel({
           <input
             value={channelsDraft}
             onChange={(event) => onChannelsDraftChange(event.target.value)}
-            placeholder="upload, whatsapp, email"
+            placeholder="upload, magic_link, email"
             className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:bg-white"
           />
         </label>
@@ -2243,7 +2243,7 @@ function IntakeRoutingPanel({
             }}
             className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
           >
-            Recommended
+            Use usual setup
           </button>
           {[
             { label: "Shared link + email", value: "upload, magic_link, email" },
@@ -2267,7 +2267,7 @@ function IntakeRoutingPanel({
             }
             className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
           >
-            Use starter note
+            Use usual note
           </button>
         </div>
         <label className="block">
@@ -2287,7 +2287,7 @@ function IntakeRoutingPanel({
         </Button>
         {saveStatus ? <p className="text-sm text-slate-500">{saveStatus}</p> : null}
       </div>
-      {!canPersistSettings ? <p className="mt-3 text-sm text-slate-500">These defaults will open once account details finish loading.</p> : null}
+      {!canPersistSettings ? <p className="mt-3 text-sm text-slate-500">These defaults will appear once account details finish loading.</p> : null}
     </section>
   );
 }
@@ -2326,7 +2326,7 @@ function AIIntakePanel({
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Usual client formats</p>
           <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Show Brivoly what clients usually send.</h2>
           <p className="mt-3 text-sm leading-6 text-slate-600">
-            Keep a short memory cue and your common source formats here so future spreadsheet, file, and image interpretation stays close to how you actually work.
+            Keep a short memory cue and your usual source formats here so future spreadsheet, file, and image interpretation stays close to how you actually work.
           </p>
         </div>
         <div className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${advancedAiUnlocked ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-amber-50 text-amber-800"}`}>
@@ -2361,7 +2361,7 @@ function AIIntakePanel({
             }}
             className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
           >
-            Recommended
+            Use usual setup
           </button>
           {[
             { label: "Sheets + screenshots", value: "csv, google_sheets, spreadsheet_screenshot" },
@@ -2386,7 +2386,7 @@ function AIIntakePanel({
             }
             className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
           >
-            Use starter cue
+            Use usual cue
           </button>
         </div>
         <label className="block">
@@ -2406,7 +2406,7 @@ function AIIntakePanel({
         </Button>
         {saveStatus ? <p className="text-sm text-slate-500">{saveStatus}</p> : null}
       </div>
-      {!canPersistSettings ? <p className="mt-3 text-sm text-slate-500">These defaults will open once account settings finish loading.</p> : null}
+      {!canPersistSettings ? <p className="mt-3 text-sm text-slate-500">These defaults will appear once account settings finish loading.</p> : null}
     </section>
   );
 }
