@@ -15,6 +15,7 @@ from src.domain.crm import (
     LeadFollowUpEmailDraft,
     LeadFollowUpOverview,
     LeadInboxSummary,
+    LeadAmbientMemorySummary,
     MailboxConnection,
     MailboxSendResult,
     MailboxSyncResult,
@@ -283,6 +284,20 @@ class LeadInboxSummaryDTO:
 
 
 @dataclass(frozen=True)
+class LeadAmbientMemorySummaryDTO:
+    continuity_state: str
+    continuity_summary: str
+    active_mailbox_count: int
+    paused_mailbox_count: int
+    attention_mailbox_count: int
+    event_ready_mailbox_count: int
+    active_calendar_count: int
+    paused_calendar_count: int
+    attention_calendar_count: int
+    warm_calendar_count: int
+
+
+@dataclass(frozen=True)
 class MailboxConnectionDTO:
     id: str
     provider: str
@@ -366,6 +381,7 @@ class LeadFollowUpOverviewDTO:
     relationship_summary: LeadRelationshipSummaryDTO | None
     pipeline_summary: LeadPipelineSummaryDTO | None
     inbox_summary: LeadInboxSummaryDTO | None
+    ambient_memory_summary: LeadAmbientMemorySummaryDTO | None
 
 
 @dataclass(frozen=True)
@@ -602,6 +618,7 @@ def build_lead_follow_up_overview_dto(overview: LeadFollowUpOverview) -> LeadFol
         relationship_summary=build_lead_relationship_summary_dto(overview.relationship_summary),
         pipeline_summary=build_lead_pipeline_summary_dto(overview.pipeline_summary),
         inbox_summary=build_lead_inbox_summary_dto(overview.inbox_summary),
+        ambient_memory_summary=build_lead_ambient_memory_summary_dto(overview.ambient_memory_summary),
     )
 
 
@@ -761,6 +778,23 @@ def build_lead_inbox_summary_dto(summary: LeadInboxSummary | None) -> LeadInboxS
         waiting_on_contact_count=summary.waiting_on_contact_count,
         stale_thread_count=summary.stale_thread_count,
         auto_created_contact_count=summary.auto_created_contact_count,
+    )
+
+
+def build_lead_ambient_memory_summary_dto(summary: LeadAmbientMemorySummary | None) -> LeadAmbientMemorySummaryDTO | None:
+    if summary is None:
+        return None
+    return LeadAmbientMemorySummaryDTO(
+        continuity_state=summary.continuity_state,
+        continuity_summary=summary.continuity_summary,
+        active_mailbox_count=summary.active_mailbox_count,
+        paused_mailbox_count=summary.paused_mailbox_count,
+        attention_mailbox_count=summary.attention_mailbox_count,
+        event_ready_mailbox_count=summary.event_ready_mailbox_count,
+        active_calendar_count=summary.active_calendar_count,
+        paused_calendar_count=summary.paused_calendar_count,
+        attention_calendar_count=summary.attention_calendar_count,
+        warm_calendar_count=summary.warm_calendar_count,
     )
 
 

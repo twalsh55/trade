@@ -10,6 +10,7 @@ from src.application.account import UserDashboardSettings
 from src.application.ports import LeadFollowUpRepositoryPort, MailboxProviderPort
 from src.domain.auth import User
 from src.domain.crm import (
+    LeadAmbientMemorySummary,
     CalendarConnection,
     LeadEmailThreadSummary,
     LeadFollowUp,
@@ -53,6 +54,16 @@ class GetLeadFollowUpOverviewUseCase:
         items = [_enrich_follow_up(item, current_time) for item in self.repository.list_lead_follow_ups(user)]
         ordered_items = sorted(items, key=lambda item: (item.next_follow_up_at, item.priority != "high", item.lead_name))
         current_date = current_time.date()
+        mailbox_connections = (
+            self.repository.list_mailbox_connections(user)
+            if callable(getattr(self.repository, "list_mailbox_connections", None))
+            else []
+        )
+        calendar_connections = (
+            self.repository.list_calendar_connections(user)
+            if callable(getattr(self.repository, "list_calendar_connections", None))
+            else []
+        )
 
         return LeadFollowUpOverview(
             generated_at=current_time,
@@ -64,6 +75,7 @@ class GetLeadFollowUpOverviewUseCase:
             relationship_summary=_build_relationship_summary(ordered_items),
             pipeline_summary=_build_pipeline_summary(ordered_items, current_time),
             inbox_summary=_build_inbox_summary(ordered_items, current_time),
+            ambient_memory_summary=_build_ambient_memory_summary(mailbox_connections, calendar_connections),
         )
 
 
@@ -927,6 +939,75 @@ def _build_inbox_summary(items: list[LeadFollowUp], current_time: datetime) -> L
             1 for thread in threads if thread.last_message_at <= current_time - timedelta(days=5)
         ),
         auto_created_contact_count=sum(1 for item in items if item.stage.strip().lower() == "inbox"),
+    )
+
+
+def _build_ambient_memory_summary(
+    mailbox_connections: list[MailboxConnection],
+    calendar_connections: list[CalendarConnection],
+) -> LeadAmbientMemorySummary:
+    active_mailbox_count = sum(1 for item in mailbox_connections if item.background_sync_enabled and item.status == "connected")
+    paused_mailbox_count = sum(1 for item in mailbox_connections if not item.background_sync_enabled)
+    attention_mailbox_count = sum(1 for item in mailbox_connections if item.reauth_required or item.status in {"attention_needed", "needs_reauth"})
+    event_ready_mailbox_count = sum(
+        1
+        for item in mailbox_connections
+        if item.background_sync_enabled and item.status == "connected" and item.watch_status == "active" and item.last_watch_event_at is not None
+    )
+    active_calendar_count = sum(1 for item in calendar_connections if item.background_sync_enabled and item.status == "connected")
+    paused_calendar_count = sum(1 for item in calendar_connections if not item.background_sync_enabled)
+    attention_calendar_count = sum(1 for item in calendar_connections if item.status not in {"", "connected"})
+    warm_calendar_count = sum(
+        1
+        for item in calendar_connections
+        if item.background_sync_enabled and item.status == "connected" and item.last_event_ingested_at is not None
+    )
+
+    active_memory_count = active_mailbox_count + active_calendar_count
+    paused_memory_count = paused_mailbox_count + paused_calendar_count
+    attention_count = attention_mailbox_count + attention_calendar_count
+
+    if attention_count:
+        continuity_state = "attention_needed"
+        continuity_summary = (
+            f"{attention_count} connection{'s' if attention_count != 1 else ''} need attention, "
+            f"but Brivoly is still holding context from {active_memory_count} live source{'s' if active_memory_count != 1 else ''} in the background."
+            if active_memory_count
+            else f"{attention_count} connection{'s' if attention_count != 1 else ''} need attention before Brivoly can hold relationship memory quietly again."
+        )
+    elif event_ready_mailbox_count or warm_calendar_count:
+        continuity_state = "warm"
+        continuity_summary = (
+            f"Brivoly is quietly holding fresh context from {event_ready_mailbox_count} event-ready inbox{'es' if event_ready_mailbox_count != 1 else ''} "
+            f"and {warm_calendar_count} warm calendar{'s' if warm_calendar_count != 1 else ''}."
+        )
+    elif active_memory_count:
+        continuity_state = "waiting"
+        continuity_summary = (
+            f"Background memory is on across {active_mailbox_count} inbox{'es' if active_mailbox_count != 1 else ''} "
+            f"and {active_calendar_count} calendar{'s' if active_calendar_count != 1 else ''}, and Brivoly is waiting for the next live context to land."
+        )
+    elif paused_memory_count:
+        continuity_state = "paused"
+        continuity_summary = (
+            f"Background memory is paused on {paused_mailbox_count} inbox{'es' if paused_mailbox_count != 1 else ''} "
+            f"and {paused_calendar_count} calendar{'s' if paused_calendar_count != 1 else ''}. Resume one if you want quieter continuity."
+        )
+    else:
+        continuity_state = "disconnected"
+        continuity_summary = "Connect an inbox or calendar once and Brivoly can keep more of this context warm for you."
+
+    return LeadAmbientMemorySummary(
+        continuity_state=continuity_state,
+        continuity_summary=continuity_summary,
+        active_mailbox_count=active_mailbox_count,
+        paused_mailbox_count=paused_mailbox_count,
+        attention_mailbox_count=attention_mailbox_count,
+        event_ready_mailbox_count=event_ready_mailbox_count,
+        active_calendar_count=active_calendar_count,
+        paused_calendar_count=paused_calendar_count,
+        attention_calendar_count=attention_calendar_count,
+        warm_calendar_count=warm_calendar_count,
     )
 
 

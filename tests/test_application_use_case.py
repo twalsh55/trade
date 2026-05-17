@@ -448,6 +448,11 @@ def test_follow_up_overview_enriches_relationship_intelligence() -> None:
     assert overview.pipeline_summary is not None
     assert any(stage.stage == "Proposal" for stage in overview.pipeline_summary.stage_summaries)
     assert any(stage.high_priority_count >= 1 for stage in overview.pipeline_summary.stage_summaries)
+    assert overview.ambient_memory_summary is not None
+    assert overview.ambient_memory_summary.continuity_state in {"warm", "waiting", "attention_needed", "paused", "disconnected"}
+    assert overview.ambient_memory_summary.continuity_summary
+    assert overview.ambient_memory_summary.event_ready_mailbox_count >= 0
+    assert overview.ambient_memory_summary.warm_calendar_count >= 0
 
 
 def test_ingest_lead_email_thread_auto_updates_relationship_memory() -> None:

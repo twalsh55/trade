@@ -142,6 +142,7 @@ export type CRMFollowUpOverview = {
   relationship_summary: CRMRelationshipSummary | null;
   pipeline_summary: CRMPipelineSummary | null;
   inbox_summary: CRMInboxSummary | null;
+  ambient_memory_summary: CRMAmbientMemorySummary | null;
 };
 
 export type CRMEmailThreadSummary = {
@@ -215,6 +216,19 @@ export type CRMInboxSummary = {
   waiting_on_contact_count: number;
   stale_thread_count: number;
   auto_created_contact_count: number;
+};
+
+export type CRMAmbientMemorySummary = {
+  continuity_state: string;
+  continuity_summary: string;
+  active_mailbox_count: number;
+  paused_mailbox_count: number;
+  attention_mailbox_count: number;
+  event_ready_mailbox_count: number;
+  active_calendar_count: number;
+  paused_calendar_count: number;
+  attention_calendar_count: number;
+  warm_calendar_count: number;
 };
 
 export type CRMMailboxConnection = {

@@ -1246,8 +1246,7 @@ export function CRMFollowUpWorkspace({
             selectedLeadId={selectedLead?.id ?? null}
             onSelectLead={setSelectedLeadId}
             onRunAction={runTodayPriorityAction}
-            mailboxConnections={mailboxConnections}
-            calendarConnections={calendarConnections}
+            ambientMemorySummary={overview.ambient_memory_summary}
           />
         </div>
       ) : null}
@@ -1797,8 +1796,7 @@ export function CRMFollowUpWorkspace({
             items={overview.items}
             inboxSummary={overview.inbox_summary}
             onRunAction={runTodayPriorityAction}
-            mailboxConnections={mailboxConnections}
-            calendarConnections={calendarConnections}
+            ambientMemorySummary={overview.ambient_memory_summary}
           />
           {overview.relationship_summary ? <RelationshipContinuityPanel summary={overview.relationship_summary} /> : null}
         </section>
@@ -1867,14 +1865,12 @@ function TodayPrioritiesPanel({
   items,
   inboxSummary,
   onRunAction,
-  mailboxConnections,
-  calendarConnections,
+  ambientMemorySummary,
 }: {
   items: CRMLeadFollowUp[];
   inboxSummary: CRMFollowUpOverview["inbox_summary"];
   onRunAction: (leadId: string, route: string, preset?: TodayDraftPreset, memoryView?: "meeting_prep", threadId?: string | null) => void;
-  mailboxConnections: CRMMailboxConnection[];
-  calendarConnections: CRMCalendarConnection[];
+  ambientMemorySummary: CRMFollowUpOverview["ambient_memory_summary"];
 }) {
   const replyLead = [...items]
     .filter((item) => item.recent_email_threads.some((thread) => thread.needs_reply))
@@ -2053,29 +2049,7 @@ function TodayPrioritiesPanel({
   const freshContextCount = items.filter((item) => hasFreshContext(item)).length;
   const urgentCount = replyCount + proposalCount + reconnectCount;
   const contextCount = recentUploadCount + Math.max(0, freshContextCount - recentUploadCount);
-  const activeMailboxCount = mailboxConnections.filter((item) => item.background_sync_enabled && item.status === "connected").length;
-  const pausedMailboxCount = mailboxConnections.filter((item) => !item.background_sync_enabled).length;
-  const activeCalendarCount = calendarConnections.filter((item) => item.background_sync_enabled && item.status === "connected").length;
-  const pausedCalendarCount = calendarConnections.filter((item) => !item.background_sync_enabled).length;
-  const mailboxAttentionCount = mailboxConnections.filter((item) => item.reauth_required || item.status === "attention_needed" || item.status === "needs_reauth").length;
-  const calendarAttentionCount = calendarConnections.filter((item) => item.status !== "connected" && item.status !== "").length;
-  const activeMemoryCount = activeMailboxCount + activeCalendarCount;
-  const pausedMemoryCount = pausedMailboxCount + pausedCalendarCount;
-  const connectionAttentionCount = mailboxAttentionCount + calendarAttentionCount;
-  const eventReadyMailboxCount = mailboxConnections.filter((item) => item.event_ready).length;
-  const warmCalendarCount = calendarConnections.filter((item) => item.memory_warm).length;
-  const memoryCoverageLine =
-    connectionAttentionCount
-      ? activeMemoryCount
-        ? `${connectionAttentionCount} connection${connectionAttentionCount === 1 ? "" : "s"} need attention, but Brivoly is still holding context from ${activeMemoryCount} live source${activeMemoryCount === 1 ? "" : "s"} in the background.`
-        : `${connectionAttentionCount} connection${connectionAttentionCount === 1 ? "" : "s"} need attention before Brivoly can hold relationship memory quietly again.`
-      : eventReadyMailboxCount || warmCalendarCount
-      ? `Brivoly is quietly holding fresh context from ${eventReadyMailboxCount} event-ready inbox${eventReadyMailboxCount === 1 ? "" : "es"} and ${warmCalendarCount} warm calendar${warmCalendarCount === 1 ? "" : "s"}.`
-      : activeMemoryCount
-      ? `Background memory is on across ${activeMailboxCount} inbox${activeMailboxCount === 1 ? "" : "es"} and ${activeCalendarCount} calendar${activeCalendarCount === 1 ? "" : "s"}, and Brivoly is waiting for the next live context to land.`
-      : pausedMemoryCount
-        ? `Background memory is paused on ${pausedMailboxCount} inbox${pausedMailboxCount === 1 ? "" : "es"} and ${pausedCalendarCount} calendar${pausedCalendarCount === 1 ? "" : "s"}. Resume one if you want quieter continuity.`
-        : "Connect an inbox or calendar once and Brivoly can keep more of this context warm for you.";
+  const memoryCoverageLine = ambientMemorySummary?.continuity_summary || "Connect an inbox or calendar once and Brivoly can keep more of this context warm for you.";
 
   return (
     <section className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm">
@@ -2290,16 +2264,14 @@ function PipelineBoardPanel({
   selectedLeadId,
   onSelectLead,
   onRunAction,
-  mailboxConnections,
-  calendarConnections,
+  ambientMemorySummary,
 }: {
   summary: CRMPipelineStageSummary[];
   items: CRMLeadFollowUp[];
   selectedLeadId: string | null;
   onSelectLead: (leadId: string) => void;
   onRunAction: (leadId: string, route: string, preset?: TodayDraftPreset) => void;
-  mailboxConnections: CRMMailboxConnection[];
-  calendarConnections: CRMCalendarConnection[];
+  ambientMemorySummary: CRMFollowUpOverview["ambient_memory_summary"];
 }) {
   const itemsByStage = new Map<string, CRMLeadFollowUp[]>();
   for (const item of items) {
@@ -2311,29 +2283,7 @@ function PipelineBoardPanel({
     .filter((item) => relationshipStateUrgency(item.relationship_state) > 0 || item.recent_email_threads.some((thread) => thread.needs_reply))
     .sort((left, right) => compareAttentionPriority(left, right))
     .slice(0, 4);
-  const activeMailboxCount = mailboxConnections.filter((item) => item.background_sync_enabled && item.status === "connected").length;
-  const pausedMailboxCount = mailboxConnections.filter((item) => !item.background_sync_enabled).length;
-  const activeCalendarCount = calendarConnections.filter((item) => item.background_sync_enabled && item.status === "connected").length;
-  const pausedCalendarCount = calendarConnections.filter((item) => !item.background_sync_enabled).length;
-  const mailboxAttentionCount = mailboxConnections.filter((item) => item.reauth_required || item.status === "attention_needed" || item.status === "needs_reauth").length;
-  const calendarAttentionCount = calendarConnections.filter((item) => item.status !== "connected" && item.status !== "").length;
-  const activeMemoryCount = activeMailboxCount + activeCalendarCount;
-  const pausedMemoryCount = pausedMailboxCount + pausedCalendarCount;
-  const connectionAttentionCount = mailboxAttentionCount + calendarAttentionCount;
-  const eventReadyMailboxCount = mailboxConnections.filter((item) => item.event_ready).length;
-  const warmCalendarCount = calendarConnections.filter((item) => item.memory_warm).length;
-  const memoryCoverageLine =
-    connectionAttentionCount
-      ? activeMemoryCount
-        ? `${connectionAttentionCount} connection${connectionAttentionCount === 1 ? "" : "s"} need attention, but Brivoly is still keeping some continuity warm from ${activeMemoryCount} live source${activeMemoryCount === 1 ? "" : "s"}.`
-        : `${connectionAttentionCount} connection${connectionAttentionCount === 1 ? "" : "s"} need attention, so some continuity may cool off unless you reconnect them.`
-      : eventReadyMailboxCount || warmCalendarCount
-      ? `Brivoly is keeping warmth in view from ${eventReadyMailboxCount} event-ready inbox${eventReadyMailboxCount === 1 ? "" : "es"} and ${warmCalendarCount} warm calendar${warmCalendarCount === 1 ? "" : "s"}.`
-      : activeMemoryCount
-      ? `Background memory is on across ${activeMailboxCount} inbox${activeMailboxCount === 1 ? "" : "es"} and ${activeCalendarCount} calendar${activeCalendarCount === 1 ? "" : "s"}, even if the latest live context has been quieter for a moment.`
-      : pausedMemoryCount
-        ? `Some background memory is paused. Resume ${pausedMailboxCount ? "inbox" : "calendar"} coverage if these relationships start slipping more quietly than usual.`
-        : "Connect an inbox or calendar if you want quiet continuity to show up here with less manual work.";
+  const memoryCoverageLine = ambientMemorySummary?.continuity_summary || "Connect an inbox or calendar if you want quiet continuity to show up here with less manual work.";
 
   return (
     <section className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm xl:col-span-2">

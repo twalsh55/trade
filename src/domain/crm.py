@@ -94,6 +94,20 @@ class LeadInboxSummary:
 
 
 @dataclass(frozen=True)
+class LeadAmbientMemorySummary:
+    continuity_state: str
+    continuity_summary: str
+    active_mailbox_count: int
+    paused_mailbox_count: int
+    attention_mailbox_count: int
+    event_ready_mailbox_count: int
+    active_calendar_count: int
+    paused_calendar_count: int
+    attention_calendar_count: int
+    warm_calendar_count: int
+
+
+@dataclass(frozen=True)
 class MailboxConnection:
     id: str
     provider: str
@@ -229,6 +243,7 @@ class LeadFollowUpOverview:
     relationship_summary: LeadRelationshipSummary | None = None
     pipeline_summary: LeadPipelineSummary | None = None
     inbox_summary: LeadInboxSummary | None = None
+    ambient_memory_summary: LeadAmbientMemorySummary | None = None
 
 
 @dataclass(frozen=True)
