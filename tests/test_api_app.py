@@ -1118,6 +1118,8 @@ def test_crm_calendar_connect_event_ingest_and_delete_endpoints_manage_meeting_m
     list_response = client.get("/api/crm/calendars", headers={"Authorization": "Bearer session-token"})
     assert list_response.status_code == 200
     assert list_response.json()["items"][0]["calendar_address"] == "ada@northstar.example"
+    assert list_response.json()["items"][0]["last_event_ingested_at"] is not None
+    assert list_response.json()["items"][0]["health_note"] == ""
 
     pause_response = client.patch(
         f"/api/crm/calendars/{connection['id']}",

@@ -256,7 +256,9 @@ export type CRMCalendarConnection = {
   last_sync_at: string | null;
   last_sync_status: string;
   last_sync_error: string;
+  last_event_ingested_at: string | null;
   background_sync_enabled: boolean;
+  health_note: string;
 };
 
 export type AccountPrivacyExport = {

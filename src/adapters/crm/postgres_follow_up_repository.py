@@ -489,7 +489,9 @@ def _payload_to_calendar_connection(payload: dict[str, Any]) -> CalendarConnecti
         last_sync_at=_parse_datetime(payload.get("last_sync_at")),
         last_sync_status=str(payload.get("last_sync_status", "")),
         last_sync_error=str(payload.get("last_sync_error", "")),
+        last_event_ingested_at=_parse_datetime(payload.get("last_event_ingested_at")),
         background_sync_enabled=bool(payload.get("background_sync_enabled", True)),
+        health_note=str(payload.get("health_note", "")),
     )
 
 

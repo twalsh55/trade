@@ -1609,6 +1609,8 @@ export function CRMFollowUpWorkspace({
                         </div>
                         <div className="flex flex-wrap gap-2">
                           <MiniFlag label={connection.background_sync_enabled ? "memory on" : "memory paused"} tone={connection.background_sync_enabled ? "neutral" : "warning"} />
+                          {isCalendarMemoryWarm(connection) ? <MiniFlag label="context warm" tone="neutral" /> : null}
+                          {isCalendarSyncStale(connection) ? <MiniFlag label="context quiet" tone="warning" /> : null}
                           <Button type="button" variant="outline" disabled={isCalendarPending} onClick={() => toggleCalendarBackgroundSync(connection)}>
                             {connection.background_sync_enabled ? "Pause memory" : "Resume memory"}
                           </Button>
@@ -1620,7 +1622,10 @@ export function CRMFollowUpWorkspace({
                       {connection.last_sync_at ? (
                         <p className="mt-2 text-xs text-slate-500">Last meeting context saved {formatDateTime(connection.last_sync_at)}.</p>
                       ) : null}
-                      {connection.last_sync_error ? <p className="mt-2 text-xs text-amber-700">{connection.last_sync_error}</p> : null}
+                      {connection.last_event_ingested_at ? (
+                        <p className="mt-2 text-xs text-slate-500">Latest meeting memory landed {formatDateTime(connection.last_event_ingested_at)}.</p>
+                      ) : null}
+                      {describeCalendarConnectionState(connection) ? <p className="mt-2 text-xs text-slate-500">{describeCalendarConnectionState(connection)}</p> : null}
                     </div>
                   ))
                 ) : (
@@ -2057,13 +2062,17 @@ function TodayPrioritiesPanel({
   const activeMemoryCount = activeMailboxCount + activeCalendarCount;
   const pausedMemoryCount = pausedMailboxCount + pausedCalendarCount;
   const connectionAttentionCount = mailboxAttentionCount + calendarAttentionCount;
+  const eventReadyMailboxCount = mailboxConnections.filter((item) => isMailboxEventReady(item)).length;
+  const warmCalendarCount = calendarConnections.filter((item) => isCalendarMemoryWarm(item)).length;
   const memoryCoverageLine =
     connectionAttentionCount
       ? activeMemoryCount
         ? `${connectionAttentionCount} connection${connectionAttentionCount === 1 ? "" : "s"} need attention, but Brivoly is still holding context from ${activeMemoryCount} live source${activeMemoryCount === 1 ? "" : "s"} in the background.`
         : `${connectionAttentionCount} connection${connectionAttentionCount === 1 ? "" : "s"} need attention before Brivoly can hold relationship memory quietly again.`
+      : eventReadyMailboxCount || warmCalendarCount
+      ? `Brivoly is quietly holding fresh context from ${eventReadyMailboxCount} event-ready inbox${eventReadyMailboxCount === 1 ? "" : "es"} and ${warmCalendarCount} warm calendar${warmCalendarCount === 1 ? "" : "s"}.`
       : activeMemoryCount
-      ? `Brivoly is quietly holding memory from ${activeMailboxCount} inbox${activeMailboxCount === 1 ? "" : "es"} and ${activeCalendarCount} calendar${activeCalendarCount === 1 ? "" : "s"} right now.`
+      ? `Background memory is on across ${activeMailboxCount} inbox${activeMailboxCount === 1 ? "" : "es"} and ${activeCalendarCount} calendar${activeCalendarCount === 1 ? "" : "s"}, and Brivoly is waiting for the next live context to land.`
       : pausedMemoryCount
         ? `Background memory is paused on ${pausedMailboxCount} inbox${pausedMailboxCount === 1 ? "" : "es"} and ${pausedCalendarCount} calendar${pausedCalendarCount === 1 ? "" : "s"}. Resume one if you want quieter continuity.`
         : "Connect an inbox or calendar once and Brivoly can keep more of this context warm for you.";
@@ -2311,13 +2320,17 @@ function PipelineBoardPanel({
   const activeMemoryCount = activeMailboxCount + activeCalendarCount;
   const pausedMemoryCount = pausedMailboxCount + pausedCalendarCount;
   const connectionAttentionCount = mailboxAttentionCount + calendarAttentionCount;
+  const eventReadyMailboxCount = mailboxConnections.filter((item) => isMailboxEventReady(item)).length;
+  const warmCalendarCount = calendarConnections.filter((item) => isCalendarMemoryWarm(item)).length;
   const memoryCoverageLine =
     connectionAttentionCount
       ? activeMemoryCount
         ? `${connectionAttentionCount} connection${connectionAttentionCount === 1 ? "" : "s"} need attention, but Brivoly is still keeping some continuity warm from ${activeMemoryCount} live source${activeMemoryCount === 1 ? "" : "s"}.`
         : `${connectionAttentionCount} connection${connectionAttentionCount === 1 ? "" : "s"} need attention, so some continuity may cool off unless you reconnect them.`
+      : eventReadyMailboxCount || warmCalendarCount
+      ? `Brivoly is keeping warmth in view from ${eventReadyMailboxCount} event-ready inbox${eventReadyMailboxCount === 1 ? "" : "es"} and ${warmCalendarCount} warm calendar${warmCalendarCount === 1 ? "" : "s"}.`
       : activeMemoryCount
-      ? `Brivoly is keeping warmth in view from ${activeMailboxCount} inbox${activeMailboxCount === 1 ? "" : "es"} and ${activeCalendarCount} calendar${activeCalendarCount === 1 ? "" : "s"}.`
+      ? `Background memory is on across ${activeMailboxCount} inbox${activeMailboxCount === 1 ? "" : "es"} and ${activeCalendarCount} calendar${activeCalendarCount === 1 ? "" : "s"}, even if the latest live context has been quieter for a moment.`
       : pausedMemoryCount
         ? `Some background memory is paused. Resume ${pausedMailboxCount ? "inbox" : "calendar"} coverage if these relationships start slipping more quietly than usual.`
         : "Connect an inbox or calendar if you want quiet continuity to show up here with less manual work.";
@@ -4527,6 +4540,61 @@ function isMailboxTokenExpiringSoon(connection: CRMMailboxConnection) {
   }
   const now = Date.now();
   return expiresAt > now && expiresAt <= now + 1000 * 60 * 60 * 12;
+}
+
+function isMailboxEventReady(connection: CRMMailboxConnection) {
+  if (!connection.background_sync_enabled || connection.status !== "connected" || connection.connection_mode !== "oauth") {
+    return false;
+  }
+  if (connection.watch_status !== "active" || !connection.last_watch_event_at) {
+    return false;
+  }
+  const lastEventAt = new Date(connection.last_watch_event_at).getTime();
+  if (Number.isNaN(lastEventAt)) {
+    return false;
+  }
+  return lastEventAt >= Date.now() - 1000 * 60 * 60 * 24 * 2;
+}
+
+function isCalendarMemoryWarm(connection: CRMCalendarConnection) {
+  if (!connection.background_sync_enabled || connection.status !== "connected" || !connection.last_event_ingested_at) {
+    return false;
+  }
+  const lastEventAt = new Date(connection.last_event_ingested_at).getTime();
+  if (Number.isNaN(lastEventAt)) {
+    return false;
+  }
+  return lastEventAt >= Date.now() - 1000 * 60 * 60 * 24 * 7;
+}
+
+function isCalendarSyncStale(connection: CRMCalendarConnection) {
+  if (!connection.background_sync_enabled || !connection.last_sync_at) {
+    return false;
+  }
+  const lastSyncAt = new Date(connection.last_sync_at).getTime();
+  if (Number.isNaN(lastSyncAt)) {
+    return false;
+  }
+  return lastSyncAt <= Date.now() - 1000 * 60 * 60 * 24 * 7;
+}
+
+function describeCalendarConnectionState(connection: CRMCalendarConnection) {
+  if (connection.health_note.trim()) {
+    return connection.health_note;
+  }
+  if (connection.last_sync_error.trim()) {
+    return connection.last_sync_error;
+  }
+  if (isCalendarMemoryWarm(connection)) {
+    return `Fresh meeting context is warm from ${formatDateTime(connection.last_event_ingested_at)}.`;
+  }
+  if (isCalendarSyncStale(connection)) {
+    return `Meeting memory has been quiet since ${formatDateTime(connection.last_sync_at)}. Bring in the next meeting if you want fresher prep context.`;
+  }
+  if (connection.background_sync_enabled) {
+    return "Calendar memory is ready. Bring one meeting in and Brivoly will hold onto the context for you.";
+  }
+  return "";
 }
 
 function describeMailboxConnectionState(connection: CRMMailboxConnection) {

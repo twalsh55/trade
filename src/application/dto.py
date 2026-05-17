@@ -323,7 +323,9 @@ class CalendarConnectionDTO:
     last_sync_at: str | None
     last_sync_status: str
     last_sync_error: str
+    last_event_ingested_at: str | None
     background_sync_enabled: bool
+    health_note: str
 
 
 @dataclass(frozen=True)
@@ -796,7 +798,9 @@ def build_calendar_connection_dto(connection: CalendarConnection) -> CalendarCon
         last_sync_at=connection.last_sync_at.isoformat() if connection.last_sync_at else None,
         last_sync_status=connection.last_sync_status,
         last_sync_error=connection.last_sync_error,
+        last_event_ingested_at=connection.last_event_ingested_at.isoformat() if connection.last_event_ingested_at else None,
         background_sync_enabled=connection.background_sync_enabled,
+        health_note=connection.health_note,
     )
 
 

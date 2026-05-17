@@ -136,7 +136,9 @@ class CalendarConnection:
     last_sync_at: datetime | None = None
     last_sync_status: str = ""
     last_sync_error: str = ""
+    last_event_ingested_at: datetime | None = None
     background_sync_enabled: bool = True
+    health_note: str = ""
 
 
 @dataclass(frozen=True)

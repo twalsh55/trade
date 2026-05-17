@@ -112,6 +112,7 @@ cd web && npm run e2e
   - connected mailbox cards now support disconnecting accounts, pausing or resuming scheduled background sync per mailbox, refreshing provider watch coverage, and clearer reauth / health-state visibility without losing the saved relationship memory
   - connected mailbox cards now also surface reconnect-needed and stale-sync cues more explicitly, including a direct reconnect path for OAuth inboxes when Brivoly can no longer quietly refresh them
   - connected calendar cards now support connect/disconnect, pause/resume background meeting memory, and a lightweight meeting-ingest path for bringing scheduled conversations straight into relationship memory
+  - connected calendar cards now also keep track of the latest meeting context they saved, surface when meeting memory has gone quiet, and help Today / Attention distinguish between truly warm calendar context and merely connected calendar coverage
   - manual mailbox connection still exists as a fallback beta path when provider credentials are not configured yet
   - inbox cards now surface backend-driven relationship pulse, open-loop memory, thread continuity cues, `what changed` hints, unresolved-thread cues, a clearer long-thread `through-line`, and a carry-forward cue for longer threads, grouped into `Needs you now` and `Still warm`
   - email-thread ingestion that can auto-create/update contacts from inbox activity
@@ -164,6 +165,7 @@ cd web && npm run e2e
   - scheduled mailbox automation now reports both watch-ready and event-ready inbox coverage so the always-on sync layer is easier to reason about than a raw thread count alone
   - Today, Inbox, Attention, and Relationships now quietly refresh from connected inbox/calendar memory while the page is open, so fresh context can surface without asking the user to manually refresh
   - Today and Attention now surface whether Brivoly is still holding context quietly in the background or whether paused / reconnect-needed inbox and calendar connections are starting to thin that memory layer out
+  - Today and Attention now distinguish between event-ready inboxes, warm calendar context, and background memory that is technically on but waiting for fresh live context to land
 
 ### Relationship OS Todo
 

@@ -1122,6 +1122,8 @@ class IngestCalendarEventUseCase:
                     last_sync_at=self.now(),
                     last_sync_status="ok",
                     last_sync_error="",
+                    last_event_ingested_at=self.now(),
+                    health_note="",
                 ),
             )
 
@@ -1245,7 +1247,9 @@ class ConnectCalendarUseCase:
             last_sync_at=existing.last_sync_at if existing else None,
             last_sync_status=existing.last_sync_status if existing else "",
             last_sync_error=existing.last_sync_error if existing else "",
+            last_event_ingested_at=existing.last_event_ingested_at if existing else None,
             background_sync_enabled=existing.background_sync_enabled if existing else True,
+            health_note=existing.health_note if existing else "",
         )
         return self.repository.save_calendar_connection(user, connection)
 
