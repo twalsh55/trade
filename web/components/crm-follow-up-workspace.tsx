@@ -106,11 +106,15 @@ export function CRMFollowUpWorkspace({
     );
   }
 
-  function buildImportFormData(answersOverride?: Record<string, string>) {
+  function buildImportFormData(
+    answersOverride?: Record<string, string>,
+    mappingOverride?: Record<string, string>,
+  ) {
     const formData = new FormData();
     formData.set("source_type", sourceType);
-    if (Object.keys(importFieldMapping).length) {
-      formData.set("field_mapping", JSON.stringify(importFieldMapping));
+    const effectiveFieldMapping = mappingOverride ?? importFieldMapping;
+    if (Object.keys(effectiveFieldMapping).length) {
+      formData.set("field_mapping", JSON.stringify(effectiveFieldMapping));
     }
     const effectiveClarificationAnswers = answersOverride ?? clarificationAnswers;
     if (Object.keys(effectiveClarificationAnswers).length) {
@@ -133,12 +137,15 @@ export function CRMFollowUpWorkspace({
     return formData;
   }
 
-  function requestImportPreview(answersOverride?: Record<string, string>) {
+  function requestImportPreview(
+    answersOverride?: Record<string, string>,
+    mappingOverride?: Record<string, string>,
+  ) {
     setImportError(null);
     setImportStatus(null);
     startImportTransition(async () => {
       try {
-        const data = await requestImportPreviewWithBestEffort(() => buildImportFormData(answersOverride));
+        const data = await requestImportPreviewWithBestEffort(() => buildImportFormData(answersOverride, mappingOverride));
         setImportPreview(data);
         setImportFieldMapping(
           Object.fromEntries(
@@ -212,12 +219,14 @@ export function CRMFollowUpWorkspace({
   }
 
   function updateImportFieldMapping(header: string, field: string) {
-    setImportFieldMapping((current) => ({
-      ...current,
+    const nextMapping = {
+      ...importFieldMapping,
       [header]: field,
-    }));
-    setImportStatus(null);
-    setIsImportMappingDirty(true);
+    };
+    setImportFieldMapping(nextMapping);
+    setImportStatus("Re-checking the preview with your updated column mapping...");
+    setIsImportMappingDirty(false);
+    requestImportPreview(undefined, nextMapping);
   }
 
   function answerClarificationQuestion(questionId: string, value: string) {
@@ -226,6 +235,9 @@ export function CRMFollowUpWorkspace({
       [questionId]: value,
     };
     setClarificationAnswers(nextAnswers);
+    // Clarification answers immediately trigger a fresh preview, so they should not
+    // leave the manual-mapping dirty warning visible while that re-check is running.
+    setIsImportMappingDirty(false);
     requestImportPreview(nextAnswers);
   }
 
