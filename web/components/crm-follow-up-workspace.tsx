@@ -1372,14 +1372,14 @@ function buildMailtoHref(subject: string, body: string) {
     return null;
   }
   const recipientHint = "";
-  const params = new URLSearchParams();
+  const params: string[] = [];
   if (subject.trim()) {
-    params.set("subject", subject.trim());
+    params.push(`subject=${encodeURIComponent(subject.trim())}`);
   }
   if (body.trim()) {
-    params.set("body", body.trim());
+    params.push(`body=${encodeURIComponent(body.trim())}`);
   }
-  return `mailto:${recipientHint}?${params.toString()}`;
+  return `mailto:${recipientHint}?${params.join("&")}`;
 }
 
 function MetricCard({ label, value, tone }: { label: string; value: string; tone: "neutral" | "warning" | "critical" | "positive" }) {
