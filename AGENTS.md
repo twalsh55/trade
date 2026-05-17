@@ -73,9 +73,8 @@ cd web && npm run e2e
 
 ### Current Product
 
-- Brivoly has two live surfaces:
-  - `crash-monitor`
-  - `clientos`
+- Brivoly's main live product surface is `clientos`.
+- `crash-monitor` still exists in the repo, but Client OS is the active product direction.
 - Standing product constraint:
   - optimize for near-zero pain
   - avoid copy/paste and unnecessary typing
@@ -135,7 +134,8 @@ cd web && npm run e2e
   - text-heavy card layouts now prefer wider 2-column patterns so copy does not collapse into cramped narrow cards
   - shell, taskbar, import, relationship-memory, and handoff copy now consistently point to Client OS instead of older workspace/portal language
   - overview density is calmer now, with lighter warm-intro panels, a simpler relationship continuity read, a lighter conversation-memory stack in inbox follow-through, a less repetitive relationship-memory panel, and a less dashboard-like fallback shell
-  - intake defaults now read more like set-it-and-forget-it guidance, with quieter `Client dropzone` language, lighter `Usual paths` / `What Brivoly should notice` wording, `Default 1/2/3` task framing, `Use usual setup` / `Use usual note` helper actions, and `Save defaults` actions instead of configuration-heavy language
+  - intake defaults now read more like set-it-and-forget-it guidance, with quieter `Client dropzone` language, lighter `Usual paths` / `What Brivoly should notice` wording, `Step 1/2/3` task framing, `Use usual path` / `Use usual formats` / `Use usual prompt` helper actions, and `Save defaults` actions instead of configuration-heavy language
+  - auth, shell fallback, loading, and client-upload surfaces now use calmer language and lighter guidance with less system-heavy phrasing
 
 ### Relationship OS Todo
 
@@ -201,11 +201,11 @@ cd web && npm run e2e
 ### Next Likely Moves
 
 - Highest-conviction Client OS next steps:
-  - finish the last relationship-OS copy cleanup across remaining user-facing surfaces
+  - finish the last small pockets of relationship-OS copy cleanup across remaining user-facing surfaces
   - keep sharpening `Today` so the daily home feels instantly actionable without reading around
   - deepen inbox-native memory around recent changes and multi-message continuity across longer conversations
   - let client-shared uploads influence even more suggested next moves, meeting prep, and follow-through guidance
-  - keep improving reconnect paths when Brivoly only has thin saved context
+  - keep improving reconnect paths when Brivoly only has very thin saved context
   - embed AI follow-up intelligence into `Today`, inbox, and relationship views as calm timing nudges
   - add ambient conversation memory that summarizes emails, notes, uploads, and timeline events into concise relationship context
   - improve inline suggested responses for follow-ups, recap emails, reconnects, proposal nudges, and scheduling replies
