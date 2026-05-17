@@ -458,6 +458,7 @@ def test_follow_up_overview_enriches_relationship_intelligence() -> None:
     assert isinstance(overview.ambient_memory_summary.suggested_action_label, str)
     assert isinstance(overview.ambient_memory_summary.suggested_action_route, str)
     assert isinstance(overview.ambient_memory_summary.suggested_action_focus, str)
+    assert isinstance(overview.ambient_memory_summary.suggested_action_kind, str)
     assert isinstance(overview.ambient_memory_summary.suggested_action_note, str)
     assert isinstance(overview.ambient_memory_summary.warm_source_labels, tuple)
     assert isinstance(overview.ambient_memory_summary.quiet_source_labels, tuple)
@@ -489,6 +490,7 @@ def test_ambient_memory_summary_routes_calendar_only_waiting_state_to_calendar_m
     assert summary.suggested_action_label == "Check calendars"
     assert summary.suggested_action_route == "/clientos/inbox?connections=calendar"
     assert summary.suggested_action_focus == "calendar"
+    assert summary.suggested_action_kind == "ingest"
     assert "meeting event" in summary.suggested_action_note
 
 

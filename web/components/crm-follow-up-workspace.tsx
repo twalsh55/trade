@@ -167,12 +167,16 @@ export function CRMFollowUpWorkspace({
   const requestedMemoryView = searchParams?.get("memory") === "meeting_prep" ? "meeting_prep" : null;
   const requestedConnectionFocus = searchParams?.get("connections");
   const ambientConnectionFocus = overview.ambient_memory_summary?.suggested_action_focus || "";
+  const ambientActionKind = overview.ambient_memory_summary?.suggested_action_kind || "";
   const connectionFocus =
     requestedConnectionFocus === "mailbox" || requestedConnectionFocus === "calendar" || requestedConnectionFocus === "all"
       ? requestedConnectionFocus
       : ambientConnectionFocus === "mailbox" || ambientConnectionFocus === "calendar" || ambientConnectionFocus === "all"
         ? ambientConnectionFocus
         : null;
+
+  const emphasizedActionClass =
+    "border-slate-900 bg-slate-950 text-white hover:bg-slate-800 hover:text-white";
 
   useEffect(() => {
     if (view !== "followups" || !queuedTodayDraft || !selectedLead || selectedLead.id !== queuedTodayDraft.leadId) {
@@ -1469,7 +1473,11 @@ export function CRMFollowUpWorkspace({
                   type="button"
                   disabled={isMailboxPending}
                   onClick={() => startMailboxOAuth("gmail")}
-                  className="rounded-[1.2rem] border bg-white px-4 py-4 text-left transition hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-70"
+                  className={`rounded-[1.2rem] border bg-white px-4 py-4 text-left transition hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-70 ${
+                    ambientActionKind === "connect" && (connectionFocus === "mailbox" || connectionFocus === "all")
+                      ? "border-slate-400 bg-slate-50"
+                      : ""
+                  }`}
                 >
                   <p className="ui-eyebrow">Gmail</p>
                   <p className="mt-2 text-base font-semibold text-slate-950">Connect the real Gmail account</p>
@@ -1479,7 +1487,11 @@ export function CRMFollowUpWorkspace({
                   type="button"
                   disabled={isMailboxPending}
                   onClick={() => startMailboxOAuth("outlook")}
-                  className="rounded-[1.2rem] border bg-white px-4 py-4 text-left transition hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-70"
+                  className={`rounded-[1.2rem] border bg-white px-4 py-4 text-left transition hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-70 ${
+                    ambientActionKind === "connect" && (connectionFocus === "mailbox" || connectionFocus === "all")
+                      ? "border-slate-400 bg-slate-50"
+                      : ""
+                  }`}
                 >
                   <p className="ui-eyebrow">Outlook</p>
                   <p className="mt-2 text-base font-semibold text-slate-950">Connect the real Outlook account</p>
@@ -1522,7 +1534,11 @@ export function CRMFollowUpWorkspace({
                     />
                   </label>
                   <div className="flex items-end">
-                    <Button disabled={isMailboxPending} onClick={connectMailbox}>
+                    <Button
+                      disabled={isMailboxPending}
+                      onClick={connectMailbox}
+                      className={ambientActionKind === "connect" && (connectionFocus === "mailbox" || connectionFocus === "all") ? emphasizedActionClass : undefined}
+                    >
                       {isMailboxPending ? "Connecting..." : "Add manual connection"}
                     </Button>
                   </div>
@@ -1551,17 +1567,35 @@ export function CRMFollowUpWorkspace({
                           {isMailboxTokenExpiringSoon(connection) ? <MiniFlag label="token soon" tone="warning" /> : null}
                           {connection.reauth_required ? <MiniFlag label="reauth needed" tone="warning" /> : null}
                           {connection.connection_mode === "oauth" && (connection.reauth_required || connection.status === "needs_reauth") ? (
-                            <Button type="button" variant="outline" disabled={isMailboxPending} onClick={() => startMailboxOAuth(connection.provider === "gmail" ? "gmail" : "outlook")}>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              disabled={isMailboxPending}
+                              onClick={() => startMailboxOAuth(connection.provider === "gmail" ? "gmail" : "outlook")}
+                              className={ambientActionKind === "reconnect" && (connectionFocus === "mailbox" || connectionFocus === "all") ? emphasizedActionClass : undefined}
+                            >
                               Reconnect
                             </Button>
                           ) : null}
-                          <Button type="button" variant="outline" disabled={isMailboxPending} onClick={() => toggleMailboxBackgroundSync(connection)}>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            disabled={isMailboxPending}
+                            onClick={() => toggleMailboxBackgroundSync(connection)}
+                            className={ambientActionKind === "resume" && !connection.background_sync_enabled && (connectionFocus === "mailbox" || connectionFocus === "all") ? emphasizedActionClass : undefined}
+                          >
                             {connection.background_sync_enabled ? "Pause sync" : "Resume sync"}
                           </Button>
                           <Button type="button" variant="outline" disabled={isMailboxPending || connection.connection_mode !== "oauth" || connection.reauth_required} onClick={() => renewMailboxWatch(connection)}>
                             {isMailboxPending ? "Refreshing..." : "Refresh watch"}
                           </Button>
-                          <Button type="button" variant="outline" disabled={isMailboxPending || connection.reauth_required} onClick={() => syncMailboxConnection(connection.id)}>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            disabled={isMailboxPending || connection.reauth_required}
+                            onClick={() => syncMailboxConnection(connection.id)}
+                            className={ambientActionKind === "sync" && connection.background_sync_enabled && !connection.reauth_required && (connectionFocus === "mailbox" || connectionFocus === "all") ? emphasizedActionClass : undefined}
+                          >
                             {isMailboxPending ? "Syncing..." : "Sync now"}
                           </Button>
                           <Button type="button" variant="outline" disabled={isMailboxPending} onClick={() => disconnectMailbox(connection)}>
@@ -1640,7 +1674,11 @@ export function CRMFollowUpWorkspace({
                     />
                   </label>
                   <div className="flex items-end">
-                    <Button disabled={isCalendarPending} onClick={connectCalendar}>
+                    <Button
+                      disabled={isCalendarPending}
+                      onClick={connectCalendar}
+                      className={ambientActionKind === "connect" && (connectionFocus === "calendar" || connectionFocus === "all") ? emphasizedActionClass : undefined}
+                    >
                       {isCalendarPending ? "Connecting..." : "Add calendar"}
                     </Button>
                   </div>
@@ -1663,7 +1701,13 @@ export function CRMFollowUpWorkspace({
                           <MiniFlag label={connection.background_sync_enabled ? "memory on" : "memory paused"} tone={connection.background_sync_enabled ? "neutral" : "warning"} />
                           {connection.memory_warm ? <MiniFlag label="context warm" tone="neutral" /> : null}
                           {connection.sync_stale ? <MiniFlag label="context quiet" tone="warning" /> : null}
-                          <Button type="button" variant="outline" disabled={isCalendarPending} onClick={() => toggleCalendarBackgroundSync(connection)}>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            disabled={isCalendarPending}
+                            onClick={() => toggleCalendarBackgroundSync(connection)}
+                            className={ambientActionKind === "resume" && !connection.background_sync_enabled && (connectionFocus === "calendar" || connectionFocus === "all") ? emphasizedActionClass : undefined}
+                          >
                             {connection.background_sync_enabled ? "Pause memory" : "Resume memory"}
                           </Button>
                           <Button type="button" variant="outline" disabled={isCalendarPending} onClick={() => disconnectCalendar(connection)}>
@@ -1718,7 +1762,11 @@ export function CRMFollowUpWorkspace({
                   />
                 </div>
                 <div className="mt-4 flex flex-wrap gap-3">
-                  <Button disabled={isCalendarPending} onClick={ingestCalendarEvent}>
+                  <Button
+                    disabled={isCalendarPending}
+                    onClick={ingestCalendarEvent}
+                    className={ambientActionKind === "ingest" && (connectionFocus === "calendar" || connectionFocus === "all") ? emphasizedActionClass : undefined}
+                  >
                     {isCalendarPending ? "Saving..." : "Save meeting context"}
                   </Button>
                 </div>
