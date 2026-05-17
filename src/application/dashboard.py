@@ -34,8 +34,8 @@ def build_default_dashboard_settings(user_id: UUID, *, telegram_enabled: bool) -
         onboarding_profile_deferred=False,
         crm_ai_prompt="Focus on extracting follow-up-critical CRM fields from messy spreadsheets, files, and images. Prioritize lead name, company, owner, stage, next follow-up date, notes, and next step. Preserve evidence when uncertain.",
         crm_preferred_import_formats=["csv", "google_sheets", "spreadsheet_screenshot"],
-        crm_image_intake_channels=["upload", "telegram"],
-        crm_image_intake_notes="Default to uploads inside Brivoly, then use Telegram for note photos when mobile capture is easier.",
+        crm_image_intake_channels=["upload", "magic_link"],
+        crm_image_intake_notes="Default to uploads inside Brivoly, then use the signed magic link when phone capture is easier.",
     )
 
 
@@ -92,6 +92,8 @@ def _normalize_import_formats(formats: list[str]) -> list[str]:
     cleaned: list[str] = []
     for item in formats:
         normalized = item.strip().lower().replace(" ", "_")
+        if normalized == "telegram":
+            normalized = "magic_link"
         if not normalized or normalized in seen:
             continue
         seen.add(normalized)

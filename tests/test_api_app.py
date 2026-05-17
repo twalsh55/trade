@@ -274,7 +274,7 @@ def test_account_settings_and_alert_history_dtos_serialize_values() -> None:
         onboarding_profile_deferred=False,
         crm_ai_prompt="Extract CRM fields from spreadsheets and screenshots.",
         crm_preferred_import_formats=["csv", "spreadsheet_screenshot"],
-        crm_image_intake_channels=["upload", "whatsapp", "telegram"],
+        crm_image_intake_channels=["upload", "whatsapp", "magic_link"],
         crm_image_intake_notes="WhatsApp is the fallback when the founder is away from a laptop.",
     )
     alert = AlertHistoryEntry(
@@ -294,7 +294,7 @@ def test_account_settings_and_alert_history_dtos_serialize_values() -> None:
     assert settings_payload["outbound_sender_name"] == "Ada from Northstar"
     assert settings_payload["profile_alias"] == "ada"
     assert settings_payload["crm_preferred_import_formats"] == ["csv", "spreadsheet_screenshot"]
-    assert settings_payload["crm_image_intake_channels"] == ["upload", "whatsapp", "telegram"]
+    assert settings_payload["crm_image_intake_channels"] == ["upload", "whatsapp", "magic_link"]
     assert alert_payload["title"] == "Updated"
     assert alert_payload["occurred_at"] == "2024-05-06T12:30:00+00:00"
 
@@ -1304,7 +1304,7 @@ def test_dashboard_settings_helpers_normalize_defaults_and_build_config() -> Non
     assert defaults.business_name == ""
     assert defaults.onboarding_profile_deferred is False
     assert "follow-up-critical CRM fields" in defaults.crm_ai_prompt
-    assert defaults.crm_image_intake_channels == ["upload", "telegram"]
+    assert defaults.crm_image_intake_channels == ["upload", "magic_link"]
 
     normalized = normalize_dashboard_settings(
         UserDashboardSettings(
@@ -1325,7 +1325,7 @@ def test_dashboard_settings_helpers_normalize_defaults_and_build_config() -> Non
             onboarding_profile_deferred=True,
             crm_ai_prompt="  Keep OCR evidence when uncertain.  ",
             crm_preferred_import_formats=[" CSV ", "csv", "Spreadsheet Screenshot"],
-            crm_image_intake_channels=[" Upload ", "whatsapp", "WhatsApp"],
+            crm_image_intake_channels=[" Upload ", "telegram", "WhatsApp"],
             crm_image_intake_notes="  Founder sends scans by WhatsApp.  ",
         )
     )
@@ -1340,7 +1340,7 @@ def test_dashboard_settings_helpers_normalize_defaults_and_build_config() -> Non
     assert normalized.onboarding_profile_deferred is False
     assert normalized.crm_ai_prompt == "Keep OCR evidence when uncertain."
     assert normalized.crm_preferred_import_formats == ["csv", "spreadsheet_screenshot"]
-    assert normalized.crm_image_intake_channels == ["upload", "whatsapp"]
+    assert normalized.crm_image_intake_channels == ["upload", "magic_link", "whatsapp"]
     assert normalized.crm_image_intake_notes == "Founder sends scans by WhatsApp."
 
     config = build_dashboard_config(normalized, end_date=date(2024, 5, 6))
@@ -1524,8 +1524,8 @@ def test_account_settings_endpoints_and_alert_history_round_trip() -> None:
             "onboarding_profile_deferred": False,
             "crm_ai_prompt": "Prefer extracting next step and owner from screenshots.",
             "crm_preferred_import_formats": ["spreadsheet_screenshot", "pdf_export"],
-            "crm_image_intake_channels": ["whatsapp", "telegram"],
-            "crm_image_intake_notes": "WhatsApp is used by the founder. Telegram stays available for remote intake.",
+            "crm_image_intake_channels": ["whatsapp", "magic_link"],
+            "crm_image_intake_notes": "WhatsApp is used by the founder. The signed magic link stays available for remote intake.",
         },
     )
     assert update_response.status_code == 200
@@ -1536,7 +1536,7 @@ def test_account_settings_endpoints_and_alert_history_round_trip() -> None:
     assert update_response.json()["outbound_sender_name"] == "Ada from Northstar"
     assert update_response.json()["profile_alias"] == "ada"
     assert update_response.json()["crm_preferred_import_formats"] == ["spreadsheet_screenshot", "pdf_export"]
-    assert update_response.json()["crm_image_intake_channels"] == ["whatsapp", "telegram"]
+    assert update_response.json()["crm_image_intake_channels"] == ["whatsapp", "magic_link"]
 
     alerts_response = client.get("/api/alerts/history", headers={"Authorization": "Bearer session-token"})
     assert alerts_response.status_code == 200

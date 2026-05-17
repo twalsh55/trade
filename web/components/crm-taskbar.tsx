@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 
 import { BrandMark } from "@/components/brand-mark";
 
@@ -15,6 +16,12 @@ const items = [
 
 export function CRMTaskbar() {
   const pathname = usePathname();
+  const [isSigningOut, setIsSigningOut] = useState(false);
+
+  function handleSignOut() {
+    setIsSigningOut(true);
+    window.location.assign("/sign-out");
+  }
 
   return (
     <aside className="h-fit rounded-[1.9rem] border bg-slate-950 p-5 text-slate-50 shadow-[0_24px_80px_-50px_rgba(15,23,42,0.85)] xl:sticky xl:top-6">
@@ -48,6 +55,16 @@ export function CRMTaskbar() {
           );
         })}
       </nav>
+      <div className="mt-6 border-t border-white/10 pt-4">
+        <button
+          type="button"
+          onClick={handleSignOut}
+          disabled={isSigningOut}
+          className="w-full rounded-[1.1rem] border border-white/10 bg-white/5 px-4 py-3 text-left text-sm text-slate-200 transition hover:border-white/25 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {isSigningOut ? "Signing out..." : "Sign out"}
+        </button>
+      </div>
     </aside>
   );
 }

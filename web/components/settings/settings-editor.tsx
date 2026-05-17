@@ -42,9 +42,9 @@ export function SettingsEditor({
       crm_ai_prompt:
         "Focus on extracting follow-up-critical CRM fields from messy spreadsheets, files, and images. Prioritize lead name, company, owner, stage, next follow-up date, notes, and next step. Preserve evidence when uncertain.",
       crm_preferred_import_formats: ["csv", "google_sheets", "spreadsheet_screenshot"],
-      crm_image_intake_channels: ["upload", "telegram"],
+      crm_image_intake_channels: ["upload", "magic_link"],
       crm_image_intake_notes:
-        "Default to uploads inside Brivoly, then use Telegram for note photos when mobile capture is easier.",
+        "Default to uploads inside Brivoly, then use the signed magic link when phone capture is easier.",
     },
   );
 

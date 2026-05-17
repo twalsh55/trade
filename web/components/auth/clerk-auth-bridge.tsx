@@ -1,7 +1,5 @@
 "use client";
 
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 type ClerkAuthBridgeProps = {
@@ -21,6 +19,7 @@ declare global {
       load(options?: object): Promise<void>;
       mountSignIn(target: Element): void;
       mountSignUp(target: Element): void;
+      signOut(): Promise<void>;
     };
     __internal_ClerkUICtor?: unknown;
     __brivolyClerkLoadPromise?: Promise<unknown>;
@@ -28,7 +27,6 @@ declare global {
 }
 
 export function ClerkAuthBridge({ publishableKey, host, redirectTo, mode = "sign-in" }: ClerkAuthBridgeProps) {
-  const router = useRouter();
   const isSignUp = mode === "sign-up";
   const [status, setStatus] = useState(isSignUp ? "Loading secure account creation..." : "Loading secure sign-in...");
   const [isCompleting, setIsCompleting] = useState(false);
@@ -103,7 +101,7 @@ export function ClerkAuthBridge({ publishableKey, host, redirectTo, mode = "sign
         throw new Error(payload?.error ?? "Unable to persist the authenticated session.");
       }
 
-      router.replace(redirectTo);
+      window.location.replace(redirectTo);
     }
 
     async function init() {
@@ -152,7 +150,7 @@ export function ClerkAuthBridge({ publishableKey, host, redirectTo, mode = "sign
     return () => {
       cancelled = true;
     };
-  }, [host, isSignUp, mode, publishableKey, redirectTo, router]);
+  }, [host, isSignUp, mode, publishableKey, redirectTo]);
 
   const statusAppearance = getStatusAppearance(status);
 
@@ -162,31 +160,18 @@ export function ClerkAuthBridge({ publishableKey, host, redirectTo, mode = "sign
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">{isSignUp ? "Secure Sign-Up" : "Secure Sign-In"}</p>
           <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
-            {isSignUp ? "Create your account and open Brivoly in one step." : "Open Brivoly and continue where you left off."}
+            {isSignUp ? "Create account" : "Sign in"}
           </h2>
         </div>
         <div className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700">
-          {isSignUp ? "New workspace" : "Welcome back"}
+          {isSignUp ? "New account" : "Secure access"}
         </div>
       </div>
       <p className="mt-3 max-w-xl text-sm leading-6 text-slate-600">
         {isSignUp
-          ? "Create your account here, and Brivoly will secure the session and take you straight into the CRM workspace."
-          : "Use your account to open the CRM workspace. Once you sign in, Brivoly will take you straight back to where you were headed."}
+          ? "Create your account, then Brivoly will open CRM."
+          : "Use your account to open CRM."}
       </p>
-      <div className="mt-5 grid gap-3 sm:grid-cols-3">
-        <AuthStep label="Step 1" value={isSignUp ? "Create account" : "Sign in"} />
-        <AuthStep label="Step 2" value="Secure your session" />
-        <AuthStep label="Step 3" value="Open your workspace" />
-      </div>
-      <div className="mt-5 rounded-[1.4rem] border bg-slate-50/80 px-4 py-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">What happens next</p>
-        <p className="mt-2 text-sm leading-6 text-slate-700">
-          {isSignUp
-            ? "Brivoly will finish account creation, secure the session, and load your CRM workspace as soon as everything is ready."
-            : "Brivoly will restore your queue, reminders, and saved account context as soon as the secure session is ready."}
-        </p>
-      </div>
       <div className="relative mt-6 min-h-[360px] overflow-hidden rounded-[1.5rem] border bg-slate-50 p-4">
         <div
           id="clerk-auth-root"
@@ -220,29 +205,6 @@ export function ClerkAuthBridge({ publishableKey, host, redirectTo, mode = "sign
         <p className="font-medium">{statusAppearance.label}</p>
         <p className="mt-1">{status}</p>
       </div>
-      <div className="mt-4 rounded-[1.25rem] border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-        <p className="font-medium">Account state</p>
-        <p className="mt-1">
-          Until this finishes, Brivoly treats you as signed out. Once the secure session is completed, you will be
-          redirected automatically.
-        </p>
-      </div>
-      <p className="mt-4 text-sm text-slate-500">
-        New here?{" "}
-        <Link className="font-medium text-slate-900 underline underline-offset-4" href="/crm">
-          Start from the CRM app
-        </Link>
-        .
-      </p>
-    </div>
-  );
-}
-
-function AuthStep({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-[1.25rem] border bg-slate-50 px-4 py-3">
-      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">{label}</p>
-      <p className="mt-2 text-sm font-medium text-slate-900">{value}</p>
     </div>
   );
 }

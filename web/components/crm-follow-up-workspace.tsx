@@ -460,13 +460,6 @@ export function CRMFollowUpWorkspace({
 
       <CRMViewHeader view={view} />
 
-      <section className="mt-6 grid gap-6 md:grid-cols-4">
-        <MetricCard label="Open follow-ups" value={String(overview.total_open)} tone="neutral" />
-        <MetricCard label="Due today" value={String(overview.due_today)} tone="warning" />
-        <MetricCard label="Overdue" value={String(overview.overdue)} tone={overview.overdue > 0 ? "critical" : "positive"} />
-        <MetricCard label="High priority" value={String(overview.high_priority)} tone="neutral" />
-      </section>
-
       {showingOverview && overview.relationship_summary ? (
         <section className="mt-6 grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
           <RelationshipSignalsPanel summary={overview.relationship_summary} />
@@ -1000,13 +993,15 @@ function RemoteImageCapturePanel({
   preferredChannels: string[];
   routingNotes: string;
 }) {
+  const normalizedChannels = normalizeDisplayChannels(preferredChannels);
+
   return (
     <section className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm">
       <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Remote Note Capture</p>
       <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Send note photos from your phone.</h2>
       <p className="mt-3 text-sm leading-6 text-slate-600">
         Uploading inside Brivoly is great, but operators often snap notes on the move. A signed magic link keeps
-        that phone-first capture simple without making people copy a command into Telegram first.
+        that phone-first capture simple and shareable from any device.
       </p>
 
       {!advancedAiUnlocked ? (
@@ -1023,9 +1018,9 @@ function RemoteImageCapturePanel({
         <p className="mt-2 text-sm leading-6 text-slate-600">
           {intakeChannel?.instructions ?? "Set the CRM intake secret to enable phone-first note capture."}
         </p>
-        {preferredChannels.length ? (
+        {normalizedChannels.length ? (
           <p className="mt-3 text-sm text-slate-700">
-            Preferred channels for this account: <span className="font-medium">{preferredChannels.join(", ")}</span>
+            Preferred channels for this account: <span className="font-medium">{normalizedChannels.join(", ")}</span>
           </p>
         ) : null}
         {routingNotes ? <p className="mt-2 text-sm leading-6 text-slate-600">{routingNotes}</p> : null}
@@ -1091,6 +1086,8 @@ function IntakeTaskHub({
   preferredChannels: string[];
   hasMagicLink: boolean;
 }) {
+  const normalizedChannels = normalizeDisplayChannels(preferredChannels);
+
   return (
     <section className="grid gap-6 xl:grid-cols-3">
       <TaskSummaryCard
@@ -1103,7 +1100,7 @@ function IntakeTaskHub({
         href="/crm/intake/routing"
         eyebrow="Task 2"
         title="Define routing rules"
-        body={preferredChannels.length ? `Preferred channels are set: ${preferredChannels.join(", ")}.` : "Add preferred intake channels and operator notes so the team knows where raw material should come from."}
+        body={normalizedChannels.length ? `Preferred channels are set: ${normalizedChannels.join(", ")}.` : "Add preferred intake channels and operator notes so the team knows where raw material should come from."}
       />
       <TaskSummaryCard
         href="/crm/intake/capture"
@@ -1192,6 +1189,10 @@ function IntakeRoutingPanel({
       {!canPersistSettings ? <p className="mt-3 text-sm text-slate-500">Routing settings are unavailable until account settings finish loading.</p> : null}
     </section>
   );
+}
+
+function normalizeDisplayChannels(channels: string[]): string[] {
+  return channels.map((channel) => (channel === "telegram" ? "magic_link" : channel));
 }
 
 function AIIntakePanel({

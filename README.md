@@ -205,11 +205,11 @@ Telegram-triggered prospecting:
   - `/code <guidance>`
   - `/help`
 
-Telegram CRM note capture:
+CRM note capture:
 
-- the CRM workspace can generate a per-user `/intake ...` caption
-- users can send a photo or image document to the Telegram bot with that caption
-- the API downloads the image, runs paid AI note interpretation, and imports the resulting rows into that user’s CRM queue
+- the CRM workspace can generate a per-user signed magic link
+- users can open that link on their phone, upload a photo or screenshot, and import it without copying a command
+- the API interprets the image with the paid AI intake flow and imports the resulting rows into that user’s CRM queue
 - this remote intake path uses the same paid AI gate as advanced file and image interpretation
 
 ## Daily Prospecting Agent

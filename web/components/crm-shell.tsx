@@ -1,10 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { CRMFollowUpWorkspace, type CRMWorkspaceView } from "@/components/crm-follow-up-workspace";
-import { Button } from "@/components/ui/button";
 import type { CRMPageData } from "@/lib/crm-page-data";
 
 export function CRMShell({ data }: { data: CRMPageData }) {
@@ -26,18 +24,21 @@ export function CRMShell({ data }: { data: CRMPageData }) {
   return (
     <>
       <section className="mt-6 rounded-[1.75rem] border border-amber-200 bg-amber-50 p-6 shadow-sm">
-        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-700">Before you continue</p>
-        <h2 className="mt-3 text-3xl font-semibold tracking-tight text-amber-950">Sign in to unlock the real CRM workspace.</h2>
+        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-700">CRM Load Issue</p>
+        <h2 className="mt-3 text-3xl font-semibold tracking-tight text-amber-950">We could not load the workspace data.</h2>
         <p className="mt-3 max-w-2xl text-sm leading-7 text-amber-900">
-          Sign in to load your CRM pages, follow-up queue, imports, and intake settings.
+          Your session is active, but the CRM payload did not finish loading. Refresh and Brivoly should try again with the same account context.
         </p>
-        {data.bootstrap?.clerk_sign_in_url ? (
-          <div className="mt-5">
-            <Button asChild size="lg">
-              <Link href="/sign-in?redirectTo=%2Fcrm">Sign in to open CRM</Link>
-            </Button>
-          </div>
-        ) : null}
+        {data.userLabel ? <p className="mt-4 text-sm font-medium text-amber-950">Current account: {data.userLabel}</p> : null}
+        <div className="mt-5">
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="rounded-full bg-amber-950 px-5 py-3 text-sm font-medium text-white transition hover:bg-amber-900"
+          >
+            Reload CRM
+          </button>
+        </div>
       </section>
       <section className="mt-6 grid gap-6 lg:grid-cols-4">
         <FeatureCard title="Overview" body="See the current health of the CRM without skimming every section." />

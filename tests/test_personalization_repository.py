@@ -35,8 +35,8 @@ def make_settings() -> UserDashboardSettings:
         onboarding_profile_deferred=False,
         crm_ai_prompt="Extract CRM fields from spreadsheets and screenshots.",
         crm_preferred_import_formats=["csv", "spreadsheet_screenshot"],
-        crm_image_intake_channels=["upload", "telegram"],
-        crm_image_intake_notes="Telegram for remote note photos.",
+        crm_image_intake_channels=["upload", "magic_link"],
+        crm_image_intake_notes="Use the signed magic link for remote note photos.",
     )
 
 
@@ -109,8 +109,8 @@ def test_row_mappers_convert_database_shapes() -> None:
         "onboarding_profile_deferred": False,
         "crm_ai_prompt": "Extract CRM fields from spreadsheets and screenshots.",
         "crm_preferred_import_formats": ["csv", "spreadsheet_screenshot"],
-        "crm_image_intake_channels": ["upload", "telegram"],
-        "crm_image_intake_notes": "Telegram for remote note photos.",
+        "crm_image_intake_channels": ["upload", "magic_link"],
+        "crm_image_intake_notes": "Use the signed magic link for remote note photos.",
     }
     alert_row = {
         "occurred_at": "2024-05-06T12:30:00+00:00",
@@ -175,8 +175,8 @@ def test_postgres_personalization_repository_get_and_save_settings(monkeypatch) 
                 "onboarding_profile_deferred": False,
                 "crm_ai_prompt": "Extract CRM fields from spreadsheets and screenshots.",
                 "crm_preferred_import_formats": ["csv", "spreadsheet_screenshot"],
-                "crm_image_intake_channels": ["upload", "telegram"],
-                "crm_image_intake_notes": "Telegram for remote note photos.",
+                "crm_image_intake_channels": ["upload", "magic_link"],
+                "crm_image_intake_notes": "Use the signed magic link for remote note photos.",
             }
         )
     )
@@ -198,8 +198,8 @@ def test_postgres_personalization_repository_get_and_save_settings(monkeypatch) 
         "onboarding_profile_deferred": False,
         "crm_ai_prompt": "Extract CRM fields from spreadsheets and screenshots.",
         "crm_preferred_import_formats": ["csv", "spreadsheet_screenshot"],
-        "crm_image_intake_channels": ["upload", "telegram"],
-        "crm_image_intake_notes": "Telegram for remote note photos.",
+        "crm_image_intake_channels": ["upload", "magic_link"],
+        "crm_image_intake_notes": "Use the signed magic link for remote note photos.",
     }
     saved_connection = FakeConnection(FakeCursor(fetchone_result=saved_row))
     calls = [missing_connection, existing_connection, saved_connection]

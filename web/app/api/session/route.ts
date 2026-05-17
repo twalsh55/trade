@@ -46,6 +46,13 @@ export async function DELETE() {
     path: "/",
     maxAge: 0,
   });
+  response.cookies.set("__session", "", {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 0,
+  });
   response.cookies.set(LEGACY_TRADE_SESSION_COOKIE, "", {
     httpOnly: true,
     sameSite: "lax",
