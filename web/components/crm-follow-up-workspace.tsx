@@ -1369,9 +1369,9 @@ function TodayPrioritiesPanel({
           ))}
         </div>
       ) : null}
-      <div className="mt-5 grid gap-4 md:grid-cols-2">
-        <QuickLinkCard href="/clientos/follow-ups" title="Relationship memory" body="Keep the last touch, the next touch, and the full story together." />
-        <QuickLinkCard href="/clientos/inbox" title="Inbox continuity" body="Let email quietly carry the thread forward instead of asking you to log everything." />
+      <div className="mt-5 flex flex-wrap gap-3">
+        <QuickLinkPill href="/clientos/follow-ups" title="Relationship memory" body="Keep the last touch, the next touch, and the full story together." />
+        <QuickLinkPill href="/clientos/inbox" title="Inbox continuity" body="Let email carry the thread forward without extra logging." />
       </div>
     </section>
   );
@@ -1391,11 +1391,15 @@ function TodaySignal({ label, value, detail }: { label: string; value: string; d
   );
 }
 
-function QuickLinkCard({ href, title, body }: { href: string; title: string; body: string }) {
+function QuickLinkPill({ href, title, body }: { href: string; title: string; body: string }) {
   return (
-    <Link href={href} className="block min-w-0 overflow-hidden rounded-[1.35rem] border bg-slate-50/80 px-5 py-5 transition hover:border-slate-400 hover:bg-white">
-      <p className="break-words text-xs font-semibold uppercase tracking-[0.14em] text-slate-400 [overflow-wrap:anywhere] sm:tracking-[0.18em]">{title}</p>
-      <p className="mt-3 break-words text-sm leading-6 text-slate-700 [overflow-wrap:anywhere]">{body}</p>
+    <Link
+      href={href}
+      className="inline-flex min-w-0 max-w-full items-center gap-2 rounded-full border bg-slate-50/80 px-4 py-3 text-sm text-slate-700 transition hover:border-slate-400 hover:bg-white hover:text-slate-950"
+    >
+      <span className="font-semibold text-slate-950">{title}</span>
+      <span className="text-slate-400">·</span>
+      <span className="truncate">{body}</span>
     </Link>
   );
 }
