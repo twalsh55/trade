@@ -100,6 +100,7 @@ export type CRMLeadFollowUp = {
   relationship_health_score: number;
   relationship_health_label: "healthy" | "watch" | "at_risk" | string;
   relationship_state: "active" | "warm" | "drifting" | "stale" | "at_risk" | string;
+  relationship_timing_nudge: string;
   relationship_context_summary: string;
   relationship_recent_changes_summary: string;
   relationship_last_30_days_summary: string;

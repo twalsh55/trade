@@ -104,6 +104,7 @@ class LeadFollowUp:
     relationship_health_score: int = 0
     relationship_health_label: str = ""
     relationship_state: str = ""
+    relationship_timing_nudge: str = ""
     relationship_context_summary: str = ""
     relationship_recent_changes_summary: str = ""
     relationship_last_30_days_summary: str = ""

@@ -229,6 +229,7 @@ def test_follow_up_overview_enriches_relationship_intelligence() -> None:
     assert cedar.dormant is True
     assert cedar.relationship_state in {"drifting", "stale", "at_risk"}
     assert cedar.relationship_health_score < 75
+    assert amber.relationship_timing_nudge
     assert amber.relationship_context_summary
     assert amber.relationship_recent_changes_summary
     assert amber.relationship_last_30_days_summary

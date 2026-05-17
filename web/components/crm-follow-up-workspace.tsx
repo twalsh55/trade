@@ -1082,7 +1082,7 @@ function TodayPrioritiesPanel({
           href: "/clientos/follow-ups",
           eyebrow: "Reconnect",
           title: `Reconnect with ${reconnectLead.lead_name}`,
-          body: reconnectLead.relationship_reminders[0]?.message ?? reconnectLead.next_step,
+          body: reconnectLead.relationship_timing_nudge || reconnectLead.relationship_reminders[0]?.message || reconnectLead.next_step,
           meta: `${reconnectLead.company_name} · last meaningful touch ${formatDateTime(reconnectLead.last_meaningful_interaction_at)}`,
         }
       : null,
@@ -1092,7 +1092,7 @@ function TodayPrioritiesPanel({
           href: "/clientos/follow-ups",
           eyebrow: "Proposal follow-up",
           title: `Keep momentum with ${proposalLead.lead_name}`,
-          body: proposalLead.next_step,
+          body: proposalLead.relationship_timing_nudge || proposalLead.next_step,
           meta: `${proposalLead.company_name} · ${formatStageLabel(proposalLead.stage)}`,
         }
       : null,
@@ -2109,7 +2109,7 @@ function LeadMemoryPanel({
       <div className="mt-4 grid gap-3 md:grid-cols-3">
         <TimelineTile label="Last meaningful interaction" value={formatDateTime(lead.last_meaningful_interaction_at)} />
         <TimelineTile label="Relationship state" value={formatRelationshipState(lead.relationship_state)} />
-        <TimelineTile label="Brivoly nudge" value={buildRelationshipNudge(lead)} />
+        <TimelineTile label="Brivoly nudge" value={lead.relationship_timing_nudge || "Brivoly is keeping the timing in view."} />
       </div>
 
       {lead.referral_source_name || lead.birthday || lead.company_milestone_date || lead.relationship_reminders.length ? (
@@ -2775,22 +2775,6 @@ function formatImportFieldLabel(value: string) {
 
 function formatRelationshipState(value: string) {
   return value.replaceAll("_", " ");
-}
-
-function buildRelationshipNudge(lead: CRMLeadFollowUp) {
-  if (lead.relationship_state === "at_risk") {
-    return "This relationship may be going cold.";
-  }
-  if (lead.relationship_state === "stale") {
-    return `You have not meaningfully reconnected with ${lead.lead_name} in a while.`;
-  }
-  if (lead.relationship_state === "drifting") {
-    return "A light follow-up soon would help keep momentum.";
-  }
-  if (lead.relationship_state === "warm") {
-    return "This relationship still feels warm. Keep the next touch easy.";
-  }
-  return "Things are active here. Brivoly is keeping the context ready.";
 }
 
 function buildSuggestedResponsePresets(lead: CRMLeadFollowUp) {

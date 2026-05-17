@@ -165,6 +165,7 @@ class LeadFollowUpDTO:
     relationship_health_score: int
     relationship_health_label: str
     relationship_state: str
+    relationship_timing_nudge: str
     relationship_context_summary: str
     relationship_recent_changes_summary: str
     relationship_last_30_days_summary: str
@@ -530,6 +531,7 @@ def build_lead_follow_up_dto(item: LeadFollowUp) -> LeadFollowUpDTO:
         relationship_health_score=item.relationship_health_score,
         relationship_health_label=item.relationship_health_label,
         relationship_state=item.relationship_state,
+        relationship_timing_nudge=item.relationship_timing_nudge,
         relationship_context_summary=item.relationship_context_summary,
         relationship_recent_changes_summary=item.relationship_recent_changes_summary,
         relationship_last_30_days_summary=item.relationship_last_30_days_summary,

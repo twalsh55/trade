@@ -66,6 +66,7 @@ def _enrich_follow_up(item: LeadFollowUp, current_time: datetime) -> LeadFollowU
     dormant = _is_dormant(item, last_meaningful, current_time)
     reminders = _build_relationship_reminders(item, last_meaningful, current_time)
     context_summary = _build_relationship_context_summary(item)
+    timing_nudge = _build_relationship_timing_nudge(item, current_time)
     recent_changes_summary = _build_recent_changes_summary(item, current_time)
     last_30_days_summary = _build_last_30_days_summary(item, current_time)
     meeting_prep_summary = _build_meeting_prep_summary(item, current_time)
@@ -75,6 +76,7 @@ def _enrich_follow_up(item: LeadFollowUp, current_time: datetime) -> LeadFollowU
         relationship_health_score=health_score,
         relationship_health_label=_health_label(health_score),
         relationship_state=_relationship_state(health_score, dormant, item, current_time),
+        relationship_timing_nudge=timing_nudge,
         relationship_context_summary=context_summary,
         relationship_recent_changes_summary=recent_changes_summary,
         relationship_last_30_days_summary=last_30_days_summary,
@@ -221,6 +223,31 @@ def _build_relationship_context_summary(item: LeadFollowUp) -> str:
         return "Brivoly has not captured enough relationship context yet."
 
     return " ".join(_sentence_case(part) for part in parts[:2])
+
+
+def _build_relationship_timing_nudge(item: LeadFollowUp, current_time: datetime) -> str:
+    latest_thread = sorted(item.recent_email_threads, key=lambda thread: thread.last_message_at, reverse=True)[:1]
+    if latest_thread:
+        thread = latest_thread[0]
+        if thread.needs_reply:
+            return f"You have not replied to {thread.counterpart_name or item.lead_name} since {_relative_days(thread.last_message_at, current_time).lower()}."
+        if thread.waiting_on_contact:
+            return f"You sent the latest note {_relative_days(thread.last_message_at, current_time).lower()} and are waiting on them."
+
+    stage = item.stage.strip().lower()
+    if stage == "proposal":
+        return f"Proposal sent {_relative_days(item.last_meaningful_interaction_at or item.next_follow_up_at, current_time).lower()} - consider following up."
+    if stage == "negotiation":
+        return f"This relationship is still in active discussion. A quick check-in now could keep momentum up."
+    if item.relationship_state == "stale":
+        return f"You have not meaningfully reconnected with {item.lead_name} in a while."
+    if item.relationship_state == "at_risk":
+        return "This relationship may be going cold."
+    if item.relationship_state == "drifting":
+        return "A light follow-up soon would help keep momentum."
+    if item.relationship_reminders:
+        return _sentence_case(item.relationship_reminders[0].message.rstrip(".")) + "."
+    return "Things are active here. Brivoly is keeping the context ready."
 
 
 def _build_recent_changes_summary(item: LeadFollowUp, current_time: datetime) -> str:
