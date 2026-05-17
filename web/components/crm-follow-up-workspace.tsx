@@ -609,7 +609,7 @@ export function CRMFollowUpWorkspace({
       <section className="mt-6 rounded-[1.75rem] border bg-white/85 p-6 shadow-sm">
         <div className="grid gap-6 xl:grid-cols-[0.92fr_1.08fr]">
           <section>
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Context Intake</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Bring in context</p>
             <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Bring relationship context in without retyping it.</h2>
             <p className="mt-3 text-sm leading-6 text-slate-600">
               Upload a CSV, XLSX, XLS, or note image, or paste a Google Sheets link. Brivoly cleans up messy headers, spots missing context, and keeps only what is ready to support better follow-through.
@@ -650,7 +650,7 @@ export function CRMFollowUpWorkspace({
 
             {sourceType === "file_upload" ? (
               <section className="mt-5 rounded-[1.4rem] border bg-slate-50/80 p-5">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">File upload</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Upload a file</p>
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -1064,8 +1064,8 @@ function CRMViewHeader({ view }: { view: CRMWorkspaceView }) {
       body: "Use this page to spot quiet relationships, reopening moments, and where a gentle reconnect is due.",
     },
     import: {
-      eyebrow: "Context Intake",
-      title: "Bring client context into Brivoly without extra cleanup.",
+      eyebrow: "Bring in context",
+      title: "Bring older client context back into memory without extra cleanup.",
       body: "Upload spreadsheets and raw note images, let Brivoly make sense of them, and only keep what supports better follow-through.",
     },
     intake: {
@@ -1238,6 +1238,24 @@ function TodayPrioritiesPanel({
         Brivoly pulls together reply pressure, reconnect risk, proposal momentum, and fresh context so you can pick up the right relationships without re-reading everything first.
       </p>
       <p className="mt-3 text-sm font-medium text-slate-700">Start with one relationship. Brivoly will hold the rest.</p>
+      <div className="mt-4 flex flex-wrap gap-2">
+        {visiblePriorities.slice(0, 3).map((item) => (
+          <button
+            key={`${item.id}-quick-start`}
+            type="button"
+            onClick={() => {
+              if (item.onAction) {
+                item.onAction();
+                return;
+              }
+              window.location.assign(item.href);
+            }}
+            className="rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-700 transition hover:border-slate-400 hover:bg-white hover:text-slate-950"
+          >
+            {item.eyebrow}
+          </button>
+        ))}
+      </div>
       <div className="mt-5 grid gap-3 md:grid-cols-2">
         <TodaySignal
           label="Reply pressure"
@@ -1309,7 +1327,7 @@ function TodayPrioritiesPanel({
       ) : null}
       <div className="mt-5 grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
         <QuickLinkCard href="/clientos/follow-ups" title="Relationship memory" body="Keep the last touch, the next touch, and the full story together." />
-        <QuickLinkCard href="/clientos/inbox" title="Inbox continuity" body="Let email quietly update context instead of asking you to log everything." />
+        <QuickLinkCard href="/clientos/inbox" title="Inbox continuity" body="Let email quietly carry the thread forward instead of asking you to log everything." />
         <QuickLinkCard href="/clientos/intake" title="Client updates" body="Let clients send files and notes without friction when something changes." />
       </div>
     </section>
@@ -1755,6 +1773,7 @@ function InboxThreadCard({
             <p className="mt-3 text-sm font-medium text-slate-900">{thread.relationship_pulse}</p>
             <p className="mt-2 text-sm leading-6 text-slate-600">{thread.continuity_span}</p>
             <p className="mt-3 text-sm leading-6 text-slate-600">{thread.memory_summary}</p>
+            {thread.carry_forward_hint ? <p className="mt-3 text-sm leading-6 text-slate-700">{thread.carry_forward_hint}</p> : null}
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {thread.needs_reply ? <MiniFlag tone="critical" label="Reply" /> : null}
@@ -1874,6 +1893,12 @@ function InboxNextMovePanel({
           <p className="mt-2 text-sm font-medium text-slate-900">{latestThread.relationship_pulse}</p>
           <p className="mt-2 text-sm leading-6 text-slate-600">{latestThread.continuity_span}</p>
           <p className="mt-2 text-sm leading-6 text-slate-600">{latestThread.memory_summary}</p>
+        </div>
+      ) : null}
+      {latestThread?.carry_forward_hint ? (
+        <div className="mt-4 rounded-[1.2rem] border bg-slate-50/80 px-4 py-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Carry forward</p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">{latestThread.carry_forward_hint}</p>
         </div>
       ) : null}
       {latestThread?.recent_change_hint ? (

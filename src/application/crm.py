@@ -109,6 +109,7 @@ def _build_enriched_threads(item: LeadFollowUp, current_time: datetime) -> list[
             relationship_pulse=_build_thread_relationship_pulse(item, thread, current_time),
             continuity_span=_build_thread_continuity_span(thread, current_time),
             recent_change_hint=_build_thread_recent_change_hint(item, thread, current_time),
+            carry_forward_hint=_build_thread_carry_forward_hint(item, thread),
         )
         for thread in item.recent_email_threads
     ]
@@ -191,6 +192,22 @@ def _build_thread_recent_change_hint(item: LeadFollowUp, thread: LeadEmailThread
     if item.next_step.strip():
         return f"Still orbiting: {_ensure_sentence(_sentence_case(item.next_step.strip().rstrip('.')))}"
     return f"Not much shifted here since {_relative_days(thread.last_message_at, current_time).lower()}."
+
+
+def _build_thread_carry_forward_hint(item: LeadFollowUp, thread: LeadEmailThreadSummary) -> str:
+    snippet = thread.snippet.strip().rstrip(".")
+    if thread.message_count >= 4 and snippet:
+        return f"Carry this forward: {_truncate_sentence(_sentence_case(snippet), 110)}"
+    if thread.waiting_on_contact and item.next_step.strip():
+        return f"If they reply, pick back up from {_ensure_sentence(item.next_step)}"
+    if thread.needs_reply and snippet:
+        return f"Ground your reply in {_truncate_sentence(_sentence_case(snippet), 90)}"
+    upload_context = _build_upload_memory_snippet(item)
+    if upload_context:
+        return f"Weave in the new client context: {upload_context}"
+    if item.relationship_context_summary.strip() and item.relationship_context_summary != "Brivoly has not captured enough relationship context yet.":
+        return f"Carry forward the context around {_truncate_sentence(item.relationship_context_summary, 95)}"
+    return ""
 
 
 def _resolve_last_meaningful_interaction(item: LeadFollowUp) -> datetime | None:

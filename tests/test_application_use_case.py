@@ -38,6 +38,7 @@ from src.application.crm import (
     _build_thread_next_touch_hint,
     _build_thread_open_loop,
     _build_thread_relationship_pulse,
+    _build_thread_carry_forward_hint,
     _build_thread_recent_change_hint,
     _build_thread_continuity_span,
     _compute_relationship_health_score,
@@ -331,6 +332,7 @@ def test_follow_up_overview_enriches_relationship_intelligence() -> None:
     assert amber.recent_email_threads[0].relationship_pulse
     assert amber.recent_email_threads[0].continuity_span
     assert amber.recent_email_threads[0].recent_change_hint
+    assert amber.recent_email_threads[0].carry_forward_hint
     assert overview.relationship_summary is not None
     assert overview.relationship_summary.stale_count >= 1
     assert overview.relationship_summary.referral_reminder_count >= 1
@@ -538,6 +540,13 @@ def test_crm_helper_branches_cover_thread_memory_and_timing_paths() -> None:
     )
     assert "Still orbiting" in _build_thread_recent_change_hint(next_step_lead, reply_thread, now)
     assert "Not much shifted here" in _build_thread_recent_change_hint(empty_lead, quiet_thread, now)
+    assert "Carry this forward" in _build_thread_carry_forward_hint(empty_lead, active_snippet_thread)
+    assert "If they reply" in _build_thread_carry_forward_hint(build_follow_up(now=now, next_step="send the recap", threads=(waiting_thread,)), waiting_thread)
+    assert "Ground your reply" in _build_thread_carry_forward_hint(next_step_lead, reply_snippet_thread)
+    assert "Weave in the new client context" in _build_thread_carry_forward_hint(upload_context_lead, light_thread)
+    context_only_lead = replace(empty_lead, relationship_context_summary="Pricing concerns and rollout timing")
+    assert "Carry forward the context around" in _build_thread_carry_forward_hint(context_only_lead, quiet_thread)
+    assert _build_thread_carry_forward_hint(empty_lead, quiet_thread) == ""
     assert "Best next touch from the new context" in _build_upload_follow_through_hint(upload_for_next_step, now)
     assert "fold the new client context" in _build_upload_follow_through_hint(upload_waiting_lead, now)
     assert "A short recap" in _build_upload_follow_through_hint(upload_context_lead, now)

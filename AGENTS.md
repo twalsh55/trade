@@ -93,10 +93,10 @@ cd web && npm run e2e
 - `/crm` remains as a compatibility alias.
 - Current Client OS capabilities:
   - left taskbar with dedicated Client OS pages
-  - Today priorities with a clear `Start here` focus card, direct draft/review actions, calmer 2-column summary layouts, and stronger upload-aware next-touch framing
+  - Today priorities with a clear `Start here` focus card, direct draft/review actions, quick-start pills, calmer 2-column summary layouts, and stronger upload-aware next-touch framing
   - follow-up queue
   - inbox-native relationship page for auto-logging email threads and reconnect-aware next moves
-  - inbox cards now surface backend-driven relationship pulse, open-loop memory, thread continuity cues, and `what changed` hints, grouped into `Needs you now` and `Still warm`
+  - inbox cards now surface backend-driven relationship pulse, open-loop memory, thread continuity cues, `what changed` hints, and a carry-forward cue for longer threads, grouped into `Needs you now` and `Still warm`
   - email-thread ingestion that can auto-create/update contacts from inbox activity
   - attention view with reconnect-first guidance and direct draft actions
   - complete and snooze actions
@@ -129,7 +129,7 @@ cd web && npm run e2e
   - intake setup now has one-tap starter defaults for channels, handoff notes, source formats, and AI memory prompts to reduce typing
   - intake and attention copy now lean further into relationship continuity and away from setup / pipeline language
   - text-heavy card layouts now prefer wider 2-column patterns so copy does not collapse into cramped narrow cards
-  - shell, taskbar, and handoff copy now consistently point to Client OS instead of older workspace/portal language
+  - shell, taskbar, import, and handoff copy now consistently point to Client OS instead of older workspace/portal language
 
 ### Relationship OS Todo
 
