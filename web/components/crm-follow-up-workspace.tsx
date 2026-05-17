@@ -483,7 +483,7 @@ export function CRMFollowUpWorkspace({
     setEmailObjective(objective);
     setEmailTone(tone);
     setEmailLength(length);
-    setEmailStatus(overrides?.status ?? "Designing a follow-up email...");
+    setEmailStatus(overrides?.status ?? "Drafting the next note...");
     startEmailTransition(async () => {
       try {
         const response = await fetch(`/api/crm/followups/email-draft/${lead.id}`, {
@@ -2896,7 +2896,7 @@ function LeadMemoryPanel({
           <p className="mt-2 text-sm leading-6 text-slate-700">{activeMemoryPanel.body}</p>
         </div>
         <div className="mt-4 rounded-[1.2rem] border bg-white px-4 py-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Latest saved context</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Context on hand</p>
           <p className="mt-2 text-sm leading-6 text-slate-700">{lead.notes}</p>
           {lead.relationship_recent_upload_summary ? (
             <div className="mt-4 rounded-[1rem] border bg-slate-50/80 px-4 py-4">
@@ -2918,13 +2918,13 @@ function LeadMemoryPanel({
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <p className="ui-eyebrow">Suggested next note</p>
-            <h3 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">Draft the next reconnect without starting from zero.</h3>
+            <h3 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">Draft the next note without starting from zero.</h3>
             <p className="mt-2 text-sm leading-6 text-slate-600">
               Brivoly uses the latest context, suggested next touch, and your saved business profile to suggest a message you can edit before sending.
             </p>
           </div>
           <div className="rounded-[1.2rem] border bg-slate-50 px-4 py-3 text-sm text-slate-600 lg:max-w-xs">
-            <p className="ui-eyebrow">Brand source</p>
+            <p className="ui-eyebrow">Sent from</p>
             <p className="mt-2">
               Sender: <span className="font-medium text-slate-900">{settings?.outbound_sender_name || settings?.business_name || "Fallback defaults"}</span>
             </p>
@@ -2932,7 +2932,7 @@ function LeadMemoryPanel({
         </div>
 
         <div className="mt-5 rounded-[1.2rem] border bg-slate-50/80 px-4 py-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Suggested responses</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Ways to say it</p>
           <div className="mt-3 flex flex-wrap gap-2">
             {suggestedResponses.map((item) => (
               <button
@@ -2963,7 +2963,7 @@ function LeadMemoryPanel({
               onChange={(event) => onEmailObjectiveChange(event.target.value as CRMEmailDraft["objective"])}
               className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:bg-white"
             >
-              <option value="follow_up">General follow-up</option>
+              <option value="follow_up">General note</option>
               <option value="recap">Send recap</option>
               <option value="revive">Revive the thread</option>
               <option value="close_loop">Close the loop</option>
