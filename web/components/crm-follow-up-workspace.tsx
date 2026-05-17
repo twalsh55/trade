@@ -1500,14 +1500,21 @@ export function CRMFollowUpWorkspace({
                           <MiniFlag label={connection.background_sync_enabled ? "background sync on" : "background sync paused"} tone={connection.background_sync_enabled ? "neutral" : "warning"} />
                           <MiniFlag label={`${connection.watch_event_count} watch event${connection.watch_event_count === 1 ? "" : "s"}`} tone="neutral" />
                           <MiniFlag label={`watch ${connection.watch_status || "inactive"}`} tone={connection.watch_status === "active" ? "neutral" : connection.watch_status === "manual" ? "warning" : "warning"} />
+                          {isMailboxSyncStale(connection) ? <MiniFlag label="sync stale" tone="warning" /> : null}
+                          {isMailboxTokenExpiringSoon(connection) ? <MiniFlag label="token soon" tone="warning" /> : null}
                           {connection.reauth_required ? <MiniFlag label="reauth needed" tone="warning" /> : null}
+                          {connection.connection_mode === "oauth" && (connection.reauth_required || connection.status === "needs_reauth") ? (
+                            <Button type="button" variant="outline" disabled={isMailboxPending} onClick={() => startMailboxOAuth(connection.provider === "gmail" ? "gmail" : "outlook")}>
+                              Reconnect
+                            </Button>
+                          ) : null}
                           <Button type="button" variant="outline" disabled={isMailboxPending} onClick={() => toggleMailboxBackgroundSync(connection)}>
                             {connection.background_sync_enabled ? "Pause sync" : "Resume sync"}
                           </Button>
-                          <Button type="button" variant="outline" disabled={isMailboxPending || connection.connection_mode !== "oauth"} onClick={() => renewMailboxWatch(connection)}>
+                          <Button type="button" variant="outline" disabled={isMailboxPending || connection.connection_mode !== "oauth" || connection.reauth_required} onClick={() => renewMailboxWatch(connection)}>
                             {isMailboxPending ? "Refreshing..." : "Refresh watch"}
                           </Button>
-                          <Button type="button" variant="outline" disabled={isMailboxPending} onClick={() => syncMailboxConnection(connection.id)}>
+                          <Button type="button" variant="outline" disabled={isMailboxPending || connection.reauth_required} onClick={() => syncMailboxConnection(connection.id)}>
                             {isMailboxPending ? "Syncing..." : "Sync now"}
                           </Button>
                           <Button type="button" variant="outline" disabled={isMailboxPending} onClick={() => disconnectMailbox(connection)}>
@@ -1520,6 +1527,9 @@ export function CRMFollowUpWorkspace({
                       ) : null}
                       {connection.watch_expires_at ? (
                         <p className="mt-2 text-xs text-slate-500">Watch coverage renews by {formatDateTime(connection.watch_expires_at)}.</p>
+                      ) : null}
+                      {describeMailboxConnectionState(connection) ? (
+                        <p className="mt-2 text-xs text-slate-500">{describeMailboxConnectionState(connection)}</p>
                       ) : null}
                       {connection.last_sent_at ? (
                         <p className="mt-2 text-xs text-slate-500">Last provider-backed note sent {formatDateTime(connection.last_sent_at)}.</p>
@@ -4492,6 +4502,45 @@ function formatImportFieldLabel(value: string) {
 
 function formatRelationshipState(value: string) {
   return value.replaceAll("_", " ");
+}
+
+function isMailboxSyncStale(connection: CRMMailboxConnection) {
+  if (!connection.background_sync_enabled || !connection.last_sync_at) {
+    return false;
+  }
+  const lastSyncAt = new Date(connection.last_sync_at).getTime();
+  if (Number.isNaN(lastSyncAt)) {
+    return false;
+  }
+  return lastSyncAt <= Date.now() - 1000 * 60 * 60 * 24 * 3;
+}
+
+function isMailboxTokenExpiringSoon(connection: CRMMailboxConnection) {
+  if (connection.connection_mode !== "oauth" || !connection.token_expires_at || connection.reauth_required) {
+    return false;
+  }
+  const expiresAt = new Date(connection.token_expires_at).getTime();
+  if (Number.isNaN(expiresAt)) {
+    return false;
+  }
+  const now = Date.now();
+  return expiresAt > now && expiresAt <= now + 1000 * 60 * 60 * 12;
+}
+
+function describeMailboxConnectionState(connection: CRMMailboxConnection) {
+  if (connection.reauth_required || connection.status === "needs_reauth") {
+    return "Reconnect this inbox so Brivoly can keep holding relationship memory quietly.";
+  }
+  if (connection.health_note.trim()) {
+    return connection.health_note;
+  }
+  if (isMailboxSyncStale(connection)) {
+    return `This inbox has not refreshed since ${formatDateTime(connection.last_sync_at)}. A quick sync can warm the latest context back up.`;
+  }
+  if (isMailboxTokenExpiringSoon(connection)) {
+    return `Access for this inbox renews around ${formatDateTime(connection.token_expires_at)}. Brivoly will try to keep it quiet, but reconnect if that slips.`;
+  }
+  return "";
 }
 
 function buildSuggestedResponsePresets(lead: CRMLeadFollowUp) {

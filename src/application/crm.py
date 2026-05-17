@@ -1797,7 +1797,7 @@ def _mark_mailbox_attention_needed(connection: MailboxConnection, reason: str) -
     lower_reason = normalized_reason.lower()
     needs_reauth = any(
         token in lower_reason
-        for token in ("token", "oauth", "auth", "unauthorized", "forbidden", "expired", "refresh")
+        for token in ("token", "oauth", "auth", "unauthorized", "forbidden", "expired", "refresh", "reconnect")
     )
     status = "needs_reauth" if needs_reauth else "attention_needed"
     return replace(

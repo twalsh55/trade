@@ -143,10 +143,11 @@ class OAuthMailboxProviderAdapter(MailboxProviderPort):
     def refresh_connection(self, connection: MailboxConnection) -> MailboxConnection:
         if connection.connection_mode != "oauth":
             return connection
+        expiry_threshold = self.now() + timedelta(minutes=2)
+        if connection.token_expires_at and connection.token_expires_at > expiry_threshold:
+            return connection
         if not connection.refresh_token.strip():
-            return connection
-        if connection.token_expires_at and connection.token_expires_at > self.now() + timedelta(minutes=2):
-            return connection
+            raise MailboxProviderError("Reconnect this inbox so Brivoly can keep holding relationship memory quietly.")
 
         normalized_provider = _normalize_provider(connection.provider)
         if normalized_provider == "gmail":
@@ -596,7 +597,7 @@ def _read_json_response(response: httpx.Response) -> dict[str, Any]:
             elif isinstance(error_payload, str):
                 detail = error_payload
             detail = detail or _optional_string(payload.get("error_description")) or _optional_string(payload.get("message")) or ""
-        raise MailboxProviderError(detail or f"Mailbox provider request failed with status {response.status_code}.") from exc
+        raise MailboxProviderError(_normalize_provider_error(detail, response.status_code)) from exc
     try:
         payload = response.json()
     except ValueError as exc:
@@ -611,6 +612,18 @@ def _normalize_provider(provider: str) -> str:
     if normalized_provider not in {"gmail", "outlook"}:
         raise MailboxProviderError("Unsupported mailbox provider.")
     return normalized_provider
+
+
+def _normalize_provider_error(detail: str, status_code: int) -> str:
+    normalized_detail = detail.strip()
+    lower_detail = normalized_detail.lower()
+    if status_code == 429:
+        return "This inbox is being rate-limited right now. Brivoly can try again in a moment."
+    if status_code >= 500:
+        return "The mailbox provider is having a rough moment. Brivoly can try again shortly."
+    if any(token in lower_detail for token in ("invalid_grant", "expired", "expired token", "invalid token", "refresh token", "oauth", "unauthorized", "forbidden", "consent_required")):
+        return "Reconnect this inbox so Brivoly can keep holding relationship memory quietly."
+    return normalized_detail or f"Mailbox provider request failed with status {status_code}."
 
 
 def _required_env(name: str) -> str:

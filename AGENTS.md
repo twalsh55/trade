@@ -110,6 +110,7 @@ cd web && npm run e2e
   - mailbox beta now includes real Gmail / Outlook OAuth-ready connection start/complete routes, provider-backed sync for OAuth-linked accounts, provider-watch event callbacks, and provider-backed sending through Gmail API / Microsoft Graph when those accounts are connected
   - calendar beta now includes durable Google Calendar / Outlook Calendar connection records plus meeting-event ingest into relationship memory so upcoming conversations can feed Today and meeting prep
   - connected mailbox cards now support disconnecting accounts, pausing or resuming scheduled background sync per mailbox, refreshing provider watch coverage, and clearer reauth / health-state visibility without losing the saved relationship memory
+  - connected mailbox cards now also surface reconnect-needed and stale-sync cues more explicitly, including a direct reconnect path for OAuth inboxes when Brivoly can no longer quietly refresh them
   - connected calendar cards now support connect/disconnect, pause/resume background meeting memory, and a lightweight meeting-ingest path for bringing scheduled conversations straight into relationship memory
   - manual mailbox connection still exists as a fallback beta path when provider credentials are not configured yet
   - inbox cards now surface backend-driven relationship pulse, open-loop memory, thread continuity cues, `what changed` hints, unresolved-thread cues, a clearer long-thread `through-line`, and a carry-forward cue for longer threads, grouped into `Needs you now` and `Still warm`

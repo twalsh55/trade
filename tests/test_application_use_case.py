@@ -14,6 +14,7 @@ from src.application.crm import (
     CompleteLeadFollowUpUseCase,
     DesignLeadFollowUpEmailUseCase,
     EmailThreadMessageInput,
+    SyncMailboxConnectionUseCase,
     GetLeadFollowUpOverviewUseCase,
     IngestCalendarEventUseCase,
     IngestLeadEmailThreadUseCase,
@@ -65,11 +66,12 @@ from src.application.crm import (
     _sentence_case,
     _truncate_sentence,
 )
+from src.adapters.crm.oauth_mailbox_provider import MailboxProviderError, OAuthMailboxProviderAdapter
 from src.application.dashboard import build_default_dashboard_settings
 from src.adapters.crm.in_memory_follow_up_repository import InMemoryLeadFollowUpRepository
 from src.application.use_cases import BuildCrashDashboardUseCase
 from src.domain.auth import User
-from src.domain.crm import LeadEmailThreadSummary, LeadFollowUp, LeadRelationshipReminder, LeadTimelineEntry
+from src.domain.crm import LeadEmailThreadSummary, LeadFollowUp, LeadRelationshipReminder, LeadTimelineEntry, MailboxConnection
 from src.domain.models import DashboardConfig
 
 
@@ -257,6 +259,98 @@ def test_add_lead_follow_up_note_requires_non_empty_body() -> None:
         assert str(exc) == "Note body is required."
     else:
         raise AssertionError("Expected ValueError for empty note")
+
+
+def test_oauth_mailbox_refresh_requires_reconnect_when_refresh_token_is_missing() -> None:
+    now = datetime(2024, 5, 6, 12, 30, tzinfo=UTC)
+    adapter = OAuthMailboxProviderAdapter(now=lambda: now)
+    connection = MailboxConnection(
+        id="mailbox-gmail-test",
+        provider="gmail",
+        email_address="ada@example.com",
+        display_name="Ada Lovelace",
+        status="connected",
+        connected_at=now - timedelta(days=2),
+        connection_mode="oauth",
+        access_token="expired-access-token",
+        refresh_token="",
+        token_expires_at=now - timedelta(minutes=5),
+    )
+
+    with pytest.raises(MailboxProviderError) as exc_info:
+        adapter.refresh_connection(connection)
+
+    assert str(exc_info.value) == "Reconnect this inbox so Brivoly can keep holding relationship memory quietly."
+
+
+def test_mailbox_sync_marks_connection_for_reconnect_when_provider_refresh_fails() -> None:
+    now = datetime(2024, 5, 6, 12, 30, tzinfo=UTC)
+    user = make_user()
+    repository = InMemoryLeadFollowUpRepository(now=lambda: now)
+    repository.save_mailbox_connection(
+        user,
+        MailboxConnection(
+            id="mailbox-gmail-oauth",
+            provider="gmail",
+            email_address="ada@example.com",
+            display_name="Ada Lovelace",
+            status="connected",
+            connected_at=now - timedelta(days=2),
+            connection_mode="oauth",
+            access_token="expired-access-token",
+            refresh_token="refresh-token",
+            token_expires_at=now - timedelta(minutes=5),
+            background_sync_enabled=True,
+        ),
+    )
+
+    class FailingMailboxProvider:
+        def build_authorization_url(self, provider: str, redirect_uri: str, state: str) -> str:
+            raise AssertionError("not used")
+
+        def exchange_authorization_code(
+            self,
+            provider: str,
+            code: str,
+            redirect_uri: str,
+            existing_connection=None,
+        ):  # type: ignore[no-untyped-def]
+            raise AssertionError("not used")
+
+        def refresh_connection(self, connection: MailboxConnection) -> MailboxConnection:
+            raise RuntimeError("Reconnect this inbox so Brivoly can keep holding relationship memory quietly.")
+
+        def ensure_watch_subscription(self, connection: MailboxConnection) -> MailboxConnection:
+            raise AssertionError("not used")
+
+        def pull_thread_updates(self, connection: MailboxConnection, max_results: int = 10):  # type: ignore[no-untyped-def]
+            raise AssertionError("not used")
+
+        def send_message(
+            self,
+            connection: MailboxConnection,
+            *,
+            to_email: str,
+            to_name: str,
+            subject: str,
+            body: str,
+            thread_id: str | None = None,
+            reply_to_external_message_id: str | None = None,
+        ):  # type: ignore[no-untyped-def]
+            raise AssertionError("not used")
+
+    with pytest.raises(RuntimeError) as exc_info:
+        SyncMailboxConnectionUseCase(
+            repository=repository,
+            now=lambda: now,
+            mailbox_provider=FailingMailboxProvider(),
+        ).execute(user, "mailbox-gmail-oauth")
+
+    assert str(exc_info.value) == "Reconnect this inbox so Brivoly can keep holding relationship memory quietly."
+    [saved_connection] = repository.list_mailbox_connections(user)
+    assert saved_connection.status == "needs_reauth"
+    assert saved_connection.reauth_required is True
+    assert saved_connection.health_note == "Reconnect this inbox so Brivoly can keep holding relationship memory quietly."
 
 
 def test_design_lead_follow_up_email_uses_lead_context_and_business_profile() -> None:
