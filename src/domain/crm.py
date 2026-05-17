@@ -107,6 +107,8 @@ class LeadAmbientMemorySummary:
     warm_calendar_count: int
     suggested_action_label: str = ""
     suggested_action_route: str = ""
+    attention_source_labels: tuple[str, ...] = ()
+    paused_source_labels: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

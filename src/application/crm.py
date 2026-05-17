@@ -946,6 +946,26 @@ def _build_ambient_memory_summary(
     mailbox_connections: list[MailboxConnection],
     calendar_connections: list[CalendarConnection],
 ) -> LeadAmbientMemorySummary:
+    attention_source_labels = tuple(
+        [
+            *[
+                _format_mailbox_source_label(item)
+                for item in mailbox_connections
+                if item.reauth_required or item.status in {"attention_needed", "needs_reauth"}
+            ],
+            *[
+                _format_calendar_source_label(item)
+                for item in calendar_connections
+                if item.status not in {"", "connected"}
+            ],
+        ][:4]
+    )
+    paused_source_labels = tuple(
+        [
+            *[_format_mailbox_source_label(item) for item in mailbox_connections if not item.background_sync_enabled],
+            *[_format_calendar_source_label(item) for item in calendar_connections if not item.background_sync_enabled],
+        ][:4]
+    )
     active_mailbox_count = sum(1 for item in mailbox_connections if item.background_sync_enabled and item.status == "connected")
     paused_mailbox_count = sum(1 for item in mailbox_connections if not item.background_sync_enabled)
     attention_mailbox_count = sum(1 for item in mailbox_connections if item.reauth_required or item.status in {"attention_needed", "needs_reauth"})
@@ -1020,7 +1040,19 @@ def _build_ambient_memory_summary(
         warm_calendar_count=warm_calendar_count,
         suggested_action_label=suggested_action_label,
         suggested_action_route=suggested_action_route,
+        attention_source_labels=attention_source_labels,
+        paused_source_labels=paused_source_labels,
     )
+
+
+def _format_mailbox_source_label(connection: MailboxConnection) -> str:
+    provider_label = "Gmail" if connection.provider == "gmail" else "Outlook"
+    return f"{provider_label} · {connection.email_address}"
+
+
+def _format_calendar_source_label(connection: CalendarConnection) -> str:
+    provider_label = "Google Calendar" if connection.provider == "google_calendar" else "Outlook Calendar"
+    return f"{provider_label} · {connection.calendar_address}"
 
 
 class CompleteLeadFollowUpUseCase:

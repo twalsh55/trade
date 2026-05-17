@@ -1127,6 +1127,8 @@ def test_crm_calendar_connect_event_ingest_and_delete_endpoints_manage_meeting_m
     assert overview_response.json()["ambient_memory_summary"]["continuity_state"] in {"warm", "waiting", "attention_needed", "paused", "disconnected"}
     assert "suggested_action_label" in overview_response.json()["ambient_memory_summary"]
     assert "suggested_action_route" in overview_response.json()["ambient_memory_summary"]
+    assert "attention_source_labels" in overview_response.json()["ambient_memory_summary"]
+    assert "paused_source_labels" in overview_response.json()["ambient_memory_summary"]
 
     pause_response = client.patch(
         f"/api/crm/calendars/{connection['id']}",

@@ -2060,6 +2060,23 @@ function TodayPrioritiesPanel({
       </p>
       <p className="mt-3 text-sm font-medium text-slate-700">Start with one relationship and one next move. Brivoly will hold the rest.</p>
       <p className="mt-2 text-sm leading-6 text-slate-600">{memoryCoverageLine}</p>
+      {ambientMemorySummary?.attention_source_labels?.length ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {ambientMemorySummary.attention_source_labels.map((label) => (
+            <span key={`attention-${label}`} className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800">
+              Needs care: {label}
+            </span>
+          ))}
+        </div>
+      ) : ambientMemorySummary?.paused_source_labels?.length ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {ambientMemorySummary.paused_source_labels.map((label) => (
+            <span key={`paused-${label}`} className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700">
+              Paused: {label}
+            </span>
+          ))}
+        </div>
+      ) : null}
       {ambientMemorySummary?.suggested_action_label && ambientMemorySummary.suggested_action_route ? (
         <div className="mt-3">
           <button
@@ -2306,6 +2323,23 @@ function PipelineBoardPanel({
             This page is for quiet threads, overdue replies, and gentle re-entry moments. The goal is continuity and warmth, not system-heavy tracking.
           </p>
           <p className="mt-3 text-sm leading-6 text-slate-600">{memoryCoverageLine}</p>
+          {ambientMemorySummary?.attention_source_labels?.length ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {ambientMemorySummary.attention_source_labels.map((label) => (
+                <span key={`attention-${label}`} className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800">
+                  Needs care: {label}
+                </span>
+              ))}
+            </div>
+          ) : ambientMemorySummary?.paused_source_labels?.length ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {ambientMemorySummary.paused_source_labels.map((label) => (
+                <span key={`paused-${label}`} className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700">
+                  Paused: {label}
+                </span>
+              ))}
+            </div>
+          ) : null}
           {ambientMemorySummary?.suggested_action_label && ambientMemorySummary.suggested_action_route ? (
             <div className="mt-3">
               <button

@@ -169,6 +169,7 @@ cd web && npm run e2e
   - mailbox and calendar DTOs now carry Python-owned continuity states and summaries, so the Client OS shell can describe warm, quiet, paused, reconnect-needed, and event-ready memory without re-deriving those states in TypeScript
   - the CRM follow-up overview now also carries a Python-owned ambient memory summary, so Today and Attention can read one shared continuity posture for inbox + calendar memory instead of rebuilding the top-level story in the frontend
   - that ambient memory summary now also suggests the calmest next recovery move, so Today and Attention can offer one small fix such as checking connections, resuming memory, or connecting a source instead of just describing the state
+  - that shared ambient memory summary now also carries specific paused and attention-needed source labels, so Today and Attention can quietly point to the exact inboxes or calendars thinning Brivoly's memory layer without adding a new admin surface
 
 ### Relationship OS Todo
 
