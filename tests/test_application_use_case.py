@@ -432,6 +432,7 @@ def test_crm_helper_branches_cover_thread_memory_and_timing_paths() -> None:
     now = datetime(2024, 5, 17, 12, 30, tzinfo=UTC)
     reply_thread = LeadEmailThreadSummary(
         thread_id="thread-1",
+        source="gmail",
         subject="Reply needed",
         counterpart_name="Amber",
         counterpart_email="amber@example.com",
@@ -444,6 +445,7 @@ def test_crm_helper_branches_cover_thread_memory_and_timing_paths() -> None:
     )
     waiting_thread = LeadEmailThreadSummary(
         thread_id="thread-2",
+        source="gmail",
         subject="Waiting",
         counterpart_name="Marcus",
         counterpart_email="marcus@example.com",
@@ -456,6 +458,7 @@ def test_crm_helper_branches_cover_thread_memory_and_timing_paths() -> None:
     )
     quiet_thread = LeadEmailThreadSummary(
         thread_id="thread-3",
+        source="gmail",
         subject="Quiet",
         counterpart_name="Jordan",
         counterpart_email="jordan@example.com",
@@ -468,6 +471,7 @@ def test_crm_helper_branches_cover_thread_memory_and_timing_paths() -> None:
     )
     active_thread = LeadEmailThreadSummary(
         thread_id="thread-4",
+        source="gmail",
         subject="Active",
         counterpart_name="Priya",
         counterpart_email="priya@example.com",
@@ -480,6 +484,7 @@ def test_crm_helper_branches_cover_thread_memory_and_timing_paths() -> None:
     )
     light_thread = LeadEmailThreadSummary(
         thread_id="thread-5",
+        source="gmail",
         subject="Light",
         counterpart_name="Lee",
         counterpart_email="lee@example.com",
@@ -611,6 +616,7 @@ def test_crm_helper_branches_cover_relationship_summaries() -> None:
         threads=(
             LeadEmailThreadSummary(
                 thread_id="thread",
+                source="gmail",
                 subject="Proposal",
                 counterpart_name="Taylor",
                 counterpart_email="taylor@example.com",
@@ -673,6 +679,7 @@ def test_crm_helper_branches_cover_reconnect_guidance() -> None:
     )
     waiting_thread = LeadEmailThreadSummary(
         thread_id="thread-reconnect",
+        source="gmail",
         subject="Checking in",
         counterpart_name="Jordan",
         counterpart_email="jordan@example.com",

@@ -161,6 +161,7 @@ cd web && npm run e2e
   - Today navigation and other dense summary areas are progressively flattening into lighter pills and calmer summaries instead of equal-weight cards
   - scheduled mailbox automation now reports both watch-ready and event-ready inbox coverage so the always-on sync layer is easier to reason about than a raw thread count alone
   - Today, Inbox, Attention, and Relationships now quietly refresh from connected inbox/calendar memory while the page is open, so fresh context can surface without asking the user to manually refresh
+  - Today and Attention now surface whether Brivoly is still holding context quietly in the background or whether paused / reconnect-needed inbox and calendar connections are starting to thin that memory layer out
 
 ### Relationship OS Todo
 

@@ -234,6 +234,7 @@ class LeadRelationshipSummaryDTO:
 @dataclass(frozen=True)
 class LeadEmailThreadSummaryDTO:
     thread_id: str
+    source: str
     subject: str
     counterpart_name: str
     counterpart_email: str
@@ -715,6 +716,7 @@ def build_lead_pipeline_stage_summary_dto(stage: LeadPipelineStageSummary) -> Le
 def build_lead_email_thread_summary_dto(thread: LeadEmailThreadSummary) -> LeadEmailThreadSummaryDTO:
     return LeadEmailThreadSummaryDTO(
         thread_id=thread.thread_id,
+        source=thread.source,
         subject=thread.subject,
         counterpart_name=thread.counterpart_name,
         counterpart_email=thread.counterpart_email,

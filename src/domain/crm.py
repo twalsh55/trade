@@ -33,6 +33,7 @@ class LeadWarmIntroConnection:
 @dataclass(frozen=True)
 class LeadEmailThreadSummary:
     thread_id: str
+    source: str
     subject: str
     counterpart_name: str
     counterpart_email: str

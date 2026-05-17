@@ -146,6 +146,7 @@ export type CRMFollowUpOverview = {
 
 export type CRMEmailThreadSummary = {
   thread_id: string;
+  source: string;
   subject: string;
   counterpart_name: string;
   counterpart_email: string;

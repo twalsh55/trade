@@ -421,6 +421,7 @@ def _payload_to_reminder(payload: dict[str, Any]) -> LeadRelationshipReminder:
 def _payload_to_thread(payload: dict[str, Any]) -> LeadEmailThreadSummary:
     return LeadEmailThreadSummary(
         thread_id=str(payload["thread_id"]),
+        source=str(payload.get("source", "")),
         subject=str(payload["subject"]),
         counterpart_name=str(payload["counterpart_name"]),
         counterpart_email=str(payload["counterpart_email"]),

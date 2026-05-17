@@ -146,6 +146,13 @@ export function CRMFollowUpWorkspace({
 
   const filteredFollowUps = overview.items.filter((item) => matchesRelationshipQuery(item, relationshipQuery) && matchesRelationshipFilter(item, relationshipFilter));
   const selectedLead = filteredFollowUps.find((item) => item.id === selectedLeadId) ?? filteredFollowUps[0] ?? null;
+  const selectedThread = selectedLead?.recent_email_threads.find((thread) => thread.thread_id === selectedThreadId) ?? null;
+  const preferredMailboxConnection =
+    (selectedThread
+      ? mailboxConnections.find((connection) => connection.status === "connected" && connection.provider === selectedThread.source)
+      : null) ??
+    mailboxConnections.find((connection) => connection.status === "connected") ??
+    null;
   const advancedAiUnlocked = hasAdvancedAiAccess(initialBilling);
   const showingOverview = view === "overview";
   const showingFollowups = view === "followups";
@@ -1047,7 +1054,7 @@ export function CRMFollowUpWorkspace({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            connection_id: mailboxConnections[0]?.id ?? null,
+            connection_id: preferredMailboxConnection?.id ?? null,
             thread_id: selectedThreadId,
             subject: emailSubjectDraft,
             body: emailBodyDraft,
@@ -1062,7 +1069,9 @@ export function CRMFollowUpWorkspace({
         }
         setOverview(body.overview);
         upsertMailboxConnection(body.connection);
-        setEmailStatus(`Sent through ${body.connection.provider === "gmail" ? "Gmail" : "Outlook"} at ${body.connection.email_address}.`);
+        setEmailStatus(
+          `Sent through ${body.connection.provider === "gmail" ? "Gmail" : "Outlook"} at ${body.connection.email_address}${selectedThread ? ` and kept attached to ${selectedThread.subject}.` : "."}`,
+        );
         router.refresh();
       } catch (sendError) {
         setEmailStatus(sendError instanceof Error ? sendError.message : "Unable to send this note right now.");
@@ -1362,6 +1371,8 @@ export function CRMFollowUpWorkspace({
               emailStatus={emailStatus}
               isGeneratingEmail={isEmailPending}
               canSendFromMailbox={mailboxConnections.length > 0}
+              selectedThread={selectedThread}
+              preferredMailboxConnection={preferredMailboxConnection}
               draftFocusToken={draftFocusToken}
               onEmailObjectiveChange={setEmailObjective}
               onEmailToneChange={setEmailTone}
@@ -2029,10 +2040,19 @@ function TodayPrioritiesPanel({
   const pausedMailboxCount = mailboxConnections.filter((item) => !item.background_sync_enabled).length;
   const activeCalendarCount = calendarConnections.filter((item) => item.background_sync_enabled && item.status === "connected").length;
   const pausedCalendarCount = calendarConnections.filter((item) => !item.background_sync_enabled).length;
+  const mailboxAttentionCount = mailboxConnections.filter((item) => item.reauth_required || item.status === "attention_needed" || item.status === "needs_reauth").length;
+  const calendarAttentionCount = calendarConnections.filter((item) => item.status !== "connected" && item.status !== "").length;
+  const activeMemoryCount = activeMailboxCount + activeCalendarCount;
+  const pausedMemoryCount = pausedMailboxCount + pausedCalendarCount;
+  const connectionAttentionCount = mailboxAttentionCount + calendarAttentionCount;
   const memoryCoverageLine =
-    activeMailboxCount || activeCalendarCount
+    connectionAttentionCount
+      ? activeMemoryCount
+        ? `${connectionAttentionCount} connection${connectionAttentionCount === 1 ? "" : "s"} need attention, but Brivoly is still holding context from ${activeMemoryCount} live source${activeMemoryCount === 1 ? "" : "s"} in the background.`
+        : `${connectionAttentionCount} connection${connectionAttentionCount === 1 ? "" : "s"} need attention before Brivoly can hold relationship memory quietly again.`
+      : activeMemoryCount
       ? `Brivoly is quietly holding memory from ${activeMailboxCount} inbox${activeMailboxCount === 1 ? "" : "es"} and ${activeCalendarCount} calendar${activeCalendarCount === 1 ? "" : "s"} right now.`
-      : pausedMailboxCount || pausedCalendarCount
+      : pausedMemoryCount
         ? `Background memory is paused on ${pausedMailboxCount} inbox${pausedMailboxCount === 1 ? "" : "es"} and ${pausedCalendarCount} calendar${pausedCalendarCount === 1 ? "" : "s"}. Resume one if you want quieter continuity.`
         : "Connect an inbox or calendar once and Brivoly can keep more of this context warm for you.";
 
@@ -2274,10 +2294,19 @@ function PipelineBoardPanel({
   const pausedMailboxCount = mailboxConnections.filter((item) => !item.background_sync_enabled).length;
   const activeCalendarCount = calendarConnections.filter((item) => item.background_sync_enabled && item.status === "connected").length;
   const pausedCalendarCount = calendarConnections.filter((item) => !item.background_sync_enabled).length;
+  const mailboxAttentionCount = mailboxConnections.filter((item) => item.reauth_required || item.status === "attention_needed" || item.status === "needs_reauth").length;
+  const calendarAttentionCount = calendarConnections.filter((item) => item.status !== "connected" && item.status !== "").length;
+  const activeMemoryCount = activeMailboxCount + activeCalendarCount;
+  const pausedMemoryCount = pausedMailboxCount + pausedCalendarCount;
+  const connectionAttentionCount = mailboxAttentionCount + calendarAttentionCount;
   const memoryCoverageLine =
-    activeMailboxCount || activeCalendarCount
+    connectionAttentionCount
+      ? activeMemoryCount
+        ? `${connectionAttentionCount} connection${connectionAttentionCount === 1 ? "" : "s"} need attention, but Brivoly is still keeping some continuity warm from ${activeMemoryCount} live source${activeMemoryCount === 1 ? "" : "s"}.`
+        : `${connectionAttentionCount} connection${connectionAttentionCount === 1 ? "" : "s"} need attention, so some continuity may cool off unless you reconnect them.`
+      : activeMemoryCount
       ? `Brivoly is keeping warmth in view from ${activeMailboxCount} inbox${activeMailboxCount === 1 ? "" : "es"} and ${activeCalendarCount} calendar${activeCalendarCount === 1 ? "" : "s"}.`
-      : pausedMailboxCount || pausedCalendarCount
+      : pausedMemoryCount
         ? `Some background memory is paused. Resume ${pausedMailboxCount ? "inbox" : "calendar"} coverage if these relationships start slipping more quietly than usual.`
         : "Connect an inbox or calendar if you want quiet continuity to show up here with less manual work.";
 
@@ -3514,6 +3543,8 @@ function LeadMemoryPanel({
   emailStatus,
   isGeneratingEmail,
   canSendFromMailbox,
+  selectedThread,
+  preferredMailboxConnection,
   draftFocusToken,
   onEmailObjectiveChange,
   onEmailToneChange,
@@ -3539,6 +3570,8 @@ function LeadMemoryPanel({
   emailStatus: string | null;
   isGeneratingEmail: boolean;
   canSendFromMailbox: boolean;
+  selectedThread: CRMLeadFollowUp["recent_email_threads"][number] | null;
+  preferredMailboxConnection: CRMMailboxConnection | null;
   draftFocusToken: number;
   onEmailObjectiveChange: (value: CRMEmailDraft["objective"]) => void;
   onEmailToneChange: (value: CRMEmailDraft["tone"]) => void;
@@ -3593,6 +3626,12 @@ function LeadMemoryPanel({
       <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Relationship memory</p>
       <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">{lead.lead_name}</h2>
       <p className="mt-1 text-sm text-slate-600">{lead.company_name}</p>
+      {selectedThread ? (
+        <p className="mt-2 text-sm leading-6 text-slate-600">
+          Drafting inside <span className="font-medium text-slate-900">{selectedThread.subject}</span>
+          {preferredMailboxConnection ? ` through ${preferredMailboxConnection.provider === "gmail" ? "Gmail" : "Outlook"}.` : "."}
+        </p>
+      ) : null}
 
       <div className="mt-5 grid gap-3 md:grid-cols-2">
         <TimelineTile label="Where it stands" value={formatStageLabel(lead.stage)} />

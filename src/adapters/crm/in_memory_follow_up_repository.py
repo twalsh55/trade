@@ -53,6 +53,7 @@ def build_seed_follow_ups(current_time: datetime) -> tuple[LeadFollowUp, ...]:
             recent_email_threads=(
                 LeadEmailThreadSummary(
                     thread_id="thread-amber-recap",
+                    source="gmail",
                     subject="Re: discovery recap",
                     counterpart_name="Amber Flores",
                     counterpart_email="amber@northstarstudio.com",
@@ -101,6 +102,7 @@ def build_seed_follow_ups(current_time: datetime) -> tuple[LeadFollowUp, ...]:
             recent_email_threads=(
                 LeadEmailThreadSummary(
                     thread_id="thread-riverbridge-proposal",
+                    source="gmail",
                     subject="Proposal follow-up",
                     counterpart_name="Marcus Chen",
                     counterpart_email="marcus@riverbridgeops.com",
@@ -149,6 +151,7 @@ def build_seed_follow_ups(current_time: datetime) -> tuple[LeadFollowUp, ...]:
             recent_email_threads=(
                 LeadEmailThreadSummary(
                     thread_id="thread-lattice-qualification",
+                    source="gmail",
                     subject="Spreadsheet workflow question",
                     counterpart_name="Priya Nair",
                     counterpart_email="priya@latticelane.com",
@@ -195,6 +198,7 @@ def build_seed_follow_ups(current_time: datetime) -> tuple[LeadFollowUp, ...]:
             recent_email_threads=(
                 LeadEmailThreadSummary(
                     thread_id="thread-cedar-pilot",
+                    source="gmail",
                     subject="Checking timing on the pilot",
                     counterpart_name="Jordan Pike",
                     counterpart_email="jordan@cedarpeakagency.com",

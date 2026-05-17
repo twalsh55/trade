@@ -1635,13 +1635,24 @@ class SendLeadFollowUpEmailUseCase:
             raise ValueError("This relationship does not have an email address yet.")
 
         connections = self.repository.list_mailbox_connections(user)
-        connection = (
-            _require_mailbox_connection(connections, connection_id)
-            if connection_id
-            else next((item for item in connections if item.status == "connected"), None)
-        )
+        selected_thread = next((item for item in lead.recent_email_threads if thread_id and item.thread_id == thread_id), None)
+        connection = None
+        if connection_id:
+            connection = _require_mailbox_connection(connections, connection_id)
+        elif selected_thread:
+            connection = next(
+                (
+                    item
+                    for item in connections
+                    if item.status == "connected" and item.provider == selected_thread.source
+                ),
+                None,
+            )
+        if connection is None:
+            connection = next((item for item in connections if item.status == "connected"), None)
         if connection is None:
             raise ValueError("Connect a mailbox before sending from Brivoly.")
+        _ensure_mailbox_connection_sendable(connection)
 
         current_time = self.now()
         resolved_thread_id = (
@@ -1762,6 +1773,13 @@ def _require_calendar_connection(items: list[CalendarConnection], connection_id:
         if item.id == normalized_connection_id:
             return item
     raise KeyError(normalized_connection_id)
+
+
+def _ensure_mailbox_connection_sendable(connection: MailboxConnection) -> None:
+    if connection.status != "connected":
+        if connection.reauth_required:
+            raise ValueError("Reconnect this mailbox before sending from Brivoly.")
+        raise ValueError("This mailbox needs attention before Brivoly can send from it.")
 
 
 def _mailbox_watch_renewal_due(connection: MailboxConnection) -> bool:
@@ -1957,6 +1975,7 @@ def _merge_email_thread_into_follow_up(
     latest_message = messages[-1]
     thread_history = _upsert_thread_summary(
         lead.recent_email_threads,
+        source=source,
         thread_id=thread_id,
         counterpart_email=counterpart_email,
         counterpart_name=counterpart_name,
@@ -2042,6 +2061,7 @@ def _build_email_timeline_summary(message: EmailThreadMessageInput) -> str:
 def _upsert_thread_summary(
     existing_threads: tuple[LeadEmailThreadSummary, ...],
     *,
+    source: str,
     thread_id: str,
     counterpart_email: str,
     counterpart_name: str,
@@ -2053,6 +2073,7 @@ def _upsert_thread_summary(
     existing = existing_by_id.get(thread_id)
     thread = LeadEmailThreadSummary(
         thread_id=thread_id,
+        source=source,
         subject=latest_message.subject,
         counterpart_name=counterpart_name or _derive_name_from_email(counterpart_email),
         counterpart_email=counterpart_email,
