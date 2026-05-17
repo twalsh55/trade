@@ -10,7 +10,7 @@ export async function GET() {
     const overview = await getCrmFollowUpOverview({ sessionToken, cookieHeader });
     return NextResponse.json(overview);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unable to load CRM follow-up queue.";
+    const message = error instanceof Error ? error.message : "Unable to load your relationship list right now.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

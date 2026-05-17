@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
     if (error instanceof ApiError) {
       return NextResponse.json({ error: error.message }, { status: error.status });
     }
-    const message = error instanceof Error ? error.message : "Unable to import CRM rows.";
+    const message = error instanceof Error ? error.message : "Unable to bring this context in right now.";
     return NextResponse.json({ error: message }, { status: 422 });
   }
 }

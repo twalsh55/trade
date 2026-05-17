@@ -33,7 +33,7 @@ export async function PATCH(request: NextRequest, context: Context) {
     if (error instanceof ApiError) {
       return NextResponse.json({ error: error.message }, { status: error.status });
     }
-    const message = error instanceof Error ? error.message : "Unable to update CRM follow-up.";
+    const message = error instanceof Error ? error.message : "Unable to update this relationship right now.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

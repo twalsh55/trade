@@ -30,7 +30,7 @@ export async function POST(request: NextRequest, context: Context) {
     if (error instanceof ApiError) {
       return NextResponse.json({ error: error.message }, { status: error.status });
     }
-    const message = error instanceof Error ? error.message : "Unable to generate CRM email draft.";
+    const message = error instanceof Error ? error.message : "Unable to draft the note right now.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

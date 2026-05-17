@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
     if (error instanceof ApiError) {
       return NextResponse.json({ error: error.message }, { status: error.status });
     }
-    const message = error instanceof Error ? error.message : "Unable to preview CRM import.";
+    const message = error instanceof Error ? error.message : "Unable to preview this context right now.";
     return NextResponse.json({ error: message }, { status: 422 });
   }
 }
