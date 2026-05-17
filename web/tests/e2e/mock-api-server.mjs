@@ -113,6 +113,7 @@ function makeState() {
         last_meaningful_interaction_at: "2024-05-01T12:30:00+00:00",
         relationship_health_score: 64,
         relationship_health_label: "watch",
+        relationship_state: "drifting",
         dormant: false,
         relationship_reminders: [],
         timeline: [
@@ -387,6 +388,7 @@ const server = http.createServer(async (request, response) => {
       last_meaningful_interaction_at: message.sent_at,
       relationship_health_score: 70,
       relationship_health_label: "watch",
+      relationship_state: "warm",
       dormant: false,
       relationship_reminders: [],
       timeline: [

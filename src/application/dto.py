@@ -164,6 +164,7 @@ class LeadFollowUpDTO:
     last_meaningful_interaction_at: str | None
     relationship_health_score: int
     relationship_health_label: str
+    relationship_state: str
     dormant: bool
     relationship_reminders: list["LeadRelationshipReminderDTO"]
     recent_email_threads: list["LeadEmailThreadSummaryDTO"]
@@ -197,10 +198,11 @@ class LeadWarmIntroConnectionDTO:
 
 @dataclass(frozen=True)
 class LeadRelationshipSummaryDTO:
-    healthy_count: int
-    watch_count: int
+    active_count: int
+    warm_count: int
+    drifting_count: int
+    stale_count: int
     at_risk_count: int
-    dormant_count: int
     referral_reminder_count: int
     milestone_reminder_count: int
     warm_intro_connections: list[LeadWarmIntroConnectionDTO]
@@ -523,6 +525,7 @@ def build_lead_follow_up_dto(item: LeadFollowUp) -> LeadFollowUpDTO:
         last_meaningful_interaction_at=item.last_meaningful_interaction_at.isoformat() if item.last_meaningful_interaction_at else None,
         relationship_health_score=item.relationship_health_score,
         relationship_health_label=item.relationship_health_label,
+        relationship_state=item.relationship_state,
         dormant=item.dormant,
         relationship_reminders=[build_lead_relationship_reminder_dto(item) for item in item.relationship_reminders],
         recent_email_threads=[build_lead_email_thread_summary_dto(thread) for thread in item.recent_email_threads],
@@ -554,10 +557,11 @@ def build_lead_relationship_summary_dto(
     if summary is None:
         return None
     return LeadRelationshipSummaryDTO(
-        healthy_count=summary.healthy_count,
-        watch_count=summary.watch_count,
+        active_count=summary.active_count,
+        warm_count=summary.warm_count,
+        drifting_count=summary.drifting_count,
+        stale_count=summary.stale_count,
         at_risk_count=summary.at_risk_count,
-        dormant_count=summary.dormant_count,
         referral_reminder_count=summary.referral_reminder_count,
         milestone_reminder_count=summary.milestone_reminder_count,
         warm_intro_connections=[build_lead_warm_intro_connection_dto(item) for item in summary.warm_intro_connections],

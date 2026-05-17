@@ -46,10 +46,11 @@ class LeadEmailThreadSummary:
 
 @dataclass(frozen=True)
 class LeadRelationshipSummary:
-    healthy_count: int
-    watch_count: int
+    active_count: int
+    warm_count: int
+    drifting_count: int
+    stale_count: int
     at_risk_count: int
-    dormant_count: int
     referral_reminder_count: int
     milestone_reminder_count: int
     warm_intro_connections: list[LeadWarmIntroConnection]
@@ -102,6 +103,7 @@ class LeadFollowUp:
     last_meaningful_interaction_at: datetime | None = None
     relationship_health_score: int = 0
     relationship_health_label: str = ""
+    relationship_state: str = ""
     dormant: bool = False
     relationship_reminders: tuple[LeadRelationshipReminder, ...] = ()
     recent_email_threads: tuple[LeadEmailThreadSummary, ...] = ()

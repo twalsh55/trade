@@ -760,8 +760,9 @@ export function CRMFollowUpWorkspace({
                         <p className="mt-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Owner · {item.owner_name}</p>
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
-                        {item.dormant ? <MiniFlag tone="warning" label="Stale" /> : null}
-                        {item.relationship_health_label === "at_risk" ? <MiniFlag tone="critical" label="At risk" /> : null}
+                        {item.relationship_state === "stale" ? <MiniFlag tone="warning" label="Stale" /> : null}
+                        {item.relationship_state === "drifting" ? <MiniFlag tone="warning" label="Drifting" /> : null}
+                        {item.relationship_state === "at_risk" ? <MiniFlag tone="critical" label="At risk" /> : null}
                         <PriorityBadge priority={item.priority} />
                       </div>
                     </div>
@@ -1046,7 +1047,7 @@ function TodayPrioritiesPanel({
   inboxSummary: CRMFollowUpOverview["inbox_summary"];
 }) {
   const replyLead = items.find((item) => item.recent_email_threads.some((thread) => thread.needs_reply));
-  const reconnectLead = items.find((item) => item.dormant || item.relationship_health_label === "at_risk");
+  const reconnectLead = items.find((item) => item.relationship_state === "stale" || item.relationship_state === "at_risk" || item.relationship_state === "drifting");
   const proposalLead = items.find((item) => isProposalFollowThrough(item));
   const recentContextLead = items.find((item) => getLatestContextEntry(item));
 
@@ -1104,7 +1105,7 @@ function TodayPrioritiesPanel({
   const visiblePriorities = (priorities.length ? priorities : fallbackPriorities).slice(0, 4);
 
   const replyCount = inboxSummary?.needs_reply_count ?? 0;
-  const reconnectCount = items.filter((item) => item.dormant || item.relationship_health_label === "at_risk").length;
+  const reconnectCount = items.filter((item) => item.relationship_state === "stale" || item.relationship_state === "at_risk" || item.relationship_state === "drifting").length;
   const proposalCount = items.filter((item) => isProposalFollowThrough(item)).length;
 
   return (
@@ -1166,9 +1167,9 @@ function RelationshipContinuityPanel({ summary }: { summary: NonNullable<CRMFoll
       <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Relationship continuity</p>
       <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Stay warm without holding everything in your head.</h2>
       <div className="mt-5 grid gap-3 md:grid-cols-3">
-        <CompactMetricLight label="Steady" value={String(summary.healthy_count)} tone="positive" />
-        <CompactMetricLight label="Needs care" value={String(summary.watch_count)} tone="warning" />
-        <CompactMetricLight label="Slipping" value={String(summary.dormant_count + summary.at_risk_count)} tone="critical" />
+        <CompactMetricLight label="Active" value={String(summary.active_count)} tone="positive" />
+        <CompactMetricLight label="Warm" value={String(summary.warm_count)} tone="neutral" />
+        <CompactMetricLight label="Needs care" value={String(summary.drifting_count + summary.stale_count + summary.at_risk_count)} tone="warning" />
       </div>
       <div className="mt-4 space-y-3">
         <TimelineTile label="Warm re-entry paths" value={`${summary.warm_intro_connections.length} contact${summary.warm_intro_connections.length === 1 ? "" : "s"} could help reopen a thread`} />
@@ -2079,8 +2080,8 @@ function LeadMemoryPanel({
 
       <div className="mt-4 grid gap-3 md:grid-cols-3">
         <TimelineTile label="Last meaningful interaction" value={formatDateTime(lead.last_meaningful_interaction_at)} />
-        <TimelineTile label="Relationship health" value={`${lead.relationship_health_score}/100 · ${formatHealthLabel(lead.relationship_health_label)}`} />
-        <TimelineTile label="Dormant detection" value={lead.dormant ? "Dormant and needs a real touch" : "Still active"} />
+        <TimelineTile label="Relationship state" value={formatRelationshipState(lead.relationship_state)} />
+        <TimelineTile label="Brivoly nudge" value={buildRelationshipNudge(lead)} />
       </div>
 
       {lead.referral_source_name || lead.birthday || lead.company_milestone_date || lead.relationship_reminders.length ? (
@@ -2260,12 +2261,13 @@ function RelationshipSignalsPanel({ summary }: { summary: NonNullable<CRMFollowU
       <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Client momentum</p>
       <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">See who is slipping before the relationship cools.</h2>
       <div className="mt-5 grid gap-3 md:grid-cols-3">
-        <CompactMetricLight label="Healthy" value={String(summary.healthy_count)} tone="positive" />
-        <CompactMetricLight label="Watch" value={String(summary.watch_count)} tone="warning" />
+        <CompactMetricLight label="Active" value={String(summary.active_count)} tone="positive" />
+        <CompactMetricLight label="Warm" value={String(summary.warm_count)} tone="neutral" />
         <CompactMetricLight label="At risk" value={String(summary.at_risk_count)} tone="critical" />
       </div>
       <div className="mt-4 grid gap-3 md:grid-cols-3">
-        <TimelineTile label="Dormant clients" value={String(summary.dormant_count)} />
+        <TimelineTile label="Drifting" value={String(summary.drifting_count)} />
+        <TimelineTile label="Stale" value={String(summary.stale_count)} />
         <TimelineTile label="Referral reminders" value={String(summary.referral_reminder_count)} />
         <TimelineTile label="Birthday + milestone reminders" value={String(summary.milestone_reminder_count)} />
       </div>
@@ -2431,10 +2433,10 @@ function summarizePriority(item: CRMLeadFollowUp) {
   if (item.recent_email_threads.some((thread) => thread.needs_reply)) {
     return `Reply to ${item.lead_name}`;
   }
-  if (item.dormant) {
+  if (item.relationship_state === "stale") {
     return `Reconnect with ${item.lead_name}`;
   }
-  if (item.relationship_health_label === "at_risk") {
+  if (item.relationship_state === "at_risk" || item.relationship_state === "drifting") {
     return `${item.lead_name} needs a warmer touch`;
   }
   return `${formatStageLabel(item.stage)} for ${item.lead_name}`;
@@ -2660,9 +2662,9 @@ function matchesRelationshipFilter(item: CRMLeadFollowUp, filter: RelationshipFi
     return isDueNow(item.next_follow_up_at);
   }
   if (filter === "stale") {
-    return item.dormant;
+    return item.relationship_state === "stale";
   }
-  return item.relationship_health_label === "at_risk";
+  return item.relationship_state === "at_risk" || item.relationship_state === "drifting";
 }
 
 function isDueNow(value: string): boolean {
@@ -2696,8 +2698,24 @@ function formatImportFieldLabel(value: string) {
     .join(" ");
 }
 
-function formatHealthLabel(value: string) {
+function formatRelationshipState(value: string) {
   return value.replaceAll("_", " ");
+}
+
+function buildRelationshipNudge(lead: CRMLeadFollowUp) {
+  if (lead.relationship_state === "at_risk") {
+    return "This relationship may be going cold.";
+  }
+  if (lead.relationship_state === "stale") {
+    return `You have not meaningfully reconnected with ${lead.lead_name} in a while.`;
+  }
+  if (lead.relationship_state === "drifting") {
+    return "A light follow-up soon would help keep momentum.";
+  }
+  if (lead.relationship_state === "warm") {
+    return "This relationship still feels warm. Keep the next touch easy.";
+  }
+  return "Things are active here. Brivoly is keeping the context ready.";
 }
 
 function formatReminderKind(value: string) {

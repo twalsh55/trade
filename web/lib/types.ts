@@ -99,6 +99,7 @@ export type CRMLeadFollowUp = {
   last_meaningful_interaction_at: string | null;
   relationship_health_score: number;
   relationship_health_label: "healthy" | "watch" | "at_risk" | string;
+  relationship_state: "active" | "warm" | "drifting" | "stale" | "at_risk" | string;
   dormant: boolean;
   relationship_reminders: CRMRelationshipReminder[];
   recent_email_threads: CRMEmailThreadSummary[];
@@ -153,10 +154,11 @@ export type CRMWarmIntroConnection = {
 };
 
 export type CRMRelationshipSummary = {
-  healthy_count: number;
-  watch_count: number;
+  active_count: number;
+  warm_count: number;
+  drifting_count: number;
+  stale_count: number;
   at_risk_count: number;
-  dormant_count: number;
   referral_reminder_count: number;
   milestone_reminder_count: number;
   warm_intro_connections: CRMWarmIntroConnection[];

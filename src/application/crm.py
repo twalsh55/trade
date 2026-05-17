@@ -70,6 +70,7 @@ def _enrich_follow_up(item: LeadFollowUp, current_time: datetime) -> LeadFollowU
         last_meaningful_interaction_at=last_meaningful,
         relationship_health_score=health_score,
         relationship_health_label=_health_label(health_score),
+        relationship_state=_relationship_state(health_score, dormant, item, current_time),
         dormant=dormant,
         relationship_reminders=tuple(reminders),
     )
@@ -127,6 +128,23 @@ def _health_label(score: int) -> str:
     if score >= 50:
         return "watch"
     return "at_risk"
+
+
+def _relationship_state(
+    score: int,
+    dormant: bool,
+    item: LeadFollowUp,
+    current_time: datetime,
+) -> str:
+    if dormant:
+        return "stale"
+    if item.next_follow_up_at < current_time - timedelta(days=7) or score < 45:
+        return "at_risk"
+    if score >= 86:
+        return "active"
+    if score >= 70:
+        return "warm"
+    return "drifting"
 
 
 def _is_dormant(item: LeadFollowUp, last_meaningful: datetime | None, current_time: datetime) -> bool:
@@ -194,10 +212,11 @@ def _combine_date_with_time(value: date, current_time: datetime) -> datetime:
 
 
 def _build_relationship_summary(items: list[LeadFollowUp]) -> LeadRelationshipSummary:
-    healthy_count = sum(1 for item in items if item.relationship_health_label == "healthy")
-    watch_count = sum(1 for item in items if item.relationship_health_label == "watch")
+    active_count = sum(1 for item in items if item.relationship_state == "active")
+    warm_count = sum(1 for item in items if item.relationship_state == "warm")
+    drifting_count = sum(1 for item in items if item.relationship_state == "drifting")
+    stale_count = sum(1 for item in items if item.relationship_state == "stale")
     at_risk_count = sum(1 for item in items if item.relationship_health_label == "at_risk")
-    dormant_count = sum(1 for item in items if item.dormant)
     referral_reminder_count = sum(
         1
         for item in items
@@ -222,10 +241,11 @@ def _build_relationship_summary(items: list[LeadFollowUp]) -> LeadRelationshipSu
         if item.referral_source_name.strip()
     ]
     return LeadRelationshipSummary(
-        healthy_count=healthy_count,
-        watch_count=watch_count,
+        active_count=active_count,
+        warm_count=warm_count,
+        drifting_count=drifting_count,
+        stale_count=stale_count,
         at_risk_count=at_risk_count,
-        dormant_count=dormant_count,
         referral_reminder_count=referral_reminder_count,
         milestone_reminder_count=milestone_reminder_count,
         warm_intro_connections=warm_intro_connections,

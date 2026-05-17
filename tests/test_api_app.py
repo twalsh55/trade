@@ -374,8 +374,9 @@ def test_crm_follow_up_overview_dto_and_use_case_sort_and_count_values() -> None
     assert payload["items"][0]["last_meaningful_interaction_at"] == now.isoformat()
     assert payload["items"][0]["relationship_health_score"] >= 75
     assert payload["items"][0]["relationship_health_label"] == "healthy"
-    assert payload["relationship_summary"]["healthy_count"] == 1
-    assert payload["relationship_summary"]["watch_count"] == 1
+    assert payload["items"][0]["relationship_state"] in {"active", "warm"}
+    assert payload["relationship_summary"]["active_count"] == 1
+    assert payload["relationship_summary"]["drifting_count"] == 1
     assert payload["pipeline_summary"]["stage_summaries"][0]["stage"] == "Discovery"
     assert payload["pipeline_summary"]["stage_summaries"][1]["stage"] == "Proposal"
 
@@ -1284,24 +1285,28 @@ def test_billing_routes_round_trip_overview_checkout_and_portal_urls() -> None:
 
 
 def test_billing_routes_require_auth_and_configuration() -> None:
-    anonymous_client = make_client(user=make_user())
-    unauthenticated_response = anonymous_client.get("/api/account/billing")
-    unavailable_checkout = anonymous_client.post(
-        "/api/account/billing/checkout",
-        headers={"Authorization": "Bearer session-token"},
-        json={"return_url": "https://www.brivoly.com/account"},
-    )
-    unavailable_portal = anonymous_client.post(
-        "/api/account/billing/portal",
-        headers={"Authorization": "Bearer session-token"},
-        json={"return_url": "https://www.brivoly.com/account"},
-    )
+    os.environ["ALLOW_ANONYMOUS_CRM"] = "false"
+    try:
+        anonymous_client = make_client(user=make_user())
+        unauthenticated_response = anonymous_client.get("/api/account/billing")
+        unavailable_checkout = anonymous_client.post(
+            "/api/account/billing/checkout",
+            headers={"Authorization": "Bearer session-token"},
+            json={"return_url": "https://www.brivoly.com/account"},
+        )
+        unavailable_portal = anonymous_client.post(
+            "/api/account/billing/portal",
+            headers={"Authorization": "Bearer session-token"},
+            json={"return_url": "https://www.brivoly.com/account"},
+        )
 
-    assert unauthenticated_response.status_code == 401
-    assert unavailable_checkout.status_code == 503
-    assert unavailable_checkout.json()["detail"] == "Stripe billing is not configured."
-    assert unavailable_portal.status_code == 503
-    assert unavailable_checkout.json()["detail"] == "Stripe billing is not configured."
+        assert unauthenticated_response.status_code == 401
+        assert unavailable_checkout.status_code == 503
+        assert unavailable_checkout.json()["detail"] == "Stripe billing is not configured."
+        assert unavailable_portal.status_code == 503
+        assert unavailable_checkout.json()["detail"] == "Stripe billing is not configured."
+    finally:
+        os.environ.pop("ALLOW_ANONYMOUS_CRM", None)
 
 
 def test_dashboard_snapshot_dto_serializes_frontend_safe_shapes() -> None:
@@ -1598,61 +1603,65 @@ def test_dashboard_endpoint_uses_default_universe_when_given_empty_values() -> N
 
 
 def test_account_settings_endpoints_and_alert_history_round_trip() -> None:
-    repository = InMemoryPersonalizationRepository()
-    client = make_client(user=make_user(), personalization_repository=repository)
+    os.environ["ALLOW_ANONYMOUS_CRM"] = "false"
+    try:
+        repository = InMemoryPersonalizationRepository()
+        client = make_client(user=make_user(), personalization_repository=repository)
 
-    unauthorized_settings = client.get("/api/account/settings")
-    assert unauthorized_settings.status_code == 401
-    assert unauthorized_settings.json()["detail"] == "Authentication required."
+        unauthorized_settings = client.get("/api/account/settings")
+        assert unauthorized_settings.status_code == 401
+        assert unauthorized_settings.json()["detail"] == "Authentication required."
 
-    settings_response = client.get("/api/account/settings", headers={"Authorization": "Bearer session-token"})
-    assert settings_response.status_code == 200
-    assert settings_response.json()["benchmark"] == "SPY"
-    assert settings_response.json()["lookback_years"] == 4
+        settings_response = client.get("/api/account/settings", headers={"Authorization": "Bearer session-token"})
+        assert settings_response.status_code == 200
+        assert settings_response.json()["benchmark"] == "SPY"
+        assert settings_response.json()["lookback_years"] == 4
 
-    update_response = client.put(
-        "/api/account/settings",
-        headers={"Authorization": "Bearer session-token"},
-        json={
-            "universe": ["spy", "qqq"],
-            "benchmark": "qqq",
-            "vix_symbol": "^vix",
-            "risk_proxy": "hyg",
-            "short_yield_symbol": "^irx",
-            "long_yield_symbol": "^tnx",
-            "lookback_years": 3,
-            "telegram_enabled": True,
-            "business_name": "Northstar Studio",
-            "business_website": "https://northstar.example",
-            "outbound_sender_name": "Ada from Northstar",
-            "profile_alias": "ada",
-            "business_logo_data_url": "data:image/png;base64,ZmFrZQ==",
-            "onboarding_profile_deferred": False,
-            "crm_ai_prompt": "Prefer extracting next step and owner from screenshots.",
-            "crm_preferred_import_formats": ["spreadsheet_screenshot", "pdf_export"],
-            "crm_image_intake_channels": ["whatsapp", "magic_link"],
-            "crm_image_intake_notes": "WhatsApp is used by the founder. The signed magic link stays available for remote intake.",
-        },
-    )
-    assert update_response.status_code == 200
-    assert update_response.json()["benchmark"] == "QQQ"
-    assert update_response.json()["universe"] == ["SPY", "QQQ"]
-    assert update_response.json()["telegram_enabled"] is True
-    assert update_response.json()["business_name"] == "Northstar Studio"
-    assert update_response.json()["outbound_sender_name"] == "Ada from Northstar"
-    assert update_response.json()["profile_alias"] == "ada"
-    assert update_response.json()["crm_preferred_import_formats"] == ["spreadsheet_screenshot", "pdf_export"]
-    assert update_response.json()["crm_image_intake_channels"] == ["whatsapp", "magic_link"]
+        update_response = client.put(
+            "/api/account/settings",
+            headers={"Authorization": "Bearer session-token"},
+            json={
+                "universe": ["spy", "qqq"],
+                "benchmark": "qqq",
+                "vix_symbol": "^vix",
+                "risk_proxy": "hyg",
+                "short_yield_symbol": "^irx",
+                "long_yield_symbol": "^tnx",
+                "lookback_years": 3,
+                "telegram_enabled": True,
+                "business_name": "Northstar Studio",
+                "business_website": "https://northstar.example",
+                "outbound_sender_name": "Ada from Northstar",
+                "profile_alias": "ada",
+                "business_logo_data_url": "data:image/png;base64,ZmFrZQ==",
+                "onboarding_profile_deferred": False,
+                "crm_ai_prompt": "Prefer extracting next step and owner from screenshots.",
+                "crm_preferred_import_formats": ["spreadsheet_screenshot", "pdf_export"],
+                "crm_image_intake_channels": ["whatsapp", "magic_link"],
+                "crm_image_intake_notes": "WhatsApp is used by the founder. The signed magic link stays available for remote intake.",
+            },
+        )
+        assert update_response.status_code == 200
+        assert update_response.json()["benchmark"] == "QQQ"
+        assert update_response.json()["universe"] == ["SPY", "QQQ"]
+        assert update_response.json()["telegram_enabled"] is True
+        assert update_response.json()["business_name"] == "Northstar Studio"
+        assert update_response.json()["outbound_sender_name"] == "Ada from Northstar"
+        assert update_response.json()["profile_alias"] == "ada"
+        assert update_response.json()["crm_preferred_import_formats"] == ["spreadsheet_screenshot", "pdf_export"]
+        assert update_response.json()["crm_image_intake_channels"] == ["whatsapp", "magic_link"]
 
-    alerts_response = client.get("/api/alerts/history", headers={"Authorization": "Bearer session-token"})
-    assert alerts_response.status_code == 200
-    assert alerts_response.json()["count"] == 1
-    assert alerts_response.json()["items"][0]["category"] == "settings"
+        alerts_response = client.get("/api/alerts/history", headers={"Authorization": "Bearer session-token"})
+        assert alerts_response.status_code == 200
+        assert alerts_response.json()["count"] == 1
+        assert alerts_response.json()["items"][0]["category"] == "settings"
 
-    updated_dashboard = client.get("/api/dashboard", headers={"Authorization": "Bearer session-token"})
-    assert updated_dashboard.status_code == 200
-    assert updated_dashboard.json()["config"]["benchmark"] == "QQQ"
-    assert updated_dashboard.json()["config"]["universe"] == ["SPY", "QQQ"]
+        updated_dashboard = client.get("/api/dashboard", headers={"Authorization": "Bearer session-token"})
+        assert updated_dashboard.status_code == 200
+        assert updated_dashboard.json()["config"]["benchmark"] == "QQQ"
+        assert updated_dashboard.json()["config"]["universe"] == ["SPY", "QQQ"]
+    finally:
+        os.environ.pop("ALLOW_ANONYMOUS_CRM", None)
 
 
 def test_account_settings_can_run_in_anonymous_crm_mode() -> None:
@@ -1695,20 +1704,24 @@ def test_account_settings_can_run_in_anonymous_crm_mode() -> None:
 
 
 def test_crm_followups_endpoint_requires_auth_and_returns_queue() -> None:
-    client = make_client(user=make_user())
+    os.environ["ALLOW_ANONYMOUS_CRM"] = "false"
+    try:
+        client = make_client(user=make_user())
 
-    unauthorized = client.get("/api/crm/followups")
-    assert unauthorized.status_code == 401
-    assert unauthorized.json()["detail"] == "Authentication required."
+        unauthorized = client.get("/api/crm/followups")
+        assert unauthorized.status_code == 401
+        assert unauthorized.json()["detail"] == "Authentication required."
 
-    response = client.get("/api/crm/followups", headers={"Authorization": "Bearer session-token"})
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["total_open"] == 4
-    assert payload["high_priority"] == 2
-    assert payload["items"][0]["lead_name"] == "Amber Flores"
-    assert payload["items"][0]["stage"] == "Discovery"
-    assert payload["items"][0]["timeline"]
+        response = client.get("/api/crm/followups", headers={"Authorization": "Bearer session-token"})
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["total_open"] == 4
+        assert payload["high_priority"] == 2
+        assert payload["items"][0]["lead_name"] == "Amber Flores"
+        assert payload["items"][0]["stage"] == "Discovery"
+        assert payload["items"][0]["timeline"]
+    finally:
+        os.environ.pop("ALLOW_ANONYMOUS_CRM", None)
     assert payload["items"][0]["last_meaningful_interaction_at"]
     assert payload["relationship_summary"]["warm_intro_connections"]
     assert payload["pipeline_summary"]["stage_summaries"]
@@ -2272,26 +2285,30 @@ def test_account_settings_validation_and_alert_defaults_work() -> None:
 
 
 def test_dashboard_endpoint_maps_auth_errors_and_missing_users() -> None:
-    unavailable_client = make_client(auth_error=RuntimeError("db unavailable"))
-    unavailable_response = unavailable_client.get("/api/dashboard", headers={"Authorization": "Bearer token"})
-    assert unavailable_response.status_code == 503
-    assert unavailable_response.json()["detail"] == "db unavailable"
+    os.environ["ALLOW_ANONYMOUS_CRM"] = "false"
+    try:
+        unavailable_client = make_client(auth_error=RuntimeError("db unavailable"))
+        unavailable_response = unavailable_client.get("/api/dashboard", headers={"Authorization": "Bearer token"})
+        assert unavailable_response.status_code == 503
+        assert unavailable_response.json()["detail"] == "db unavailable"
 
-    invalid_client = make_client(auth_error=AuthenticationError("bad token"))
-    invalid_response = invalid_client.get("/api/dashboard", headers={"Authorization": "Bearer token"})
-    assert invalid_response.status_code == 401
-    assert invalid_response.json()["detail"] == "Authentication failed: bad token"
+        invalid_client = make_client(auth_error=AuthenticationError("bad token"))
+        invalid_response = invalid_client.get("/api/dashboard", headers={"Authorization": "Bearer token"})
+        assert invalid_response.status_code == 401
+        assert invalid_response.json()["detail"] == "Authentication failed: bad token"
 
-    anonymous_client = make_client(user=None)
-    anonymous_response = anonymous_client.get("/api/dashboard", headers={"Authorization": "Bearer token"})
-    assert anonymous_response.status_code == 401
-    assert anonymous_response.json()["detail"] == "Authentication required."
+        anonymous_client = make_client(user=None)
+        anonymous_response = anonymous_client.get("/api/dashboard", headers={"Authorization": "Bearer token"})
+        assert anonymous_response.status_code == 401
+        assert anonymous_response.json()["detail"] == "Authentication required."
 
-    unavailable_settings = unavailable_client.get("/api/account/settings", headers={"Authorization": "Bearer token"})
-    assert unavailable_settings.status_code == 503
+        unavailable_settings = unavailable_client.get("/api/account/settings", headers={"Authorization": "Bearer token"})
+        assert unavailable_settings.status_code == 503
 
-    invalid_alerts = invalid_client.get("/api/alerts/history", headers={"Authorization": "Bearer token"})
-    assert invalid_alerts.status_code == 401
+        invalid_alerts = invalid_client.get("/api/alerts/history", headers={"Authorization": "Bearer token"})
+        assert invalid_alerts.status_code == 401
+    finally:
+        os.environ.pop("ALLOW_ANONYMOUS_CRM", None)
 
 
 def test_dashboard_endpoint_maps_value_errors_to_422() -> None:

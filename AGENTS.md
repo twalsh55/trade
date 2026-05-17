@@ -144,6 +144,12 @@ cd web && npm run e2e
   - [ ] keep the interface calm, lightweight, and fast on both desktop and mobile
   - [ ] favor strong defaults and guidance over configuration-heavy controls
   - [ ] keep Brivoly feeling like a quiet background assistant instead of management software
+- Ambient AI direction:
+  - [ ] keep AI embedded inside workflows instead of exposing chatbot-first interfaces
+  - [ ] make AI feel like relationship memory, not like a visible assistant asking for prompts
+  - [ ] use AI most where users feel uncertainty, forgetfulness, or friction
+  - [ ] prefer invisible context recovery, timing nudges, and editable suggestions over autonomous behavior
+  - [ ] avoid giant AI sidebars, prompt-heavy UX, agent complexity, and enterprise AI dashboards
 
 ### Agent / Automation State
 
@@ -182,6 +188,12 @@ cd web && npm run e2e
   - finish the relationship-OS copy cleanup across remaining user-facing surfaces
   - make `Today` the clearest expression of who needs attention right now
   - deepen inbox-native memory and thread summaries
+  - embed AI follow-up intelligence into `Today`, inbox, and relationship views as calm timing nudges
+  - add ambient conversation memory that summarizes emails, notes, uploads, and timeline events into concise relationship context
+  - improve inline suggested responses for follow-ups, recap emails, reconnects, proposal nudges, and scheduling replies
+  - replace numeric-feeling health signals with simple status language like `active`, `warm`, `drifting`, `stale`, and `at risk`
+  - add fast timeline summaries for `last 30 days`, `meeting prep`, and `what changed recently`, especially for mobile context recovery
+  - make AI feel invisible by surfacing memory and suggestions exactly where users hesitate, instead of adding dedicated AI surfaces
   - make dropzones feel more like lightweight client handoff pages and less like intake tooling
   - deeper AI-assisted messy file / image intake behind the paid gate
   - richer stage memory / handoff history

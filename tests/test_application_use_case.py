@@ -227,10 +227,10 @@ def test_follow_up_overview_enriches_relationship_intelligence() -> None:
     assert any(reminder.kind == "referral" for reminder in amber.relationship_reminders)
     assert any(reminder.kind == "birthday" for reminder in lattice.relationship_reminders)
     assert cedar.dormant is True
-    assert cedar.relationship_health_label in {"watch", "at_risk"}
+    assert cedar.relationship_state in {"drifting", "stale", "at_risk"}
     assert cedar.relationship_health_score < 75
     assert overview.relationship_summary is not None
-    assert overview.relationship_summary.dormant_count >= 1
+    assert overview.relationship_summary.stale_count >= 1
     assert overview.relationship_summary.referral_reminder_count >= 1
     assert overview.relationship_summary.milestone_reminder_count >= 1
     assert overview.relationship_summary.warm_intro_connections
