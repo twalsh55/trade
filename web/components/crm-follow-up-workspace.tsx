@@ -885,7 +885,7 @@ export function CRMFollowUpWorkspace({
             />
           ) : null}
           <section className="rounded-[1.75rem] border bg-slate-950 p-6 text-slate-50 shadow-[0_24px_90px_-55px_rgba(15,23,42,0.9)]">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300">Why it helps</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300">Why Brivoly feels lighter</p>
             <h2 className="mt-3 text-3xl font-semibold tracking-tight">Brivoly remembers relationships so freelancers do not have to.</h2>
             <ul className="mt-5 space-y-3 text-sm leading-6 text-slate-300">
               <li>Every note, reminder, and suggested message should lower mental overhead instead of adding admin.</li>
@@ -900,7 +900,7 @@ export function CRMFollowUpWorkspace({
       {showingInbox ? (
         <section className="mt-6 grid gap-6 xl:grid-cols-[0.92fr_1.08fr]">
           <section className="rounded-[1.75rem] border bg-white/85 p-6 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Inbox Memory</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Inbox memory</p>
             <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Let Brivoly keep relationship context current from email.</h2>
             <p className="mt-3 text-sm leading-6 text-slate-600">
               Brivoly turns email activity into living relationship memory: it matches contacts by email, creates missing contacts automatically, and keeps the right conversation attached to the right person.
@@ -1923,13 +1923,13 @@ function InboxNextMovePanel({
 
   return (
     <section className="mt-6 rounded-[1.4rem] border bg-white p-5 shadow-sm">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Best next touch</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Next move</p>
       <h3 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">{lead.lead_name}</h3>
       <p className="mt-1 text-sm text-slate-600">{lead.company_name}</p>
       <div className="mt-4 grid gap-3 md:grid-cols-2">
         <TimelineTile label="Brivoly read" value={latestThread ? latestThread.next_touch_hint : "No synced thread yet"} />
         <TimelineTile
-          label="Suggested next touch"
+          label="Recommended next touch"
           value={
             lead.relationship_upload_follow_through_hint ||
             (shouldReconnect ? lead.relationship_reconnect_next_move || lead.next_step : lead.next_step)
@@ -2074,7 +2074,7 @@ function RemoteImageCapturePanel({
           </p>
         </div>
         <div className="rounded-[1.3rem] border bg-slate-50 px-4 py-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">What happens next</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">What Brivoly does next</p>
           <p className="mt-2 text-sm leading-6 text-slate-700">
             Brivoly attaches the update to the right relationship memory so you can reopen the context later without hunting through email or messages.
           </p>
@@ -2170,19 +2170,19 @@ function IntakeTaskHub({
     <section className="grid gap-6 md:grid-cols-2 2xl:grid-cols-3">
       <TaskSummaryCard
         href="/clientos/intake/profile"
-        eyebrow="Default 1"
+        eyebrow="Step 1"
         title="Show the kinds of updates you usually get"
         body={advancedAiUnlocked ? "Your AI memory defaults are ready. Keep them close to what clients actually send." : "Unlock the paid AI layer before relying on note images and messy files to carry client context back in."}
       />
       <TaskSummaryCard
         href="/clientos/intake/routing"
-        eyebrow="Default 2"
+        eyebrow="Step 2"
         title="Choose the easiest path"
         body={normalizedChannels.length ? `Default paths are set: ${normalizedChannels.join(", ")}.` : "Set one path and one short note so sending updates feels obvious."}
       />
       <TaskSummaryCard
         href="/clientos/intake/capture"
-        eyebrow="Default 3"
+        eyebrow="Step 3"
         title="Share the update link"
         body={hasMagicLink ? "A signed no-login page is live and ready to reuse with clients." : "Turn this on once so clients can send updates from their phone without friction."}
       />
@@ -2258,7 +2258,7 @@ function IntakeRoutingPanel({
             }}
             className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
           >
-            Use usual setup
+            Use usual path
           </button>
           {[
             { label: "Shared link + email", value: "upload, magic_link, email" },
@@ -2376,7 +2376,7 @@ function AIIntakePanel({
             }}
             className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
           >
-            Use usual setup
+            Use usual formats
           </button>
           {[
             { label: "Sheets + screenshots", value: "csv, google_sheets, spreadsheet_screenshot" },
@@ -2401,7 +2401,7 @@ function AIIntakePanel({
             }
             className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
           >
-            Use usual cue
+            Use usual prompt
           </button>
         </div>
         <label className="block">
@@ -2766,7 +2766,7 @@ function LeadMemoryPanel({
   const activeMemoryPanel = memoryPanels.find((item) => item.value === memoryView) ?? memoryPanels[0];
   return (
     <section className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm">
-      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Relationship Memory</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Relationship memory</p>
       <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">{lead.lead_name}</h2>
       <p className="mt-1 text-sm text-slate-600">{lead.company_name}</p>
 
