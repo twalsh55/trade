@@ -91,6 +91,7 @@ cd web && npm run e2e
 
 - `/crm` is authenticated and production live.
 - Current CRM capabilities:
+  - left taskbar with dedicated CRM pages
   - follow-up queue
   - pipeline board view by stage
   - complete and snooze actions

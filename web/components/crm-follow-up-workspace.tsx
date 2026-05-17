@@ -1,5 +1,5 @@
 "use client";
-
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 
@@ -20,16 +20,20 @@ import type {
   CRMRemoteIntakeChannel,
 } from "@/lib/types";
 
+export type CRMWorkspaceView = "overview" | "followups" | "pipeline" | "import" | "intake";
+
 export function CRMFollowUpWorkspace({
   initialOverview,
   initialSettings,
   initialBilling,
   initialIntakeChannel,
+  view = "overview",
 }: {
   initialOverview: CRMFollowUpOverview;
   initialSettings: AccountSettings | null;
   initialBilling: BillingOverview | null;
   initialIntakeChannel: CRMRemoteIntakeChannel | null;
+  view?: CRMWorkspaceView;
 }) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -82,6 +86,11 @@ export function CRMFollowUpWorkspace({
 
   const selectedLead = overview.items.find((item) => item.id === selectedLeadId) ?? overview.items[0] ?? null;
   const advancedAiUnlocked = hasAdvancedAiAccess(initialBilling);
+  const showingOverview = view === "overview";
+  const showingFollowups = view === "followups";
+  const showingPipeline = view === "pipeline";
+  const showingImport = view === "import";
+  const showingIntake = view === "intake";
 
   function runAction(
     followUpId: string,
@@ -393,7 +402,7 @@ export function CRMFollowUpWorkspace({
   }
 
   return (
-    <>
+    <div className="mt-6">
       <BusinessProfileOnboarding
         initialSettings={settings}
         accent="amber"
@@ -402,6 +411,8 @@ export function CRMFollowUpWorkspace({
         description="New accounts should quickly tell Brivoly the business name, sender name for automatic emails, and an optional logo. You can skip it for now, but this is how the CRM starts feeling like your workspace instead of a generic tool."
       />
 
+      <CRMViewHeader view={view} />
+
       <section className="mt-6 grid gap-6 md:grid-cols-4">
         <MetricCard label="Open follow-ups" value={String(overview.total_open)} tone="neutral" />
         <MetricCard label="Due today" value={String(overview.due_today)} tone="warning" />
@@ -409,13 +420,14 @@ export function CRMFollowUpWorkspace({
         <MetricCard label="High priority" value={String(overview.high_priority)} tone="neutral" />
       </section>
 
-      {overview.relationship_summary ? (
+      {showingOverview && overview.relationship_summary ? (
         <section className="mt-6 grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
           <RelationshipSignalsPanel summary={overview.relationship_summary} />
           <WarmIntroGraphPanel summary={overview.relationship_summary} />
         </section>
       ) : null}
 
+      {showingImport ? (
       <section className="mt-6 rounded-[1.75rem] border bg-white/85 p-6 shadow-sm">
         <div className="grid gap-6 xl:grid-cols-[0.92fr_1.08fr]">
           <section>
@@ -551,8 +563,9 @@ export function CRMFollowUpWorkspace({
         />
         </div>
       </section>
+      ) : null}
 
-      {overview.pipeline_summary?.stage_summaries?.length ? (
+      {showingPipeline && overview.pipeline_summary?.stage_summaries?.length ? (
         <div className="mt-6">
           <PipelineBoardPanel
             summary={overview.pipeline_summary.stage_summaries}
@@ -563,6 +576,7 @@ export function CRMFollowUpWorkspace({
         </div>
       ) : null}
 
+      {showingFollowups ? (
       <section className="mt-6 grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
         <section className="rounded-[1.75rem] border bg-white/80 p-6 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Lead Follow-Up Queue</p>
@@ -649,6 +663,21 @@ export function CRMFollowUpWorkspace({
               onGenerateEmailDraft={generateEmailDraft}
             />
           ) : null}
+          <section className="rounded-[1.75rem] border bg-slate-950 p-6 text-slate-50 shadow-[0_24px_90px_-55px_rgba(15,23,42,0.9)]">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300">Why This Slice</p>
+            <h2 className="mt-3 text-3xl font-semibold tracking-tight">Relationship memory matters.</h2>
+            <ul className="mt-5 space-y-3 text-sm leading-6 text-slate-300">
+              <li>Consultants and small agencies already keep their pipeline in spreadsheets, so import removes the adoption cliff.</li>
+              <li>A timeline turns the CRM into an operating memory instead of a static record.</li>
+              <li>This keeps the wedge narrow: faster follow-up, cleaner handoffs, and less spreadsheet sprawl.</li>
+            </ul>
+          </section>
+        </section>
+      </section>
+      ) : null}
+
+      {showingIntake ? (
+        <section className="mt-6 grid gap-6 xl:grid-cols-[1fr_1fr]">
           <AIIntakePanel
             advancedAiUnlocked={advancedAiUnlocked}
             billingStatus={initialBilling?.subscription_status ?? null}
@@ -667,18 +696,115 @@ export function CRMFollowUpWorkspace({
             preferredChannels={initialSettings?.crm_image_intake_channels ?? []}
             routingNotes={initialSettings?.crm_image_intake_notes ?? ""}
           />
-          <section className="rounded-[1.75rem] border bg-slate-950 p-6 text-slate-50 shadow-[0_24px_90px_-55px_rgba(15,23,42,0.9)]">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300">Why This Slice</p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight">Relationship memory matters.</h2>
-            <ul className="mt-5 space-y-3 text-sm leading-6 text-slate-300">
-              <li>Consultants and small agencies already keep their pipeline in spreadsheets, so import removes the adoption cliff.</li>
-              <li>A timeline turns the CRM into an operating memory instead of a static record.</li>
-              <li>This keeps the wedge narrow: faster follow-up, cleaner handoffs, and less spreadsheet sprawl.</li>
-            </ul>
+        </section>
+      ) : null}
+
+      {showingOverview ? (
+        <section className="mt-6 grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
+          <OverviewQuickLinks
+            pipelineStages={overview.pipeline_summary?.stage_summaries ?? []}
+            selectedLead={selectedLead}
+            intakeChannel={initialIntakeChannel}
+          />
+          <section className="space-y-6">
+            {overview.pipeline_summary?.stage_summaries?.length ? (
+              <PipelineBoardPanel
+                summary={overview.pipeline_summary.stage_summaries}
+                items={overview.items.slice(0, 4)}
+                selectedLeadId={selectedLead?.id ?? null}
+                onSelectLead={setSelectedLeadId}
+              />
+            ) : null}
           </section>
         </section>
-      </section>
-    </>
+      ) : null}
+    </div>
+  );
+}
+
+function CRMViewHeader({ view }: { view: CRMWorkspaceView }) {
+  const copy = {
+    overview: {
+      eyebrow: "CRM Overview",
+      title: "Start from the current state, then dive into the right workflow.",
+      body: "Use the taskbar to switch into dedicated CRM pages instead of scanning through everything at once.",
+    },
+    followups: {
+      eyebrow: "Follow-Ups",
+      title: "Work the queue with lead memory beside it.",
+      body: "This page is for next actions, relationship context, and getting the right follow-up out the door fast.",
+    },
+    pipeline: {
+      eyebrow: "Pipeline",
+      title: "See stage pressure across the whole deal flow.",
+      body: "Use this page to spot bottlenecks, overdue clusters, and where the pipeline is quietly going stale.",
+    },
+    import: {
+      eyebrow: "Import",
+      title: "Bring spreadsheet-held CRM work into Brivoly cleanly.",
+      body: "Upload files, preview mappings, fix rows in-app, and commit only after the import looks safe.",
+    },
+    intake: {
+      eyebrow: "Intake",
+      title: "Control how messy files and remote note images enter the CRM.",
+      body: "Set AI intake guidance and remote capture paths without mixing that setup into everyday queue work.",
+    },
+  }[view];
+
+  return (
+    <section className="mt-6 rounded-[1.75rem] border bg-white/90 p-6 shadow-sm">
+      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">{copy.eyebrow}</p>
+      <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">{copy.title}</h2>
+      <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">{copy.body}</p>
+    </section>
+  );
+}
+
+function OverviewQuickLinks({
+  pipelineStages,
+  selectedLead,
+  intakeChannel,
+}: {
+  pipelineStages: CRMPipelineStageSummary[];
+  selectedLead: CRMLeadFollowUp | null;
+  intakeChannel: CRMRemoteIntakeChannel | null;
+}) {
+  return (
+    <section className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm">
+      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Workspace Map</p>
+      <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Jump straight into the right CRM job.</h2>
+      <div className="mt-5 grid gap-4 md:grid-cols-2">
+        <QuickLinkCard
+          href="/crm/follow-ups"
+          title="Follow-Ups"
+          body={selectedLead ? `Next lead ready: ${selectedLead.lead_name} at ${selectedLead.company_name}.` : "Work the live follow-up queue and lead memory."}
+        />
+        <QuickLinkCard
+          href="/crm/pipeline"
+          title="Pipeline"
+          body={pipelineStages.length ? `${pipelineStages.length} active stages are live in the board.` : "See the stage board and pipeline pressure."}
+        />
+        <QuickLinkCard
+          href="/crm/import"
+          title="Import"
+          body="Bring in spreadsheets, rescue messy headers, and validate rows before commit."
+        />
+        <QuickLinkCard
+          href="/crm/intake"
+          title="Intake"
+          body={intakeChannel?.telegram_available ? "Telegram remote note capture is configured." : "Set up AI intake guidance and remote note capture."}
+        />
+      </div>
+    </section>
+  );
+}
+
+function QuickLinkCard({ href, title, body }: { href: string; title: string; body: string }) {
+  return (
+    <Link href={href} className="block rounded-[1.35rem] border bg-slate-50/80 px-5 py-5 transition hover:border-slate-400 hover:bg-white">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{title}</p>
+      <p className="mt-3 text-sm leading-6 text-slate-700">{body}</p>
+    </Link>
   );
 }
 
