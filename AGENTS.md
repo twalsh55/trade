@@ -102,7 +102,7 @@ cd web && npm run e2e
   - complete and snooze actions
   - relationship history + internal notes
   - relationship memory summaries that blend email, notes, uploads, reconnect cues, and recent upload context
-  - recent client-shared context now has its own memory view and can be pulled straight into the next drafted note
+  - recent client-shared context now has its own memory view, can be pulled straight into the next drafted note, and generates a backend-driven follow-through hint
   - auto email designer for reconnects and follow-ups with in-app draft editing
   - last meaningful interaction tracking
   - dormant client detection
@@ -198,7 +198,7 @@ cd web && npm run e2e
   - finish the last relationship-OS copy cleanup across remaining user-facing surfaces
   - keep sharpening `Today` so the daily home feels instantly actionable without reading around
   - deepen inbox-native memory around unresolved threads, recent changes, and multi-message continuity across longer conversations
-  - let client-shared uploads influence more suggested next moves, meeting prep, and follow-through guidance
+  - let client-shared uploads influence even more suggested next moves, meeting prep, and follow-through guidance
   - embed AI follow-up intelligence into `Today`, inbox, and relationship views as calm timing nudges
   - add ambient conversation memory that summarizes emails, notes, uploads, and timeline events into concise relationship context
   - improve inline suggested responses for follow-ups, recap emails, reconnects, proposal nudges, and scheduling replies

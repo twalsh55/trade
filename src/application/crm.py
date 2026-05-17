@@ -70,6 +70,7 @@ def _enrich_follow_up(item: LeadFollowUp, current_time: datetime) -> LeadFollowU
     item_with_reminders = replace(item_with_threads, relationship_reminders=tuple(reminders))
     recent_upload_summary = _build_recent_upload_summary(item_with_reminders, current_time)
     item_with_upload_context = replace(item_with_reminders, relationship_recent_upload_summary=recent_upload_summary)
+    upload_follow_through_hint = _build_upload_follow_through_hint(item_with_upload_context, current_time)
     context_summary = _build_relationship_context_summary(item_with_upload_context)
     timing_nudge = _build_relationship_timing_nudge(item_with_upload_context, current_time)
     recent_changes_summary = _build_recent_changes_summary(item_with_upload_context, current_time)
@@ -88,6 +89,7 @@ def _enrich_follow_up(item: LeadFollowUp, current_time: datetime) -> LeadFollowU
         relationship_context_summary=context_summary,
         relationship_recent_changes_summary=recent_changes_summary,
         relationship_recent_upload_summary=recent_upload_summary,
+        relationship_upload_follow_through_hint=upload_follow_through_hint,
         relationship_last_30_days_summary=last_30_days_summary,
         relationship_meeting_prep_summary=meeting_prep_summary,
         relationship_reconnect_why_now=reconnect_why_now,
@@ -410,6 +412,27 @@ def _build_recent_upload_summary(item: LeadFollowUp, current_time: datetime) -> 
     return f"{_relative_days(latest_upload.occurred_at, current_time)} Brivoly attached new client context from {source}: {summary}"
 
 
+def _build_upload_follow_through_hint(item: LeadFollowUp, current_time: datetime) -> str:
+    latest_upload = _get_latest_upload_entry(item)
+    if latest_upload is None:
+        return ""
+
+    latest_thread = sorted(item.recent_email_threads, key=lambda thread: thread.last_message_at, reverse=True)[:1]
+    if latest_thread:
+        thread = latest_thread[0]
+        if thread.needs_reply:
+            return "Reply while the new client context is still fresh and connect it back to the last thread."
+        if thread.waiting_on_contact:
+            return "If the thread stays quiet, fold the new client context into your next check-in."
+
+    if item.next_step.strip():
+        return f"Best next touch from the new context: {_ensure_sentence(item.next_step)}"
+
+    if latest_upload.occurred_at >= current_time - timedelta(days=2):
+        return "A short recap of the new client context would keep momentum up."
+    return "Keep the new client context in view the next time you reach back out."
+
+
 def _build_last_30_days_summary(item: LeadFollowUp, current_time: datetime) -> str:
     window_start = current_time - timedelta(days=30)
     recent_entries = [entry for entry in sorted(item.timeline, key=lambda entry: entry.occurred_at, reverse=True) if entry.occurred_at >= window_start]
@@ -441,6 +464,9 @@ def _build_meeting_prep_summary(item: LeadFollowUp, current_time: datetime) -> s
     upload_context = _build_upload_memory_snippet(item)
     if upload_context:
         parts.append(f"Latest client-sent context: {upload_context}")
+        upload_follow_through_hint = _build_upload_follow_through_hint(item, current_time)
+        if upload_follow_through_hint:
+            parts.append(upload_follow_through_hint)
     if latest_entries:
         parts.append(f"The last meaningful discussion centered on {_sentence_case(latest_entries[0].summary.rstrip('.'))}.")
     if item.next_step.strip():

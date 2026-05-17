@@ -28,6 +28,7 @@ from src.application.crm import (
     _build_last_30_days_summary,
     _build_meeting_prep_summary,
     _build_recent_upload_summary,
+    _build_upload_follow_through_hint,
     _build_reconnect_message_hint,
     _build_reconnect_next_move,
     _build_reconnect_why_now,
@@ -318,6 +319,7 @@ def test_follow_up_overview_enriches_relationship_intelligence() -> None:
     assert amber.relationship_context_summary
     assert amber.relationship_recent_changes_summary
     assert "shared upload link" in amber.relationship_recent_upload_summary
+    assert amber.relationship_upload_follow_through_hint
     assert amber.relationship_last_30_days_summary
     assert amber.relationship_meeting_prep_summary
     assert amber.relationship_reconnect_why_now
@@ -487,6 +489,21 @@ def test_crm_helper_branches_cover_thread_memory_and_timing_paths() -> None:
         timeline=(LeadTimelineEntry(id="upload-1", occurred_at=now, kind="import", channel="magic_link", summary="sent annotated scope screenshot"),),
         threads=(light_thread,),
     )
+    upload_for_next_step = replace(
+        build_follow_up(now=now, next_step="check in next week", notes="", threads=()),
+        timeline=(LeadTimelineEntry(id="upload-next-step", occurred_at=now, kind="import", channel="magic_link", summary="shared annotated budget screenshot"),),
+    )
+    upload_waiting_lead = replace(
+        notes_lead,
+        timeline=(LeadTimelineEntry(id="upload-waiting", occurred_at=now, kind="import", channel="magic_link", summary="shared marked-up scope image"),),
+    )
+    stale_upload_follow_up = build_follow_up(
+        now=now,
+        next_step="   ",
+        notes="   ",
+        timeline=(LeadTimelineEntry(id="upload-stale", occurred_at=now - timedelta(days=4), kind="import", channel="custom", summary="latest capture"),),
+        threads=(),
+    )
 
     assert _build_thread_memory_summary(next_step_lead, reply_thread) == "This thread is tied to Check in next week."
     assert _build_thread_memory_summary(notes_lead, waiting_thread) == "Notes only."
@@ -521,6 +538,10 @@ def test_crm_helper_branches_cover_thread_memory_and_timing_paths() -> None:
     )
     assert "Still orbiting" in _build_thread_recent_change_hint(next_step_lead, reply_thread, now)
     assert "Not much shifted here" in _build_thread_recent_change_hint(empty_lead, quiet_thread, now)
+    assert "Best next touch from the new context" in _build_upload_follow_through_hint(upload_for_next_step, now)
+    assert "fold the new client context" in _build_upload_follow_through_hint(upload_waiting_lead, now)
+    assert "A short recap" in _build_upload_follow_through_hint(upload_context_lead, now)
+    assert "Keep the new client context in view" in _build_upload_follow_through_hint(stale_upload_follow_up, now)
 
 
 def test_crm_helper_branches_cover_relationship_summaries() -> None:
@@ -577,6 +598,7 @@ def test_crm_helper_branches_cover_relationship_summaries() -> None:
     assert _build_recent_changes_summary(build_follow_up(now=now, next_step="ping again"), now) == "No major relationship changes were captured recently."
     assert _build_last_30_days_summary(build_follow_up(now=now, timeline=(), threads=()), now) == "There has not been much relationship activity in the last 30 days."
     assert _build_meeting_prep_summary(build_follow_up(now=now, timeline=(), threads=(), next_step="   ", notes="   "), now) == "Brivoly does not have enough context yet to prep this meeting."
+    assert _build_upload_follow_through_hint(build_follow_up(now=now, timeline=(), threads=()), now) == ""
 
 
 def test_crm_helper_branches_cover_reconnect_guidance() -> None:
@@ -753,6 +775,7 @@ def test_crm_helper_branches_cover_remaining_health_context_and_merge_paths() ->
     assert "Notes captured: Imported from note image." in _build_recent_upload_summary(upload_follow_up, now)
     assert "Imported from magic link image" in _build_relationship_context_summary(upload_follow_up)
     assert "Latest client-sent context" in _build_meeting_prep_summary(upload_follow_up, now)
+    assert "Best next touch from the new context" in _build_upload_follow_through_hint(upload_follow_up, now)
     duplicate_note_follow_up = build_follow_up(
         now=now,
         notes="Imported from phone-note.jpg",

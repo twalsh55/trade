@@ -1181,13 +1181,21 @@ function TodayPrioritiesPanel({
     recentUploadLead
       ? {
           id: `${recentUploadLead.id}-upload`,
-          href: "/clientos/intake",
+          href: "/clientos/follow-ups",
           eyebrow: "Client upload",
           title: `Review new files from ${recentUploadLead.lead_name}`,
-          body: `${recentUploadLead.relationship_recent_upload_summary}${recentUploadLead.next_step.trim() ? ` Next touch: ${recentUploadLead.next_step}` : ""}`,
+          body:
+            recentUploadLead.relationship_upload_follow_through_hint ||
+            `${recentUploadLead.relationship_recent_upload_summary}${recentUploadLead.next_step.trim() ? ` Next touch: ${recentUploadLead.next_step}` : ""}`,
           meta: `${recentUploadLead.company_name} · ${formatDateTime(getLatestUploadContextEntry(recentUploadLead)?.occurred_at ?? null)}`,
-          actionLabel: "Open relationship",
-          onAction: () => onRunAction(recentUploadLead.id, "/clientos/follow-ups"),
+          actionLabel: "Draft note",
+          onAction: () =>
+            onRunAction(recentUploadLead.id, "/clientos/follow-ups", {
+              objective: "recap",
+              tone: "warm",
+              length: "short",
+              status: "Drafting a note from fresh client context...",
+            }),
         }
       : null,
     recentContextLead
@@ -1302,7 +1310,7 @@ function TodayPrioritiesPanel({
       <div className="mt-5 grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
         <QuickLinkCard href="/clientos/follow-ups" title="Relationship memory" body="Keep the last touch, the next touch, and the full story together." />
         <QuickLinkCard href="/clientos/inbox" title="Inbox continuity" body="Let email quietly update context instead of asking you to log everything." />
-        <QuickLinkCard href="/clientos/intake" title="Client dropzones" body="Let clients send files and notes without friction when something changes." />
+        <QuickLinkCard href="/clientos/intake" title="Client updates" body="Let clients send files and notes without friction when something changes." />
       </div>
     </section>
   );
@@ -1846,12 +1854,18 @@ function InboxNextMovePanel({
 
   return (
     <section className="mt-6 rounded-[1.4rem] border bg-white p-5 shadow-sm">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Next move</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Best next touch</p>
       <h3 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">{lead.lead_name}</h3>
       <p className="mt-1 text-sm text-slate-600">{lead.company_name}</p>
       <div className="mt-4 grid gap-3 md:grid-cols-2">
         <TimelineTile label="Brivoly read" value={latestThread ? latestThread.next_touch_hint : "No synced thread yet"} />
-        <TimelineTile label="Suggested next touch" value={shouldReconnect ? lead.relationship_reconnect_next_move || lead.next_step : lead.next_step} />
+        <TimelineTile
+          label="Suggested next touch"
+          value={
+            lead.relationship_upload_follow_through_hint ||
+            (shouldReconnect ? lead.relationship_reconnect_next_move || lead.next_step : lead.next_step)
+          }
+        />
       </div>
       {latestThread ? (
         <div className="mt-4 rounded-[1.2rem] border bg-slate-50/80 px-4 py-4">
@@ -1878,6 +1892,7 @@ function InboxNextMovePanel({
         <div className="mt-4 rounded-[1.2rem] border bg-slate-50/80 px-4 py-4">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Fresh client context</p>
           <p className="mt-2 text-sm leading-6 text-slate-600">{lead.relationship_recent_upload_summary}</p>
+          {lead.relationship_upload_follow_through_hint ? <p className="mt-3 text-sm leading-6 text-slate-700">{lead.relationship_upload_follow_through_hint}</p> : null}
           <div className="mt-4 flex flex-wrap gap-3">
             <Button
               type="button"
@@ -2675,7 +2690,10 @@ function LeadMemoryPanel({
       <div className="mt-4 grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
         <TimelineTile label="Last meaningful interaction" value={formatDateTime(lead.last_meaningful_interaction_at)} />
         <TimelineTile label="Relationship state" value={formatRelationshipState(lead.relationship_state)} />
-        <TimelineTile label="Brivoly nudge" value={lead.relationship_timing_nudge || "Brivoly is keeping the timing in view."} />
+        <TimelineTile
+          label="Brivoly nudge"
+          value={lead.relationship_upload_follow_through_hint || lead.relationship_timing_nudge || "Brivoly is keeping the timing in view."}
+        />
       </div>
 
       {isReconnectMoment(lead) ? (
@@ -2768,6 +2786,7 @@ function LeadMemoryPanel({
           <div className="mt-4 rounded-[1.2rem] border bg-white px-4 py-4">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Recent upload context</p>
             <p className="mt-2 text-sm leading-6 text-slate-700">{lead.relationship_recent_upload_summary}</p>
+            {lead.relationship_upload_follow_through_hint ? <p className="mt-3 text-sm leading-6 text-slate-700">{lead.relationship_upload_follow_through_hint}</p> : null}
           </div>
         ) : null}
       </section>
