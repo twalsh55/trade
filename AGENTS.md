@@ -85,6 +85,9 @@ cd web && npm run e2e
   - optimize for near-zero pain
   - avoid copy/paste and unnecessary typing
   - prefer strong recommendations and acceptance flows over blank forms
+  - reduce freelancer mental overhead first
+  - keep the product calm, lightweight, and emotionally survivable
+  - avoid enterprise dashboards, reporting sprawl, operational clutter, and CRM jargon
 - Current main focus: Client OS.
 - Current Client OS wedge:
   - follow-up-first
@@ -107,7 +110,7 @@ cd web && npm run e2e
   - mailbox beta now includes real Gmail / Outlook OAuth-ready connection start/complete routes, provider-backed sync for OAuth-linked accounts, provider-watch event callbacks, and provider-backed sending through Gmail API / Microsoft Graph when those accounts are connected
   - calendar beta now includes durable Google Calendar / Outlook Calendar connection records plus meeting-event ingest into relationship memory so upcoming conversations can feed Today and meeting prep
   - connected mailbox cards now support disconnecting accounts, pausing or resuming scheduled background sync per mailbox, refreshing provider watch coverage, and clearer reauth / health-state visibility without losing the saved relationship memory
-  - connected calendar cards now support connect/disconnect and a lightweight meeting-ingest path for bringing scheduled conversations straight into relationship memory
+  - connected calendar cards now support connect/disconnect, pause/resume background meeting memory, and a lightweight meeting-ingest path for bringing scheduled conversations straight into relationship memory
   - manual mailbox connection still exists as a fallback beta path when provider credentials are not configured yet
   - inbox cards now surface backend-driven relationship pulse, open-loop memory, thread continuity cues, `what changed` hints, unresolved-thread cues, a clearer long-thread `through-line`, and a carry-forward cue for longer threads, grouped into `Needs you now` and `Still warm`
   - email-thread ingestion that can auto-create/update contacts from inbox activity
@@ -157,6 +160,7 @@ cd web && npm run e2e
   - auth, shell fallback, API fallback, loading, draft-composer, and client-upload surfaces now use calmer language and lighter guidance with less system-heavy phrasing
   - Today navigation and other dense summary areas are progressively flattening into lighter pills and calmer summaries instead of equal-weight cards
   - scheduled mailbox automation now reports both watch-ready and event-ready inbox coverage so the always-on sync layer is easier to reason about than a raw thread count alone
+  - Today, Inbox, Attention, and Relationships now quietly refresh from connected inbox/calendar memory while the page is open, so fresh context can surface without asking the user to manually refresh
 
 ### Relationship OS Todo
 
@@ -164,10 +168,12 @@ cd web && npm run e2e
   - [ ] replace remaining visible CRM/pipeline/workflow language with relationship-first language
   - [ ] make `Today` feel like the default home for daily attention, not a dashboard
   - [ ] keep copy focused on memory, continuity, warmth, follow-through, and reduced mental overhead
+  - [ ] keep navigation feeling like cognitive states such as `Today`, `Attention`, `Inbox`, `Saved Context`, `Relationships`, and `Dropzones`, not software modules
 - Relationship continuity:
   - [ ] strengthen the `Today’s relationship priorities` surface around reply, reconnect, proposal follow-up, and new uploads
   - [ ] make stale and at-risk relationships more prominent than generic stage progress
   - [ ] improve dormant conversation reopening flows and suggested reconnect actions
+  - [ ] make the relationship timeline the primary object so everything converges into what happened, what changed, what matters now, and what needs attention
 - Inbox-native behavior:
   - [ ] deepen auto-create/update from email so the inbox feels like the default relationship memory source
   - [ ] improve AI summaries for threads so recent context is easier to trust at a glance
@@ -181,6 +187,8 @@ cd web && npm run e2e
   - [ ] keep the interface calm, lightweight, and fast on both desktop and mobile
   - [ ] favor strong defaults and guidance over configuration-heavy controls
   - [ ] keep Brivoly feeling like a quiet background assistant instead of management software
+  - [ ] preserve generous whitespace, soft hierarchy, restrained colors, and low visual noise
+  - [ ] remove unnecessary helper text, clicks, and visual weight before shipping each surface
 - Ambient AI direction:
   - [ ] keep AI embedded inside workflows instead of exposing chatbot-first interfaces
   - [ ] make AI feel like relationship memory, not like a visible assistant asking for prompts
@@ -223,35 +231,27 @@ cd web && npm run e2e
 ### Next Likely Moves
 
 - Highest-conviction Client OS next steps:
-  - harden the new mailbox OAuth beta with real provider app credentials, richer failure handling, and cleaner mailbox connection management in the UI
-  - move scheduled mailbox sync beyond interval polling toward provider webhooks or watch subscriptions
-  - deepen the provider-backed send path into fuller reply semantics and stronger sent-thread reconciliation, especially for Outlook where sendMail does not return a thread id directly
-  - deepen the real-world client model beyond lightweight follow-ups, including projects, engagements, and richer account context
-  - strengthen onboarding from real data sources beyond spreadsheets so Client OS can become the live source of relationship memory
-  - turn the new locale groundwork into real multi-language UI coverage across Client OS copy, auth flows, inbox, intake, and client-facing upload pages
-  - add language-aware formatting and translation infrastructure so relationship memory, reminders, and drafted notes adapt cleanly per user locale
-  - deepen GDPR from export groundwork into fuller consent flows, delete paths, processor disclosures, retention enforcement, and safer handling of connected mailbox data
-  - add stronger GDPR-oriented operational controls for auditability, data minimization, and user-level control over stored relationship memory and uploads
-  - improve production trust and resilience with stronger empty states, safer session handling, and fewer smart-prototype moments
-  - refine billing and packaging so plan boundaries and premium features feel clearer in production
-  - add a fuller reminder layer outside the app so Brivoly can keep nudging through email, calendar, and inbox workflows
-  - add admin and support visibility for mailbox sync state, import failures, and relationship-memory troubleshooting
-  - finish the last small pockets of relationship-OS copy cleanup across remaining user-facing surfaces
-  - keep sharpening `Today` so the daily home feels instantly actionable without reading around
-  - deepen inbox-native memory around recent changes and multi-message continuity across longer conversations
-  - let client-shared uploads influence even more suggested next moves, meeting prep, and follow-through guidance
-  - keep improving reconnect paths when Brivoly only has very thin saved context
-  - embed AI follow-up intelligence into `Today`, inbox, and relationship views as calm timing nudges
-  - add ambient conversation memory that summarizes emails, notes, uploads, and timeline events into concise relationship context
-  - improve inline suggested responses for follow-ups, recap emails, reconnects, proposal nudges, and scheduling replies
-  - replace numeric-feeling health signals with simple status language like `active`, `warm`, `drifting`, `stale`, and `at risk`
-  - add fast timeline summaries for `last 30 days`, `meeting prep`, and `what changed recently`, especially for mobile context recovery
-  - make AI feel invisible by surfacing memory and suggestions exactly where users hesitate, instead of adding dedicated AI surfaces
-  - keep simplifying dropzones until they feel like lightweight client handoff pages instead of setup tooling
-  - deeper AI-assisted messy file / image intake
-  - richer stage memory / handoff history
-  - spreadsheet cleanup and field-mapping controls after preview
-  - consultant / agency templates
+  - harden the mailbox and calendar connection layer so Brivoly can quietly keep relationship memory current with less manual sync, cleaner reconnect flows, and safer provider failure handling
+  - move mailbox sync fully toward event-driven continuity through provider webhooks or watch subscriptions so inbox memory updates feel ambient instead of manually maintained
+  - deepen provider-backed send and reply behavior so Brivoly can preserve thread continuity after outbound notes, especially in Outlook edge cases
+  - keep sharpening `Today` into the unquestioned daily home with the smallest useful next move, less scanning, and more emotionally clear attention cues
+  - strengthen the `Attention` model around drifting, stale, and at-risk relationships without introducing lead scoring, forecasting, or enterprise analytics
+  - deepen the relationship timeline as the primary object so meetings, uploads, email, notes, decisions, and saved context all converge into one continuity layer
+  - deepen inbox-native memory around what changed, what matters now, unresolved topics, and the cleanest next reply across longer conversations
+  - expand pre-meeting context so upcoming meetings feel fully prepared from saved context, recent email, uploads, and unresolved threads without a separate planning workflow
+  - let client-shared uploads shape more of `Today`, meeting prep, reconnects, and suggested next moves so dropzones feel easier than attachments and more useful than file storage
+  - keep simplifying dropzones until they feel like invisible client handoff pages with almost no setup friction
+  - strengthen onboarding from real data sources beyond spreadsheets so live inboxes and calendars become the normal path into Client OS memory
+  - deepen the real-world client model only where it supports continuity, such as projects, engagements, and decision context, without drifting into project-management sprawl
+  - turn the locale groundwork into true multilingual support across Client OS copy, formatting, reminders, memory views, and drafted notes
+  - deepen GDPR from groundwork into fuller consent, export, erase, retention, processor-disclosure, and data-minimization controls for relationship memory, uploads, and connected mailbox data
+  - keep removing the last pockets of CRM-ish, dashboard-ish, or operational language so the product consistently sounds like calm relationship memory rather than management software
+  - keep reducing UI density through fewer counters, fewer equal-weight panels, softer hierarchy, and more whitespace
+  - improve production trust and resilience with stronger empty states, safer auth/session behavior, and fewer smart-prototype moments
+  - refine billing and packaging so premium boundaries are clear without adding enterprise-style packaging clutter
+  - add a fuller reminder layer outside the app through inbox, calendar, and email touchpoints while still keeping the experience low-admin
+  - add admin and support visibility for sync state, import failures, and memory health without exposing internal operational complexity to end users
+  - keep AI ambient and invisible by embedding timing nudges, context recall, timeline summaries, reconnect suggestions, and draft help directly into workflows instead of adding chatbot-first surfaces
 
 ## Autonomy Rule
 

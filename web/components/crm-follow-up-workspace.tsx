@@ -257,6 +257,80 @@ export function CRMFollowUpWorkspace({
     }
   }, [pathname, router, searchParams, view]);
 
+  async function refreshAmbientMemory() {
+    const [overviewResponse, mailboxResponse, calendarResponse] = await Promise.all([
+      fetch("/api/crm/followups", { cache: "no-store" }),
+      fetch("/api/crm/inbox/mailboxes", { cache: "no-store" }),
+      fetch("/api/crm/calendars", { cache: "no-store" }),
+    ]);
+
+    const overviewBody = (await overviewResponse.json().catch(() => null)) as CRMFollowUpOverview | { error?: string } | null;
+    const mailboxBody = (await mailboxResponse.json().catch(() => null)) as { items?: CRMMailboxConnection[]; error?: string } | null;
+    const calendarBody = (await calendarResponse.json().catch(() => null)) as { items?: CRMCalendarConnection[]; error?: string } | null;
+
+    if (overviewResponse.ok && overviewBody && "items" in overviewBody) {
+      setOverview(overviewBody);
+      if (selectedLeadId && !overviewBody.items.some((item) => item.id === selectedLeadId)) {
+        setSelectedLeadId(overviewBody.items[0]?.id ?? null);
+      }
+    }
+    if (mailboxResponse.ok && mailboxBody?.items) {
+      setMailboxConnections(mailboxBody.items);
+    }
+    if (calendarResponse.ok && calendarBody?.items) {
+      setCalendarConnections(calendarBody.items);
+    }
+  }
+
+  useEffect(() => {
+    const shouldRefreshInBackground = showingOverview || showingInbox || showingPipeline || showingFollowups;
+    const hasActiveBackgroundMemory =
+      mailboxConnections.some((connection) => connection.background_sync_enabled && connection.status === "connected") ||
+      calendarConnections.some((connection) => connection.background_sync_enabled && connection.status === "connected");
+    if (!shouldRefreshInBackground || !hasActiveBackgroundMemory) {
+      return;
+    }
+
+    let cancelled = false;
+    const runRefresh = async () => {
+      if (cancelled) {
+        return;
+      }
+      try {
+        await refreshAmbientMemory();
+      } catch {
+        // Ambient refresh should stay quiet; explicit actions still surface their own errors.
+      }
+    };
+
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void runRefresh();
+      }
+    }, 45000);
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void runRefresh();
+      }
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [
+    calendarConnections,
+    mailboxConnections,
+    selectedLeadId,
+    showingFollowups,
+    showingInbox,
+    showingOverview,
+    showingPipeline,
+  ]);
+
   function runAction(
     followUpId: string,
     payload: { action: "complete" | "snooze" | "note"; snooze_hours?: number; note_body?: string },
@@ -895,6 +969,28 @@ export function CRMFollowUpWorkspace({
     });
   }
 
+  function toggleCalendarBackgroundSync(connection: CRMCalendarConnection) {
+    const nextEnabled = !connection.background_sync_enabled;
+    setCalendarStatus(nextEnabled ? "Turning meeting memory back on..." : "Pausing background meeting memory for this calendar...");
+    startCalendarTransition(async () => {
+      try {
+        const response = await fetch(`/api/crm/calendars/${connection.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ background_sync_enabled: nextEnabled }),
+        });
+        const body = (await response.json().catch(() => null)) as CRMCalendarConnection | { error?: string } | null;
+        if (!response.ok || !body || !("id" in body)) {
+          throw new Error((body && "error" in body && body.error) || "Unable to update the calendar right now.");
+        }
+        upsertCalendarConnection(body);
+        setCalendarStatus(nextEnabled ? "Brivoly can use this calendar for meeting memory again." : "Meeting memory is paused for this calendar.");
+      } catch (calendarError) {
+        setCalendarStatus(calendarError instanceof Error ? calendarError.message : "Unable to update the calendar right now.");
+      }
+    });
+  }
+
   function ingestCalendarEvent() {
     setCalendarStatus("Bringing this meeting into relationship memory...");
     startCalendarTransition(async () => {
@@ -1139,6 +1235,8 @@ export function CRMFollowUpWorkspace({
             selectedLeadId={selectedLead?.id ?? null}
             onSelectLead={setSelectedLeadId}
             onRunAction={runTodayPriorityAction}
+            mailboxConnections={mailboxConnections}
+            calendarConnections={calendarConnections}
           />
         </div>
       ) : null}
@@ -1487,12 +1585,18 @@ export function CRMFollowUpWorkspace({
                           </p>
                         </div>
                         <div className="flex flex-wrap gap-2">
-                          <MiniFlag label={connection.background_sync_enabled ? "beta ready" : "manual"} tone="neutral" />
+                          <MiniFlag label={connection.background_sync_enabled ? "memory on" : "memory paused"} tone={connection.background_sync_enabled ? "neutral" : "warning"} />
+                          <Button type="button" variant="outline" disabled={isCalendarPending} onClick={() => toggleCalendarBackgroundSync(connection)}>
+                            {connection.background_sync_enabled ? "Pause memory" : "Resume memory"}
+                          </Button>
                           <Button type="button" variant="outline" disabled={isCalendarPending} onClick={() => disconnectCalendar(connection)}>
                             Disconnect
                           </Button>
                         </div>
                       </div>
+                      {connection.last_sync_at ? (
+                        <p className="mt-2 text-xs text-slate-500">Last meeting context saved {formatDateTime(connection.last_sync_at)}.</p>
+                      ) : null}
                       {connection.last_sync_error ? <p className="mt-2 text-xs text-amber-700">{connection.last_sync_error}</p> : null}
                     </div>
                   ))
@@ -1665,6 +1769,8 @@ export function CRMFollowUpWorkspace({
             items={overview.items}
             inboxSummary={overview.inbox_summary}
             onRunAction={runTodayPriorityAction}
+            mailboxConnections={mailboxConnections}
+            calendarConnections={calendarConnections}
           />
           {overview.relationship_summary ? <RelationshipContinuityPanel summary={overview.relationship_summary} /> : null}
         </section>
@@ -1733,10 +1839,14 @@ function TodayPrioritiesPanel({
   items,
   inboxSummary,
   onRunAction,
+  mailboxConnections,
+  calendarConnections,
 }: {
   items: CRMLeadFollowUp[];
   inboxSummary: CRMFollowUpOverview["inbox_summary"];
   onRunAction: (leadId: string, route: string, preset?: TodayDraftPreset, memoryView?: "meeting_prep", threadId?: string | null) => void;
+  mailboxConnections: CRMMailboxConnection[];
+  calendarConnections: CRMCalendarConnection[];
 }) {
   const replyLead = [...items]
     .filter((item) => item.recent_email_threads.some((thread) => thread.needs_reply))
@@ -1915,6 +2025,16 @@ function TodayPrioritiesPanel({
   const freshContextCount = items.filter((item) => hasFreshContext(item)).length;
   const urgentCount = replyCount + proposalCount + reconnectCount;
   const contextCount = recentUploadCount + Math.max(0, freshContextCount - recentUploadCount);
+  const activeMailboxCount = mailboxConnections.filter((item) => item.background_sync_enabled && item.status === "connected").length;
+  const pausedMailboxCount = mailboxConnections.filter((item) => !item.background_sync_enabled).length;
+  const activeCalendarCount = calendarConnections.filter((item) => item.background_sync_enabled && item.status === "connected").length;
+  const pausedCalendarCount = calendarConnections.filter((item) => !item.background_sync_enabled).length;
+  const memoryCoverageLine =
+    activeMailboxCount || activeCalendarCount
+      ? `Brivoly is quietly holding memory from ${activeMailboxCount} inbox${activeMailboxCount === 1 ? "" : "es"} and ${activeCalendarCount} calendar${activeCalendarCount === 1 ? "" : "s"} right now.`
+      : pausedMailboxCount || pausedCalendarCount
+        ? `Background memory is paused on ${pausedMailboxCount} inbox${pausedMailboxCount === 1 ? "" : "es"} and ${pausedCalendarCount} calendar${pausedCalendarCount === 1 ? "" : "s"}. Resume one if you want quieter continuity.`
+        : "Connect an inbox or calendar once and Brivoly can keep more of this context warm for you.";
 
   return (
     <section className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm">
@@ -1924,6 +2044,7 @@ function TodayPrioritiesPanel({
         Brivoly pulls together replies, reconnects, proposal follow-through, upcoming meeting prep, and new client context so you can pick the right next move without re-reading everything first.
       </p>
       <p className="mt-3 text-sm font-medium text-slate-700">Start with one relationship and one next move. Brivoly will hold the rest.</p>
+      <p className="mt-2 text-sm leading-6 text-slate-600">{memoryCoverageLine}</p>
       <div className="mt-4 flex flex-wrap gap-2">
         {visiblePriorities.slice(0, 2).map((item) => (
           <button
@@ -2128,12 +2249,16 @@ function PipelineBoardPanel({
   selectedLeadId,
   onSelectLead,
   onRunAction,
+  mailboxConnections,
+  calendarConnections,
 }: {
   summary: CRMPipelineStageSummary[];
   items: CRMLeadFollowUp[];
   selectedLeadId: string | null;
   onSelectLead: (leadId: string) => void;
   onRunAction: (leadId: string, route: string, preset?: TodayDraftPreset) => void;
+  mailboxConnections: CRMMailboxConnection[];
+  calendarConnections: CRMCalendarConnection[];
 }) {
   const itemsByStage = new Map<string, CRMLeadFollowUp[]>();
   for (const item of items) {
@@ -2145,6 +2270,16 @@ function PipelineBoardPanel({
     .filter((item) => relationshipStateUrgency(item.relationship_state) > 0 || item.recent_email_threads.some((thread) => thread.needs_reply))
     .sort((left, right) => compareAttentionPriority(left, right))
     .slice(0, 4);
+  const activeMailboxCount = mailboxConnections.filter((item) => item.background_sync_enabled && item.status === "connected").length;
+  const pausedMailboxCount = mailboxConnections.filter((item) => !item.background_sync_enabled).length;
+  const activeCalendarCount = calendarConnections.filter((item) => item.background_sync_enabled && item.status === "connected").length;
+  const pausedCalendarCount = calendarConnections.filter((item) => !item.background_sync_enabled).length;
+  const memoryCoverageLine =
+    activeMailboxCount || activeCalendarCount
+      ? `Brivoly is keeping warmth in view from ${activeMailboxCount} inbox${activeMailboxCount === 1 ? "" : "es"} and ${activeCalendarCount} calendar${activeCalendarCount === 1 ? "" : "s"}.`
+      : pausedMailboxCount || pausedCalendarCount
+        ? `Some background memory is paused. Resume ${pausedMailboxCount ? "inbox" : "calendar"} coverage if these relationships start slipping more quietly than usual.`
+        : "Connect an inbox or calendar if you want quiet continuity to show up here with less manual work.";
 
   return (
     <section className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm xl:col-span-2">
@@ -2155,6 +2290,7 @@ function PipelineBoardPanel({
           <p className="mt-3 text-sm leading-6 text-slate-600">
             This page is for quiet threads, overdue replies, and gentle re-entry moments. The goal is continuity and warmth, not system-heavy tracking.
           </p>
+          <p className="mt-3 text-sm leading-6 text-slate-600">{memoryCoverageLine}</p>
         </div>
         <div className="rounded-[1.2rem] border bg-slate-50/80 px-4 py-4 lg:max-w-sm">
           <p className="text-sm leading-6 text-slate-700">

@@ -1118,6 +1118,15 @@ def test_crm_calendar_connect_event_ingest_and_delete_endpoints_manage_meeting_m
     assert list_response.status_code == 200
     assert list_response.json()["items"][0]["calendar_address"] == "ada@northstar.example"
 
+    pause_response = client.patch(
+        f"/api/crm/calendars/{connection['id']}",
+        headers={"Authorization": "Bearer session-token"},
+        json={"background_sync_enabled": False},
+    )
+
+    assert pause_response.status_code == 200
+    assert pause_response.json()["background_sync_enabled"] is False
+
     delete_response = client.delete(
         f"/api/crm/calendars/{connection['id']}",
         headers={"Authorization": "Bearer session-token"},

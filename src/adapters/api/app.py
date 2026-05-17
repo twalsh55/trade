@@ -87,6 +87,7 @@ from src.application.crm import (
     SendLeadFollowUpEmailUseCase,
     SnoozeLeadFollowUpUseCase,
     SyncMailboxConnectionUseCase,
+    UpdateCalendarConnectionSyncUseCase,
     UpdateMailboxConnectionSyncUseCase,
 )
 from src.application.crm_import import (
@@ -724,6 +725,24 @@ def create_app(dependencies: ApiDependencies | None = None) -> FastAPI:
         except KeyError as exc:
             raise HTTPException(status_code=404, detail="Calendar connection not found.") from exc
         return {"deleted": True, "connection_id": connection_id}
+
+    @app.patch("/api/crm/calendars/{connection_id}")
+    def crm_update_calendar(
+        connection_id: str,
+        payload: MailboxConnectionUpdatePayload,
+        authorization: str | None = Header(default=None),
+        session_cookie: str | None = Cookie(default=None, alias=CLERK_SESSION_COOKIE),
+    ) -> dict[str, object]:
+        user = _require_crm_user(deps, authorization, session_cookie)
+        try:
+            connection = UpdateCalendarConnectionSyncUseCase(repository=deps.lead_follow_up_repository_factory()).execute(
+                user,
+                connection_id,
+                background_sync_enabled=payload.background_sync_enabled,
+            )
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="Calendar connection not found.") from exc
+        return dto_to_dict(build_calendar_connection_dto(connection))
 
     @app.post("/api/crm/calendars/events")
     def crm_calendar_event_ingest(

@@ -1189,6 +1189,18 @@ class UpdateMailboxConnectionSyncUseCase:
         )
 
 
+class UpdateCalendarConnectionSyncUseCase:
+    def __init__(self, repository: LeadFollowUpRepositoryPort) -> None:
+        self.repository = repository
+
+    def execute(self, user: User, connection_id: str, *, background_sync_enabled: bool) -> CalendarConnection:
+        connection = _require_calendar_connection(self.repository.list_calendar_connections(user), connection_id)
+        return self.repository.save_calendar_connection(
+            user,
+            replace(connection, background_sync_enabled=bool(background_sync_enabled)),
+        )
+
+
 class DisconnectMailboxConnectionUseCase:
     def __init__(self, repository: LeadFollowUpRepositoryPort) -> None:
         self.repository = repository

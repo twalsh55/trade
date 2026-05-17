@@ -299,6 +299,21 @@ export async function deleteCrmCalendarConnection(connectionId: string, options:
   );
 }
 
+export async function updateCrmCalendarConnection(
+  connectionId: string,
+  payload: { background_sync_enabled: boolean },
+  options: ApiRequestOptions = {},
+): Promise<CRMCalendarConnection> {
+  return apiRequest<CRMCalendarConnection>(
+    `/api/crm/calendars/${connectionId}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    },
+    options,
+  );
+}
+
 export async function ingestCrmCalendarEvent(
   payload: {
     connection_id?: string | null;
