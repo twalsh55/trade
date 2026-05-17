@@ -11,8 +11,8 @@ const items = [
   { href: "/clientos/follow-ups", label: "Relationships", body: "Memory, warmth, and the next touch" },
   { href: "/clientos/inbox", label: "Inbox", body: "Quietly keep context current from email" },
   { href: "/clientos/pipeline", label: "Attention", body: "Quiet relationships and gentle re-entry moments" },
-  { href: "/clientos/import", label: "Context", body: "Bring older spreadsheets and notes into memory" },
-  { href: "/clientos/intake", label: "Dropzones", body: "Client update links and upload paths" },
+  { href: "/clientos/import", label: "Saved context", body: "Bring older spreadsheets and notes back into view" },
+  { href: "/clientos/intake", label: "Dropzones", body: "Simple client update links and upload paths" },
 ];
 
 export function CRMTaskbar({ authenticated = false }: { authenticated?: boolean }) {

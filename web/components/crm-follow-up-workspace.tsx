@@ -1379,35 +1379,21 @@ function RelationshipContinuityPanel({ summary }: { summary: NonNullable<CRMFoll
       <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Relationship continuity</p>
       <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Stay warm without holding everything in your head.</h2>
       <div className="mt-5 rounded-[1.3rem] border bg-slate-50/80 px-5 py-5">
-        <p className="text-sm leading-6 text-slate-700">
+        <p className="text-sm leading-7 text-slate-700">
           <span className="font-semibold text-slate-950">{steadyCount}</span> relationship{steadyCount === 1 ? "" : "s"} still feel steady.
           {" "}
           {needsCareCount
-            ? (
-              <>
-                <span className="font-semibold text-slate-950">{needsCareCount}</span> may need a warmer touch soon.
-              </>
-            )
+            ? <><span className="font-semibold text-slate-950">{needsCareCount}</span> may need a warmer touch soon.</>
             : "Nothing feels especially fragile right now."}
+          {" "}
+          {summary.warm_intro_connections.length
+            ? `${summary.warm_intro_connections.length} warm re-entry path${summary.warm_intro_connections.length === 1 ? "" : "s"} could help reopen a thread more naturally.`
+            : ""}
+          {" "}
+          {warmMoments
+            ? `${warmMoments} thoughtful moment${warmMoments === 1 ? "" : "s"} could make the next touch easier.`
+            : ""}
         </p>
-      </div>
-      <div className="mt-4 space-y-3">
-        <div className="rounded-[1.15rem] border bg-slate-50/80 px-4 py-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Warm re-entry paths</p>
-          <p className="mt-2 text-sm leading-6 text-slate-700">
-            {summary.warm_intro_connections.length
-              ? `${summary.warm_intro_connections.length} contact${summary.warm_intro_connections.length === 1 ? "" : "s"} could help reopen a thread more naturally.`
-              : "No warm intro paths are mapped yet."}
-          </p>
-        </div>
-        {warmMoments ? (
-          <div className="rounded-[1.15rem] border bg-slate-50/80 px-4 py-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Thoughtful touchpoints</p>
-            <p className="mt-2 text-sm leading-6 text-slate-700">
-              {warmMoments} personal or referral moment{warmMoments === 1 ? "" : "s"} could help you reconnect naturally.
-            </p>
-          </div>
-        ) : null}
       </div>
     </section>
   );
@@ -1490,10 +1476,14 @@ function PipelineBoardPanel({
             This page is for quiet threads, overdue replies, and gentle re-entry moments. The goal is continuity and warmth, not system-heavy tracking.
           </p>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
-          <CompactMetricLight label="Quiet relationships" value={String(summary.reduce((total, stage) => total + stage.dormant_count, 0))} tone="warning" />
-          <CompactMetricLight label="Needs a touch" value={String(summary.reduce((total, stage) => total + stage.overdue_count, 0))} tone="critical" />
-          <CompactMetricLight label="Warm openings" value={String(summary.reduce((total, stage) => total + stage.high_priority_count, 0))} tone="neutral" />
+        <div className="rounded-[1.2rem] border bg-slate-50/80 px-4 py-4 lg:max-w-sm">
+          <p className="text-sm leading-6 text-slate-700">
+            <span className="font-semibold text-slate-950">{summary.reduce((total, stage) => total + stage.overdue_count, 0)}</span> relationship{summary.reduce((total, stage) => total + stage.overdue_count, 0) === 1 ? "" : "s"} need a touch,
+            {" "}
+            <span className="font-semibold text-slate-950">{summary.reduce((total, stage) => total + stage.dormant_count, 0)}</span> feel quiet,
+            {" "}
+            and <span className="font-semibold text-slate-950">{summary.reduce((total, stage) => total + stage.high_priority_count, 0)}</span> still have warm openings.
+          </p>
         </div>
       </div>
 
@@ -1504,7 +1494,7 @@ function PipelineBoardPanel({
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Gentle re-entry first</p>
               <p className="mt-2 text-sm leading-6 text-slate-600">Start here if you want the shortest path to keeping a relationship warm before it fully slips.</p>
             </div>
-            <p className="text-xs text-slate-500">Reply pressure and quiet relationships are surfaced ahead of raw stage progression.</p>
+            <p className="text-xs text-slate-500">Reply pressure and quiet relationships surface before stage lanes do.</p>
           </div>
           <div className="mt-4 grid gap-3 xl:grid-cols-2">
             {needsCareFirst.map((item) => {

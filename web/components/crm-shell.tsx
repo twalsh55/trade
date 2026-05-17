@@ -46,12 +46,10 @@ export function CRMShell({ data }: { data: CRMPageData }) {
           </button>
         </div>
       </section>
-      <section className="mt-6 rounded-[1.5rem] border bg-white/85 p-5 shadow-sm">
-        <p className="ui-eyebrow text-slate-500">What should appear here</p>
-        <div className="mt-3 grid gap-3 md:grid-cols-2">
-          <FeatureCard title="Today" body="Start with the relationships that need you first, plus the freshest client context." />
-          <FeatureCard title="Relationship memory" body="Keep notes, continuity, uploads, and the next touch close together." />
-        </div>
+      <section className="mt-4 rounded-[1.3rem] border bg-white/85 p-4 shadow-sm">
+        <p className="text-sm leading-6 text-slate-600">
+          When this view loads normally, Brivoly brings back Today, relationship memory, inbox continuity, and your saved next touches in one place.
+        </p>
       </section>
     </>
   );
@@ -86,13 +84,4 @@ function resolveCRMView(pathname: string): CRMWorkspaceView {
     return "intake";
   }
   return "overview";
-}
-
-function FeatureCard({ title, body }: { title: string; body: string }) {
-  return (
-    <section className="rounded-[1.25rem] border bg-slate-50/80 px-4 py-4">
-      <h2 className="text-lg font-semibold tracking-tight text-slate-950">{title}</h2>
-      <p className="mt-2 text-sm leading-6 text-slate-600">{body}</p>
-    </section>
-  );
 }
