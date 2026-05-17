@@ -23,6 +23,7 @@ import type {
 export type CRMWorkspaceView = "overview" | "followups" | "inbox" | "pipeline" | "import" | "intake";
 type CRMIntakeTask = "hub" | "profile" | "routing" | "capture";
 type RelationshipFilter = "all" | "due" | "stale" | "at_risk";
+type InboxFilter = "all" | "reply" | "waiting" | "quiet";
 
 export function CRMFollowUpWorkspace({
   initialOverview,
@@ -79,6 +80,8 @@ export function CRMFollowUpWorkspace({
   const [inboxSubject, setInboxSubject] = useState("");
   const [inboxMessageBody, setInboxMessageBody] = useState("");
   const [inboxStatus, setInboxStatus] = useState<string | null>(null);
+  const [inboxQuery, setInboxQuery] = useState("");
+  const [inboxFilter, setInboxFilter] = useState<InboxFilter>("all");
   const [isPending, startTransition] = useTransition();
   const [isImportPending, startImportTransition] = useTransition();
   const [isAiSettingsPending, startAiSettingsTransition] = useTransition();
@@ -853,9 +856,9 @@ export function CRMFollowUpWorkspace({
             </div>
 
             <section className="mt-6 rounded-[1.4rem] border bg-slate-50/80 p-5">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Thread sync tester</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Inbox sync preview</p>
               <p className="mt-2 text-sm leading-6 text-slate-600">
-                Use this to simulate inbox sync while we wire real provider connections. The same API route is ready for Gmail- or Outlook-style thread events.
+                Use this to simulate inbox sync while real provider connections are being wired. The same API route is ready for Gmail- or Outlook-style thread events.
               </p>
               <div className="mt-4 grid gap-3 md:grid-cols-2">
                 <input value={inboxThreadId} onChange={(event) => setInboxThreadId(event.target.value)} placeholder="Thread ID (optional)" className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400" />
@@ -888,9 +891,31 @@ export function CRMFollowUpWorkspace({
               </div>
               {inboxStatus ? <p className="mt-4 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">{inboxStatus}</p> : null}
             </section>
+
+            {selectedLead ? (
+              <InboxNextMovePanel
+                lead={selectedLead}
+                onDraftReply={() => {
+                  setEmailObjective("follow_up");
+                  setEmailTone("warm");
+                  setEmailLength("short");
+                  generateEmailDraft();
+                }}
+                isDrafting={isEmailPending}
+                draftStatus={emailStatus}
+              />
+            ) : null}
           </section>
 
-          <InboxActivityPanel items={overview.items} onSelectLead={setSelectedLeadId} />
+          <InboxActivityPanel
+            items={overview.items}
+            selectedLeadId={selectedLead?.id ?? null}
+            onSelectLead={setSelectedLeadId}
+            inboxQuery={inboxQuery}
+            inboxFilter={inboxFilter}
+            onInboxQueryChange={setInboxQuery}
+            onInboxFilterChange={setInboxFilter}
+          />
         </section>
       ) : null}
 
@@ -1275,10 +1300,20 @@ function PipelineBoardPanel({
 
 function InboxActivityPanel({
   items,
+  selectedLeadId,
   onSelectLead,
+  inboxQuery,
+  inboxFilter,
+  onInboxQueryChange,
+  onInboxFilterChange,
 }: {
   items: CRMLeadFollowUp[];
+  selectedLeadId: string | null;
   onSelectLead: (leadId: string) => void;
+  inboxQuery: string;
+  inboxFilter: InboxFilter;
+  onInboxQueryChange: (value: string) => void;
+  onInboxFilterChange: (value: InboxFilter) => void;
 }) {
   const threads = items
     .flatMap((item) =>
@@ -1287,54 +1322,142 @@ function InboxActivityPanel({
         leadName: item.lead_name,
         companyName: item.company_name,
         stage: item.stage,
+        notes: item.notes,
+        nextStep: item.next_step,
         thread,
       })),
     )
     .sort((left, right) => new Date(right.thread.last_message_at).getTime() - new Date(left.thread.last_message_at).getTime());
+  const filteredThreads = threads.filter((item) => matchesInboxThread(item, inboxQuery, inboxFilter));
 
   return (
     <section className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm">
       <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Relationship activity</p>
       <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Recent conversations Brivoly is keeping warm.</h2>
+      <div className="mt-5 rounded-[1.35rem] border bg-slate-50/80 p-4">
+        <div className="grid gap-3 lg:grid-cols-[1.2fr_auto] lg:items-center">
+          <input
+            value={inboxQuery}
+            onChange={(event) => onInboxQueryChange(event.target.value)}
+            placeholder="Search by name, company, subject, or email"
+            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400"
+          />
+          <div className="flex flex-wrap gap-2">
+            {[
+              { value: "all", label: "All" },
+              { value: "reply", label: "Reply soon" },
+              { value: "waiting", label: "Waiting" },
+              { value: "quiet", label: "Quiet" },
+            ].map((item) => (
+              <button
+                key={item.value}
+                type="button"
+                onClick={() => onInboxFilterChange(item.value as InboxFilter)}
+                className={`rounded-full border px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] transition ${
+                  inboxFilter === item.value
+                    ? "border-slate-900 bg-slate-950 text-white"
+                    : "border-slate-200 bg-white text-slate-600 hover:border-slate-400 hover:text-slate-900"
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <p className="mt-3 text-xs text-slate-500">
+          {filteredThreads.length} conversation{filteredThreads.length === 1 ? "" : "s"} match the current view.
+        </p>
+      </div>
       <div className="mt-6 space-y-4">
-        {threads.map(({ leadId, leadName, companyName, stage, thread }) => (
-          <button
-            key={thread.thread_id}
-            type="button"
-            onClick={() => onSelectLead(leadId)}
-            className="block w-full rounded-[1.35rem] border bg-slate-50/80 px-5 py-5 text-left transition hover:border-slate-400 hover:bg-white"
-          >
-            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                  {formatStageLabel(stage)} · {thread.last_message_direction === "inbound" ? "Needs your reply" : "Waiting on them"}
-                </p>
-                <h3 className="mt-2 text-xl font-semibold tracking-tight text-slate-950">{thread.subject}</h3>
-                <p className="mt-1 text-sm text-slate-600">
-                  {leadName} · {companyName}
-                </p>
-                <p className="mt-3 text-sm leading-6 text-slate-600">{thread.snippet}</p>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
+        {filteredThreads.map(({ leadId, leadName, companyName, stage, thread, notes, nextStep }) => {
+          const selected = leadId === selectedLeadId;
+          return (
+            <button
+              key={thread.thread_id}
+              type="button"
+              onClick={() => onSelectLead(leadId)}
+              className={`block w-full rounded-[1.35rem] border px-5 py-5 text-left transition ${
+                selected ? "border-slate-900 bg-white shadow-sm" : "bg-slate-50/80 hover:border-slate-400 hover:bg-white"
+              }`}
+            >
+              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                    {formatStageLabel(stage)} · {thread.last_message_direction === "inbound" ? "Needs your reply" : "Waiting on them"}
+                  </p>
+                  <h3 className="mt-2 text-xl font-semibold tracking-tight text-slate-950">{thread.subject}</h3>
+                  <p className="mt-1 text-sm text-slate-600">
+                    {leadName} · {companyName}
+                  </p>
+                  <p className="mt-3 text-sm leading-6 text-slate-600">{summarizeThreadPulse(thread, nextStep, notes)}</p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
                   {thread.needs_reply ? <MiniFlag tone="critical" label="Reply" /> : null}
                   {thread.waiting_on_contact ? <MiniFlag tone="warning" label="Waiting" /> : null}
-                <div className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">
-                  {thread.message_count} msg
+                  {isQuietThread(thread) ? <MiniFlag tone="neutral" label="Quiet" /> : null}
+                  <div className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">
+                    {thread.message_count} msg
+                  </div>
                 </div>
               </div>
-            </div>
-            <div className="mt-4 grid gap-3 md:grid-cols-2">
-              <TimelineTile label="Counterpart" value={thread.counterpart_email} />
-              <TimelineTile label="Last message" value={formatDateTime(thread.last_message_at)} />
-            </div>
-          </button>
-        ))}
-        {!threads.length ? (
+              <div className="mt-4 grid gap-3 md:grid-cols-3">
+                <TimelineTile label="Conversation pulse" value={describeThreadState(thread)} />
+                <TimelineTile label="Counterpart" value={thread.counterpart_email} />
+                <TimelineTile label="Last message" value={formatDateTime(thread.last_message_at)} />
+              </div>
+            </button>
+          );
+        })}
+        {!filteredThreads.length ? (
           <div className="rounded-[1.35rem] border border-dashed bg-slate-50/70 p-6 text-sm leading-6 text-slate-600">
-            No synced email threads yet. Once inbox sync is flowing, this becomes the quiet memory layer for who said what and who needs a reply.
+            No conversations match this view yet. Once inbox sync is flowing, this becomes the quiet memory layer for who said what and who needs a reply.
           </div>
         ) : null}
       </div>
+    </section>
+  );
+}
+
+function InboxNextMovePanel({
+  lead,
+  onDraftReply,
+  isDrafting,
+  draftStatus,
+}: {
+  lead: CRMLeadFollowUp;
+  onDraftReply: () => void;
+  isDrafting: boolean;
+  draftStatus: string | null;
+}) {
+  const latestThread = [...lead.recent_email_threads].sort(
+    (left, right) => new Date(right.last_message_at).getTime() - new Date(left.last_message_at).getTime(),
+  )[0] ?? null;
+
+  return (
+    <section className="mt-6 rounded-[1.4rem] border bg-white p-5 shadow-sm">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Next move</p>
+      <h3 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">{lead.lead_name}</h3>
+      <p className="mt-1 text-sm text-slate-600">{lead.company_name}</p>
+      <div className="mt-4 grid gap-3 md:grid-cols-2">
+        <TimelineTile label="Conversation pulse" value={latestThread ? describeThreadState(latestThread) : "No synced thread yet"} />
+        <TimelineTile label="Suggested next touch" value={lead.next_step} />
+      </div>
+      {latestThread ? (
+        <div className="mt-4 rounded-[1.2rem] border bg-slate-50/80 px-4 py-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Latest thread</p>
+          <p className="mt-2 text-sm font-medium text-slate-900">{latestThread.subject}</p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">{summarizeThreadPulse(latestThread, lead.next_step, lead.notes)}</p>
+        </div>
+      ) : null}
+      <div className="mt-4 flex flex-wrap gap-3">
+        <Button disabled={isDrafting} onClick={onDraftReply}>
+          {isDrafting ? "Drafting..." : "Draft reply"}
+        </Button>
+        <Button asChild variant="outline">
+          <Link href="/clientos/follow-ups">Open relationship</Link>
+        </Button>
+      </div>
+      {draftStatus ? <p className="mt-4 text-sm text-slate-500">{draftStatus}</p> : null}
     </section>
   );
 }
@@ -2192,11 +2315,11 @@ function RelationshipReminderCard({ reminder }: { reminder: CRMRelationshipRemin
   );
 }
 
-function MiniFlag({ label, tone }: { label: string; tone: "warning" | "critical" }) {
+function MiniFlag({ label, tone }: { label: string; tone: "warning" | "critical" | "neutral" }) {
   return (
     <span
       className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ${
-        tone === "critical" ? "bg-rose-100 text-rose-800" : "bg-amber-100 text-amber-800"
+        tone === "critical" ? "bg-rose-100 text-rose-800" : tone === "warning" ? "bg-amber-100 text-amber-800" : "bg-slate-100 text-slate-700"
       }`}
     >
       {label}
@@ -2360,6 +2483,103 @@ function getReplySummary(item: CRMLeadFollowUp) {
     return item.next_step;
   }
   return replyThread.snippet || item.next_step;
+}
+
+function matchesInboxThread(
+  item: {
+    leadName: string;
+    companyName: string;
+    notes: string;
+    nextStep: string;
+    thread: {
+      subject: string;
+      counterpart_email: string;
+      counterpart_name: string;
+      snippet: string;
+      waiting_on_contact: boolean;
+      needs_reply: boolean;
+      last_message_at: string;
+    };
+  },
+  query: string,
+  filter: InboxFilter,
+) {
+  const normalizedQuery = query.trim().toLowerCase();
+  const queryMatch =
+    !normalizedQuery ||
+    [
+      item.leadName,
+      item.companyName,
+      item.notes,
+      item.nextStep,
+      item.thread.subject,
+      item.thread.counterpart_email,
+      item.thread.counterpart_name,
+      item.thread.snippet,
+    ]
+      .join(" ")
+      .toLowerCase()
+      .includes(normalizedQuery);
+
+  if (!queryMatch) {
+    return false;
+  }
+
+  if (filter === "reply") {
+    return item.thread.needs_reply;
+  }
+  if (filter === "waiting") {
+    return item.thread.waiting_on_contact;
+  }
+  if (filter === "quiet") {
+    return isQuietThread(item.thread);
+  }
+  return true;
+}
+
+function isQuietThread(thread: {
+  last_message_at: string;
+  needs_reply: boolean;
+  waiting_on_contact: boolean;
+}) {
+  const ageMs = Date.now() - new Date(thread.last_message_at).getTime();
+  return !thread.needs_reply && !thread.waiting_on_contact && ageMs >= 1000 * 60 * 60 * 24 * 7;
+}
+
+function describeThreadState(thread: {
+  needs_reply: boolean;
+  waiting_on_contact: boolean;
+  last_message_at: string;
+}) {
+  if (thread.needs_reply) {
+    return "Your reply would keep this moving";
+  }
+  if (thread.waiting_on_contact) {
+    return "You are waiting on them";
+  }
+  if (isQuietThread(thread)) {
+    return "This conversation has gone quiet";
+  }
+  return `Still warm as of ${formatDateTime(thread.last_message_at)}`;
+}
+
+function summarizeThreadPulse(
+  thread: {
+    snippet: string;
+    needs_reply: boolean;
+    waiting_on_contact: boolean;
+  },
+  nextStep: string,
+  notes: string,
+) {
+  const base = thread.snippet.trim() || nextStep.trim() || notes.trim();
+  if (thread.needs_reply) {
+    return base || "A reply here would keep the relationship moving.";
+  }
+  if (thread.waiting_on_contact) {
+    return base || "This thread is waiting on the other side.";
+  }
+  return base || "Brivoly is holding onto the last bit of context here.";
 }
 
 function formatStageLabel(stage: string) {
