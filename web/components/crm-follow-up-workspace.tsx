@@ -1060,10 +1060,19 @@ function TodayPrioritiesPanel({
   selectedLead: CRMLeadFollowUp | null;
   inboxSummary: CRMFollowUpOverview["inbox_summary"];
 }) {
-  const replyLead = items.find((item) => item.recent_email_threads.some((thread) => thread.needs_reply));
-  const reconnectLead = items.find((item) => item.relationship_state === "stale" || item.relationship_state === "at_risk" || item.relationship_state === "drifting");
-  const proposalLead = items.find((item) => isProposalFollowThrough(item));
-  const recentContextLead = items.find((item) => getLatestContextEntry(item));
+  const replyLead = [...items]
+    .filter((item) => item.recent_email_threads.some((thread) => thread.needs_reply))
+    .sort((left, right) => compareReplyPriority(left, right))[0] ?? null;
+  const reconnectLead = [...items]
+    .filter((item) => item.relationship_state === "stale" || item.relationship_state === "at_risk" || item.relationship_state === "drifting")
+    .sort((left, right) => compareReconnectPriority(left, right))[0] ?? null;
+  const proposalLead = [...items]
+    .filter((item) => isProposalFollowThrough(item))
+    .sort((left, right) => compareProposalPriority(left, right))[0] ?? null;
+  const recentContextLead = [...items]
+    .filter((item) => hasFreshContext(item))
+    .sort((left, right) => compareFreshContextPriority(left, right))[0] ?? null;
+  const replyThread = replyLead ? getReplyThread(replyLead) : null;
 
   const priorities = compactPriorityCards([
     replyLead
@@ -1072,7 +1081,7 @@ function TodayPrioritiesPanel({
           href: "/clientos/inbox",
           eyebrow: "Reply soon",
           title: `Reply to ${replyLead.lead_name}`,
-          body: getReplySummary(replyLead),
+          body: replyThread?.next_touch_hint || replyThread?.memory_summary || getReplySummary(replyLead),
           meta: `${replyLead.company_name} · ${formatDateTime(getNewestThreadTime(replyLead) ?? replyLead.next_follow_up_at)}`,
         }
       : null,
@@ -1093,7 +1102,7 @@ function TodayPrioritiesPanel({
           eyebrow: "Proposal follow-up",
           title: `Keep momentum with ${proposalLead.lead_name}`,
           body: proposalLead.relationship_timing_nudge || proposalLead.next_step,
-          meta: `${proposalLead.company_name} · ${formatStageLabel(proposalLead.stage)}`,
+          meta: `${proposalLead.company_name} · follow up by ${formatDateTime(proposalLead.next_follow_up_at)}`,
         }
       : null,
     recentContextLead
@@ -1121,15 +1130,16 @@ function TodayPrioritiesPanel({
   const replyCount = inboxSummary?.needs_reply_count ?? 0;
   const reconnectCount = items.filter((item) => item.relationship_state === "stale" || item.relationship_state === "at_risk" || item.relationship_state === "drifting").length;
   const proposalCount = items.filter((item) => isProposalFollowThrough(item)).length;
+  const freshContextCount = items.filter((item) => hasFreshContext(item)).length;
 
   return (
     <section className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm">
       <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Today’s priorities</p>
       <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">A short list of who needs your attention right now.</h2>
       <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-        Brivoly surfaces the next relationship moves so you can stay responsive without scanning every thread, note, and reminder yourself.
+        Brivoly pulls together reply pressure, reconnect risk, proposal momentum, and fresh context so you can pick up the right relationships without re-reading everything first.
       </p>
-      <div className="mt-5 grid gap-3 md:grid-cols-3">
+      <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <TodaySignal
           label="Reply pressure"
           value={replyCount ? `${replyCount} conversation${replyCount === 1 ? "" : "s"} waiting on you` : "No replies piling up"}
@@ -1141,6 +1151,10 @@ function TodayPrioritiesPanel({
         <TodaySignal
           label="Proposal momentum"
           value={proposalCount ? `${proposalCount} proposal${proposalCount === 1 ? "" : "s"} need follow-through` : "No proposals need a push today"}
+        />
+        <TodaySignal
+          label="Fresh context"
+          value={freshContextCount ? `${freshContextCount} relationship${freshContextCount === 1 ? "" : "s"} picked up new context recently` : "No new context landed overnight"}
         />
       </div>
       <div className="mt-5 space-y-3">
@@ -2597,6 +2611,74 @@ function getReplySummary(item: CRMLeadFollowUp) {
     return item.next_step;
   }
   return replyThread.snippet || item.next_step;
+}
+
+function getReplyThread(item: CRMLeadFollowUp) {
+  return [...item.recent_email_threads]
+    .filter((thread) => thread.needs_reply)
+    .sort((left, right) => new Date(right.last_message_at).getTime() - new Date(left.last_message_at).getTime())[0] ?? null;
+}
+
+function compareReplyPriority(left: CRMLeadFollowUp, right: CRMLeadFollowUp) {
+  return (getNewestThreadTimestamp(right) - getNewestThreadTimestamp(left)) || compareSoonestFollowUp(left, right);
+}
+
+function compareReconnectPriority(left: CRMLeadFollowUp, right: CRMLeadFollowUp) {
+  return (
+    relationshipStateUrgency(right.relationship_state) - relationshipStateUrgency(left.relationship_state) ||
+    getLastMeaningfulTimestamp(left) - getLastMeaningfulTimestamp(right) ||
+    compareSoonestFollowUp(left, right)
+  );
+}
+
+function compareProposalPriority(left: CRMLeadFollowUp, right: CRMLeadFollowUp) {
+  return (
+    Number(right.priority === "high") - Number(left.priority === "high") ||
+    compareSoonestFollowUp(left, right) ||
+    getLastMeaningfulTimestamp(right) - getLastMeaningfulTimestamp(left)
+  );
+}
+
+function compareFreshContextPriority(left: CRMLeadFollowUp, right: CRMLeadFollowUp) {
+  return getLatestContextTimestamp(right) - getLatestContextTimestamp(left);
+}
+
+function compareSoonestFollowUp(left: CRMLeadFollowUp, right: CRMLeadFollowUp) {
+  return new Date(left.next_follow_up_at).getTime() - new Date(right.next_follow_up_at).getTime();
+}
+
+function getNewestThreadTimestamp(item: CRMLeadFollowUp) {
+  return getNewestThreadTime(item) ? new Date(getNewestThreadTime(item) as string).getTime() : 0;
+}
+
+function getLastMeaningfulTimestamp(item: CRMLeadFollowUp) {
+  return item.last_meaningful_interaction_at ? new Date(item.last_meaningful_interaction_at).getTime() : 0;
+}
+
+function getLatestContextTimestamp(item: CRMLeadFollowUp) {
+  const latest = getLatestContextEntry(item);
+  return latest ? new Date(latest.occurred_at).getTime() : 0;
+}
+
+function hasFreshContext(item: CRMLeadFollowUp) {
+  const latest = getLatestContextTimestamp(item);
+  if (!latest) {
+    return false;
+  }
+  return Date.now() - latest <= 1000 * 60 * 60 * 24 * 3;
+}
+
+function relationshipStateUrgency(state: string) {
+  if (state === "stale") {
+    return 3;
+  }
+  if (state === "at_risk") {
+    return 2;
+  }
+  if (state === "drifting") {
+    return 1;
+  }
+  return 0;
 }
 
 function matchesInboxThread(
