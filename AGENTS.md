@@ -91,6 +91,7 @@ cd web && npm run e2e
 - `/clientos` is the primary production route and currently allows anonymous guest access when `ALLOW_ANONYMOUS_CRM=true`.
 - `/crm` remains as a compatibility alias.
 - Current Client OS capabilities:
+  - temporary yellow/black sitewide under-construction banner is live
   - left taskbar with dedicated Client OS pages
   - CRM relationship memory now persists in Postgres when `DATABASE_URL` is configured, including imported follow-ups, notes, timeline history, and inbox-ingested thread state
   - anonymous guest mode now bootstraps the sample relationship set once into durable CRM storage instead of rebuilding it from process memory on every restart
@@ -103,8 +104,8 @@ cd web && npm run e2e
   - complete and snooze actions
   - relationship history + internal notes
   - relationship memory summaries that blend email, notes, uploads, reconnect cues, and recent upload context, with lighter `Conversation memory` and `Latest saved context` reads instead of repetitive stacked boxes
-  - recent client-shared context now has its own memory view, can be pulled straight into the next drafted note, generates a backend-driven follow-through hint, creates a more natural reconnect path, and now plays a bigger role in meeting prep, 30-day summaries, follow-through guidance, and inbox-side next moves
-  - auto email designer for reconnects and follow-ups with in-app draft editing
+  - recent client-shared context now has its own memory view, can be pulled straight into the next drafted note, generates a backend-driven follow-through hint, creates a more natural reconnect path, and now plays a bigger role in meeting prep, 30-day summaries, follow-through guidance, Today priorities, and inbox-side next moves
+  - auto note designer for reconnects and follow-ups with in-app draft editing
   - last meaningful interaction tracking
   - dormant client detection
   - warm intro graph
@@ -134,8 +135,9 @@ cd web && npm run e2e
   - text-heavy card layouts now prefer wider 2-column patterns so copy does not collapse into cramped narrow cards
   - shell, taskbar, import, relationship-memory, and handoff copy now consistently point to Client OS instead of older workspace/portal language
   - overview density is calmer now, with lighter warm-intro panels, a simpler relationship continuity read, a lighter conversation-memory stack in inbox follow-through, a less repetitive relationship-memory panel, and a less dashboard-like fallback shell
-  - intake defaults now read more like set-it-and-forget-it guidance, with quieter `Client dropzone` language, lighter `Usual paths` / `What Brivoly should notice` wording, `Step 1/2/3` task framing, `Use usual path` / `Use usual formats` / `Use usual prompt` helper actions, and `Save defaults` actions instead of configuration-heavy language
-  - auth, shell fallback, loading, and client-upload surfaces now use calmer language and lighter guidance with less system-heavy phrasing
+  - intake defaults now read more like set-it-and-forget-it guidance, with quieter `Client dropzone` language, lighter `Usual path` / `What to notice` wording, `First / Next / Then` task framing, recommended helper actions, and simple `Save` actions instead of configuration-heavy language
+  - auth, shell fallback, API fallback, loading, draft-composer, and client-upload surfaces now use calmer language and lighter guidance with less system-heavy phrasing
+  - Today navigation and other dense summary areas are progressively flattening into lighter pills and calmer summaries instead of equal-weight cards
 
 ### Relationship OS Todo
 
