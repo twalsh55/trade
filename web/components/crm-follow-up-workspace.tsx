@@ -2103,7 +2103,7 @@ function RemoteImageCapturePanel({
         </p>
         {normalizedChannels.length ? (
           <p className="mt-3 text-sm text-slate-700">
-            Usual paths for this account: <span className="font-medium">{normalizedChannels.join(", ")}</span>
+            Usual ways clients send updates here: <span className="font-medium">{normalizedChannels.join(", ")}</span>
           </p>
         ) : null}
         {routingNotes ? <p className="mt-2 text-sm leading-6 text-slate-600">{routingNotes}</p> : null}
@@ -2138,8 +2138,8 @@ function RemoteImageCapturePanel({
 function IntakeTaskNav({ activeTask }: { activeTask: CRMIntakeTask }) {
   const items: Array<{ href: string; title: string; body: string; task: CRMIntakeTask }> = [
     { href: "/clientos/intake", title: "Overview", body: "See the default flow at a glance.", task: "hub" },
-    { href: "/clientos/intake/profile", title: "Usual formats", body: "Show what usually comes in.", task: "profile" },
-    { href: "/clientos/intake/routing", title: "Default path", body: "Choose the easiest route once.", task: "routing" },
+    { href: "/clientos/intake/profile", title: "Usual formats", body: "Show what clients usually send.", task: "profile" },
+    { href: "/clientos/intake/routing", title: "Usual path", body: "Choose the easiest way in once.", task: "routing" },
     { href: "/clientos/intake/capture", title: "Share link", body: "Keep one phone-friendly page ready.", task: "capture" },
   ];
 
@@ -2190,7 +2190,7 @@ function IntakeTaskHub({
         href="/clientos/intake/routing"
         eyebrow="Step 2"
         title="Choose the easiest path"
-        body={normalizedChannels.length ? `Default paths are set: ${normalizedChannels.join(", ")}.` : "Set one path and one short note so sending updates feels obvious."}
+        body={normalizedChannels.length ? `Usual paths are ready: ${normalizedChannels.join(", ")}.` : "Set one path and one short note so sending updates feels obvious."}
       />
       <TaskSummaryCard
         href="/clientos/intake/capture"
@@ -2243,7 +2243,7 @@ function IntakeRoutingPanel({
 }) {
   return (
     <section className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm">
-      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Default path</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Usual path</p>
       <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Set the easiest path once.</h2>
       <p className="mt-3 text-sm leading-6 text-slate-600">
         Keep this simple: choose the usual paths for this account and leave one short note so every new update lands in the right place.
@@ -2251,7 +2251,7 @@ function IntakeRoutingPanel({
 
       <div className="mt-5 space-y-4">
         <label className="block">
-          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Usual paths</span>
+          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Usual ways in</span>
           <input
             value={channelsDraft}
             onChange={(event) => onChannelsDraftChange(event.target.value)}
@@ -2270,7 +2270,7 @@ function IntakeRoutingPanel({
             }}
             className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
           >
-            Use usual path
+            Use recommended path
           </button>
           {[
             { label: "Shared link + email", value: "upload, magic_link, email" },
@@ -2294,7 +2294,7 @@ function IntakeRoutingPanel({
             }
             className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
           >
-            Use usual note
+            Use recommended note
           </button>
         </div>
         <label className="block">
@@ -2314,7 +2314,7 @@ function IntakeRoutingPanel({
         </Button>
         {saveStatus ? <p className="text-sm text-slate-500">{saveStatus}</p> : null}
       </div>
-      {!canPersistSettings ? <p className="mt-3 text-sm text-slate-500">These defaults will appear once account details finish loading.</p> : null}
+      {!canPersistSettings ? <p className="mt-3 text-sm text-slate-500">These defaults will appear once your account details finish loading.</p> : null}
     </section>
   );
 }
@@ -2388,7 +2388,7 @@ function AIIntakePanel({
             }}
             className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
           >
-            Use usual formats
+            Use recommended formats
           </button>
           {[
             { label: "Sheets + screenshots", value: "csv, google_sheets, spreadsheet_screenshot" },
@@ -2413,11 +2413,11 @@ function AIIntakePanel({
             }
             className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
           >
-            Use usual prompt
+            Use recommended prompt
           </button>
         </div>
         <label className="block">
-          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">What Brivoly should notice</span>
+          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">What to notice</span>
           <textarea
             value={aiPromptDraft}
             onChange={(event) => onAiPromptDraftChange(event.target.value)}
