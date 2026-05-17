@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 from src.domain.auth import User
 from src.domain.crm import LeadFollowUp, LeadTimelineEntry
@@ -63,6 +63,10 @@ class InMemoryLeadFollowUpRepository:
                 next_follow_up_at=current_time - timedelta(hours=4),
                 next_step="Send a concise recap and propose two call slots.",
                 notes="Interested, but waiting on a clearer summary of timeline and scope.",
+                referral_source_name="Jules from Seabird Partners",
+                birthday=date(1991, 5, 28),
+                company_milestone_name="annual planning window",
+                company_milestone_date=date(2016, 6, 2),
                 timeline=(
                     LeadTimelineEntry(
                         id="amber-call",
@@ -92,6 +96,8 @@ class InMemoryLeadFollowUpRepository:
                 next_follow_up_at=current_time + timedelta(hours=2),
                 next_step="Follow up on proposal review and confirm who signs off internally.",
                 notes="Opened the proposal twice. Mentioned concern about rollout burden.",
+                company_milestone_name="budget reset",
+                company_milestone_date=date(2018, 6, 9),
                 timeline=(
                     LeadTimelineEntry(
                         id="riverbridge-proposal",
@@ -121,6 +127,8 @@ class InMemoryLeadFollowUpRepository:
                 next_follow_up_at=current_time + timedelta(days=1),
                 next_step="Share two examples of similar results and ask for current CRM workflow pain.",
                 notes="Strong fit if lead capture and follow-up remain spreadsheet based.",
+                referral_source_name="Nina at Harbor Circle",
+                birthday=date(1990, 6, 1),
                 timeline=(
                     LeadTimelineEntry(
                         id="lattice-qualification",
@@ -146,21 +154,21 @@ class InMemoryLeadFollowUpRepository:
                 stage="Negotiation",
                 priority="medium",
                 contact_channel="phone",
-                last_contacted_at=current_time - timedelta(days=3),
+                last_contacted_at=current_time - timedelta(days=27),
                 next_follow_up_at=current_time + timedelta(days=2),
                 next_step="Confirm decision deadline and check whether they need a lighter pilot option.",
                 notes="Likes the direction, but comparing against doing it manually one more quarter.",
                 timeline=(
                     LeadTimelineEntry(
                         id="cedar-phone",
-                        occurred_at=current_time - timedelta(days=3),
+                        occurred_at=current_time - timedelta(days=27),
                         kind="call",
                         channel="phone",
                         summary="Negotiation call focused on whether the team can justify the workflow shift before busy season.",
                     ),
                     LeadTimelineEntry(
                         id="cedar-proposal",
-                        occurred_at=current_time - timedelta(days=7),
+                        occurred_at=current_time - timedelta(days=31),
                         kind="proposal",
                         channel="email",
                         summary="Proposal framed the CRM around relationship memory, handoffs, and fewer dropped follow-ups.",

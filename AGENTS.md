@@ -94,6 +94,13 @@ cd web && npm run e2e
   - follow-up queue
   - complete and snooze actions
   - contact timeline + internal notes
+  - auto email designer for CRM follow-ups with in-app draft editing
+  - last meaningful interaction tracking
+  - dormant client detection
+  - warm intro graph
+  - referral reminders
+  - birthday and company milestone reminders
+  - relationship health scoring
   - CSV/XLSX/XLS/Google Sheets import
   - guided field mapping
   - import now preserves mapped priority, contact channel, and next step from source sheets instead of replacing them with generic defaults

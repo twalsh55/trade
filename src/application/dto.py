@@ -10,7 +10,11 @@ from src.application.billing import BillingOverview
 from src.domain.auth import User
 from src.domain.crm import (
     LeadFollowUp,
+    LeadFollowUpEmailDraft,
     LeadFollowUpOverview,
+    LeadRelationshipReminder,
+    LeadRelationshipSummary,
+    LeadWarmIntroConnection,
     LeadImportClarification,
     LeadImportClarificationOption,
     LeadImportClarificationQuestion,
@@ -147,6 +151,15 @@ class LeadFollowUpDTO:
     next_step: str
     notes: str
     timeline: list["LeadTimelineEntryDTO"]
+    referral_source_name: str
+    birthday: str | None
+    company_milestone_name: str
+    company_milestone_date: str | None
+    last_meaningful_interaction_at: str | None
+    relationship_health_score: int
+    relationship_health_label: str
+    dormant: bool
+    relationship_reminders: list["LeadRelationshipReminderDTO"]
 
 
 @dataclass(frozen=True)
@@ -159,6 +172,34 @@ class LeadTimelineEntryDTO:
 
 
 @dataclass(frozen=True)
+class LeadRelationshipReminderDTO:
+    kind: str
+    title: str
+    message: str
+    due_at: str | None
+
+
+@dataclass(frozen=True)
+class LeadWarmIntroConnectionDTO:
+    source_name: str
+    target_lead_id: str
+    target_lead_name: str
+    target_company_name: str
+    owner_name: str
+
+
+@dataclass(frozen=True)
+class LeadRelationshipSummaryDTO:
+    healthy_count: int
+    watch_count: int
+    at_risk_count: int
+    dormant_count: int
+    referral_reminder_count: int
+    milestone_reminder_count: int
+    warm_intro_connections: list[LeadWarmIntroConnectionDTO]
+
+
+@dataclass(frozen=True)
 class LeadFollowUpOverviewDTO:
     generated_at: str
     total_open: int
@@ -166,6 +207,18 @@ class LeadFollowUpOverviewDTO:
     overdue: int
     high_priority: int
     items: list[LeadFollowUpDTO]
+    relationship_summary: LeadRelationshipSummaryDTO | None
+
+
+@dataclass(frozen=True)
+class LeadFollowUpEmailDraftDTO:
+    follow_up_id: str
+    objective: str
+    tone: str
+    length: str
+    subject: str
+    body: str
+    rationale: list[str]
 
 
 @dataclass(frozen=True)
@@ -381,6 +434,19 @@ def build_lead_follow_up_overview_dto(overview: LeadFollowUpOverview) -> LeadFol
         overdue=overview.overdue,
         high_priority=overview.high_priority,
         items=[build_lead_follow_up_dto(item) for item in overview.items],
+        relationship_summary=build_lead_relationship_summary_dto(overview.relationship_summary),
+    )
+
+
+def build_lead_follow_up_email_draft_dto(draft: LeadFollowUpEmailDraft) -> LeadFollowUpEmailDraftDTO:
+    return LeadFollowUpEmailDraftDTO(
+        follow_up_id=draft.follow_up_id,
+        objective=draft.objective,
+        tone=draft.tone,
+        length=draft.length,
+        subject=draft.subject,
+        body=draft.body,
+        rationale=list(draft.rationale),
     )
 
 
@@ -398,6 +464,15 @@ def build_lead_follow_up_dto(item: LeadFollowUp) -> LeadFollowUpDTO:
         next_step=item.next_step,
         notes=item.notes,
         timeline=[build_lead_timeline_entry_dto(entry) for entry in item.timeline],
+        referral_source_name=item.referral_source_name,
+        birthday=item.birthday.isoformat() if item.birthday else None,
+        company_milestone_name=item.company_milestone_name,
+        company_milestone_date=item.company_milestone_date.isoformat() if item.company_milestone_date else None,
+        last_meaningful_interaction_at=item.last_meaningful_interaction_at.isoformat() if item.last_meaningful_interaction_at else None,
+        relationship_health_score=item.relationship_health_score,
+        relationship_health_label=item.relationship_health_label,
+        dormant=item.dormant,
+        relationship_reminders=[build_lead_relationship_reminder_dto(item) for item in item.relationship_reminders],
     )
 
 
@@ -408,6 +483,41 @@ def build_lead_timeline_entry_dto(entry: LeadTimelineEntry) -> LeadTimelineEntry
         kind=entry.kind,
         channel=entry.channel,
         summary=entry.summary,
+    )
+
+
+def build_lead_relationship_reminder_dto(reminder: LeadRelationshipReminder) -> LeadRelationshipReminderDTO:
+    return LeadRelationshipReminderDTO(
+        kind=reminder.kind,
+        title=reminder.title,
+        message=reminder.message,
+        due_at=reminder.due_at.isoformat() if reminder.due_at else None,
+    )
+
+
+def build_lead_relationship_summary_dto(
+    summary: LeadRelationshipSummary | None,
+) -> LeadRelationshipSummaryDTO | None:
+    if summary is None:
+        return None
+    return LeadRelationshipSummaryDTO(
+        healthy_count=summary.healthy_count,
+        watch_count=summary.watch_count,
+        at_risk_count=summary.at_risk_count,
+        dormant_count=summary.dormant_count,
+        referral_reminder_count=summary.referral_reminder_count,
+        milestone_reminder_count=summary.milestone_reminder_count,
+        warm_intro_connections=[build_lead_warm_intro_connection_dto(item) for item in summary.warm_intro_connections],
+    )
+
+
+def build_lead_warm_intro_connection_dto(connection: LeadWarmIntroConnection) -> LeadWarmIntroConnectionDTO:
+    return LeadWarmIntroConnectionDTO(
+        source_name=connection.source_name,
+        target_lead_id=connection.target_lead_id,
+        target_lead_name=connection.target_lead_name,
+        target_company_name=connection.target_company_name,
+        owner_name=connection.owner_name,
     )
 
 

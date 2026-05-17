@@ -90,6 +90,15 @@ export type CRMLeadFollowUp = {
   next_step: string;
   notes: string;
   timeline: CRMLeadTimelineEntry[];
+  referral_source_name: string;
+  birthday: string | null;
+  company_milestone_name: string;
+  company_milestone_date: string | null;
+  last_meaningful_interaction_at: string | null;
+  relationship_health_score: number;
+  relationship_health_label: "healthy" | "watch" | "at_risk" | string;
+  dormant: boolean;
+  relationship_reminders: CRMRelationshipReminder[];
 };
 
 export type CRMLeadTimelineEntry = {
@@ -107,6 +116,42 @@ export type CRMFollowUpOverview = {
   overdue: number;
   high_priority: number;
   items: CRMLeadFollowUp[];
+  relationship_summary: CRMRelationshipSummary | null;
+};
+
+export type CRMRelationshipReminder = {
+  kind: "referral" | "birthday" | "company_milestone" | string;
+  title: string;
+  message: string;
+  due_at: string | null;
+};
+
+export type CRMWarmIntroConnection = {
+  source_name: string;
+  target_lead_id: string;
+  target_lead_name: string;
+  target_company_name: string;
+  owner_name: string;
+};
+
+export type CRMRelationshipSummary = {
+  healthy_count: number;
+  watch_count: number;
+  at_risk_count: number;
+  dormant_count: number;
+  referral_reminder_count: number;
+  milestone_reminder_count: number;
+  warm_intro_connections: CRMWarmIntroConnection[];
+};
+
+export type CRMEmailDraft = {
+  follow_up_id: string;
+  objective: "follow_up" | "recap" | "revive" | "close_loop";
+  tone: "warm" | "direct" | "confident";
+  length: "short" | "medium";
+  subject: string;
+  body: string;
+  rationale: string[];
 };
 
 export type CRMImportIssue = {

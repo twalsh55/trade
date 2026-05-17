@@ -61,7 +61,7 @@ from src.application.billing import (
 from src.application.autonomous_build import decide_autonomous_build_brief, format_autonomous_build_brief
 from src.application.founder_code import ListFounderCodeRequestsUseCase, QueueFounderCodeRequestUseCase
 from src.application.crm import GetLeadFollowUpOverviewUseCase
-from src.application.crm import AddLeadFollowUpNoteUseCase, CompleteLeadFollowUpUseCase, SnoozeLeadFollowUpUseCase
+from src.application.crm import AddLeadFollowUpNoteUseCase, CompleteLeadFollowUpUseCase, DesignLeadFollowUpEmailUseCase, SnoozeLeadFollowUpUseCase
 from src.application.crm_import import (
     CommitLeadImportUseCase,
     GenerateLeadImportFromImageUseCase,
@@ -86,6 +86,7 @@ from src.application.dto import (
     build_dashboard_snapshot_dto,
     build_lead_import_commit_result_dto,
     build_lead_import_preview_dto,
+    build_lead_follow_up_email_draft_dto,
     build_lead_follow_up_overview_dto,
     build_user_dashboard_settings_dto,
     dto_to_dict,
@@ -148,6 +149,12 @@ class LeadImportPayload(BaseModel):
     field_mapping: dict[str, str | None] | None = None
     clarification_answers: dict[str, str] | None = None
     row_overrides: dict[str, dict[str, str]] | None = None
+
+
+class LeadFollowUpEmailDraftPayload(BaseModel):
+    objective: str = Field(default="follow_up", pattern="^(follow_up|recap|revive|close_loop)$")
+    tone: str = Field(default="warm", pattern="^(warm|direct|confident)$")
+    length: str = Field(default="short", pattern="^(short|medium)$")
 
 
 class FounderCodeRequestDTO(BaseModel):
@@ -343,6 +350,36 @@ def create_app(dependencies: ApiDependencies | None = None) -> FastAPI:
 
         overview = GetLeadFollowUpOverviewUseCase(repository=repository, now=deps.now).execute(user)
         return dto_to_dict(build_lead_follow_up_overview_dto(overview))
+
+    @app.post("/api/crm/followups/{follow_up_id}/email-draft")
+    def crm_followup_email_draft(
+        follow_up_id: str,
+        payload: LeadFollowUpEmailDraftPayload,
+        authorization: str | None = Header(default=None),
+        session_cookie: str | None = Cookie(default=None, alias=CLERK_SESSION_COOKIE),
+    ) -> dict[str, object]:
+        user = _require_authenticated_user(deps, authorization, session_cookie)
+        repository = deps.lead_follow_up_repository_factory()
+        personalization_repository = deps.personalization_repository_factory()
+        try:
+            draft = DesignLeadFollowUpEmailUseCase(
+                repository=repository,
+                settings_loader=lambda authenticated_user: GetUserDashboardSettingsUseCase(
+                    repository=personalization_repository,
+                    default_factory=_build_default_dashboard_settings,
+                ).execute(authenticated_user),
+            ).execute(
+                user,
+                follow_up_id,
+                objective=payload.objective,
+                tone=payload.tone,
+                length=payload.length,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="CRM follow-up not found.") from exc
+        return dto_to_dict(build_lead_follow_up_email_draft_dto(draft))
 
     @app.post("/api/crm/import/preview")
     def crm_import_preview(

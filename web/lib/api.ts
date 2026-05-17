@@ -2,6 +2,7 @@ import type {
   AccountSettings,
   AlertHistoryResponse,
   BillingOverview,
+  CRMEmailDraft,
   CRMFollowUpOverview,
   CRMImportPreview,
   CRMImportResult,
@@ -181,6 +182,25 @@ export async function updateCrmFollowUp(
     `/api/crm/followups/${followUpId}`,
     {
       method: "PATCH",
+      body: JSON.stringify(payload),
+    },
+    options,
+  );
+}
+
+export async function generateCrmFollowUpEmailDraft(
+  followUpId: string,
+  payload: {
+    objective: "follow_up" | "recap" | "revive" | "close_loop";
+    tone: "warm" | "direct" | "confident";
+    length: "short" | "medium";
+  },
+  options: ApiRequestOptions = {},
+): Promise<CRMEmailDraft> {
+  return apiRequest<CRMEmailDraft>(
+    `/api/crm/followups/${followUpId}/email-draft`,
+    {
+      method: "POST",
       body: JSON.stringify(payload),
     },
     options,

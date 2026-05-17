@@ -8,12 +8,14 @@ import { Button } from "@/components/ui/button";
 import type {
   AccountSettings,
   BillingOverview,
+  CRMEmailDraft,
   CRMFollowUpOverview,
   CRMImportHeaderMapping,
   CRMImportClarificationQuestion,
   CRMImportPreview,
   CRMImportPreviewRow,
   CRMLeadFollowUp,
+  CRMRelationshipReminder,
   CRMRemoteIntakeChannel,
 } from "@/lib/types";
 
@@ -49,15 +51,33 @@ export function CRMFollowUpWorkspace({
   const [aiPromptDraft, setAiPromptDraft] = useState(initialSettings?.crm_ai_prompt ?? "");
   const [aiFormatsDraft, setAiFormatsDraft] = useState((initialSettings?.crm_preferred_import_formats ?? []).join(", "));
   const [aiSettingsStatus, setAiSettingsStatus] = useState<string | null>(null);
+  const [emailObjective, setEmailObjective] = useState<CRMEmailDraft["objective"]>("follow_up");
+  const [emailTone, setEmailTone] = useState<CRMEmailDraft["tone"]>("warm");
+  const [emailLength, setEmailLength] = useState<CRMEmailDraft["length"]>("short");
+  const [emailDraft, setEmailDraft] = useState<CRMEmailDraft | null>(null);
+  const [emailSubjectDraft, setEmailSubjectDraft] = useState("");
+  const [emailBodyDraft, setEmailBodyDraft] = useState("");
+  const [emailStatus, setEmailStatus] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [isImportPending, startImportTransition] = useTransition();
   const [isAiSettingsPending, startAiSettingsTransition] = useTransition();
+  const [isEmailPending, startEmailTransition] = useTransition();
 
   useEffect(() => {
     if (!selectedLeadId && initialOverview.items[0]) {
       setSelectedLeadId(initialOverview.items[0].id);
     }
   }, [initialOverview.items, selectedLeadId]);
+
+  useEffect(() => {
+    setEmailDraft(null);
+    setEmailSubjectDraft("");
+    setEmailBodyDraft("");
+    setEmailStatus(null);
+    setEmailObjective("follow_up");
+    setEmailTone("warm");
+    setEmailLength("short");
+  }, [selectedLeadId]);
 
   const selectedLead = overview.items.find((item) => item.id === selectedLeadId) ?? overview.items[0] ?? null;
   const advancedAiUnlocked = hasAdvancedAiAccess(initialBilling);
@@ -341,6 +361,36 @@ export function CRMFollowUpWorkspace({
     });
   }
 
+  function generateEmailDraft() {
+    if (!selectedLead) {
+      return;
+    }
+    setEmailStatus("Designing a follow-up email...");
+    startEmailTransition(async () => {
+      try {
+        const response = await fetch(`/api/crm/followups/${selectedLead.id}/email-draft`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            objective: emailObjective,
+            tone: emailTone,
+            length: emailLength,
+          }),
+        });
+        const body = (await response.json().catch(() => null)) as CRMEmailDraft | { error?: string } | null;
+        if (!response.ok || !body || !("subject" in body)) {
+          throw new Error((body && "error" in body && body.error) || "Unable to generate an email draft.");
+        }
+        setEmailDraft(body);
+        setEmailSubjectDraft(body.subject);
+        setEmailBodyDraft(body.body);
+        setEmailStatus("Draft ready. Tweak anything before sending.");
+      } catch (draftError) {
+        setEmailStatus(draftError instanceof Error ? draftError.message : "Unable to generate an email draft.");
+      }
+    });
+  }
+
   return (
     <>
       <BusinessProfileOnboarding
@@ -357,6 +407,13 @@ export function CRMFollowUpWorkspace({
         <MetricCard label="Overdue" value={String(overview.overdue)} tone={overview.overdue > 0 ? "critical" : "positive"} />
         <MetricCard label="High priority" value={String(overview.high_priority)} tone="neutral" />
       </section>
+
+      {overview.relationship_summary ? (
+        <section className="mt-6 grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
+          <RelationshipSignalsPanel summary={overview.relationship_summary} />
+          <WarmIntroGraphPanel summary={overview.relationship_summary} />
+        </section>
+      ) : null}
 
       <section className="mt-6 rounded-[1.75rem] border bg-white/85 p-6 shadow-sm">
         <div className="grid gap-6 xl:grid-cols-[0.92fr_1.08fr]">
@@ -559,10 +616,25 @@ export function CRMFollowUpWorkspace({
           {selectedLead ? (
             <LeadMemoryPanel
               lead={selectedLead}
+              settings={settings}
               noteDraft={noteDraft}
               onNoteDraftChange={setNoteDraft}
               onSaveNote={saveNote}
               isSavingNote={pendingId === selectedLead.id && isPending}
+              emailObjective={emailObjective}
+              emailTone={emailTone}
+              emailLength={emailLength}
+              emailDraft={emailDraft}
+              emailSubjectDraft={emailSubjectDraft}
+              emailBodyDraft={emailBodyDraft}
+              emailStatus={emailStatus}
+              isGeneratingEmail={isEmailPending}
+              onEmailObjectiveChange={setEmailObjective}
+              onEmailToneChange={setEmailTone}
+              onEmailLengthChange={setEmailLength}
+              onEmailSubjectDraftChange={setEmailSubjectDraft}
+              onEmailBodyDraftChange={setEmailBodyDraft}
+              onGenerateEmailDraft={generateEmailDraft}
             />
           ) : null}
           <AIIntakePanel
@@ -1003,17 +1075,48 @@ function ImportPreviewRowCard({
 
 function LeadMemoryPanel({
   lead,
+  settings,
   noteDraft,
   onNoteDraftChange,
   onSaveNote,
   isSavingNote,
+  emailObjective,
+  emailTone,
+  emailLength,
+  emailDraft,
+  emailSubjectDraft,
+  emailBodyDraft,
+  emailStatus,
+  isGeneratingEmail,
+  onEmailObjectiveChange,
+  onEmailToneChange,
+  onEmailLengthChange,
+  onEmailSubjectDraftChange,
+  onEmailBodyDraftChange,
+  onGenerateEmailDraft,
 }: {
   lead: CRMLeadFollowUp;
+  settings: AccountSettings | null;
   noteDraft: string;
   onNoteDraftChange: (value: string) => void;
   onSaveNote: () => void;
   isSavingNote: boolean;
+  emailObjective: CRMEmailDraft["objective"];
+  emailTone: CRMEmailDraft["tone"];
+  emailLength: CRMEmailDraft["length"];
+  emailDraft: CRMEmailDraft | null;
+  emailSubjectDraft: string;
+  emailBodyDraft: string;
+  emailStatus: string | null;
+  isGeneratingEmail: boolean;
+  onEmailObjectiveChange: (value: CRMEmailDraft["objective"]) => void;
+  onEmailToneChange: (value: CRMEmailDraft["tone"]) => void;
+  onEmailLengthChange: (value: CRMEmailDraft["length"]) => void;
+  onEmailSubjectDraftChange: (value: string) => void;
+  onEmailBodyDraftChange: (value: string) => void;
+  onGenerateEmailDraft: () => void;
 }) {
+  const launchHref = buildMailtoHref(emailSubjectDraft, emailBodyDraft);
   return (
     <section className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm">
       <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Contact Memory</p>
@@ -1026,9 +1129,145 @@ function LeadMemoryPanel({
         <TimelineTile label="Owner" value={lead.owner_name} />
       </div>
 
+      <div className="mt-4 grid gap-3 md:grid-cols-3">
+        <TimelineTile label="Last meaningful interaction" value={formatDateTime(lead.last_meaningful_interaction_at)} />
+        <TimelineTile label="Relationship health" value={`${lead.relationship_health_score}/100 · ${formatHealthLabel(lead.relationship_health_label)}`} />
+        <TimelineTile label="Dormant detection" value={lead.dormant ? "Dormant and needs a real touch" : "Still active"} />
+      </div>
+
+      {lead.referral_source_name || lead.birthday || lead.company_milestone_date || lead.relationship_reminders.length ? (
+        <section className="mt-6 rounded-[1.5rem] border bg-amber-50/70 p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">Relationship Signals</p>
+          <div className="mt-3 grid gap-3 md:grid-cols-2">
+            <TimelineTile label="Warm intro source" value={lead.referral_source_name || "No warm intro mapped yet"} />
+            <TimelineTile
+              label="Next milestone"
+              value={
+                lead.company_milestone_date
+                  ? `${lead.company_milestone_name || "Company milestone"} · ${formatDateOnly(lead.company_milestone_date)}`
+                  : lead.birthday
+                    ? `Birthday · ${formatDateOnly(lead.birthday)}`
+                    : "No milestone captured yet"
+              }
+            />
+          </div>
+          {lead.relationship_reminders.length ? (
+            <div className="mt-4 space-y-3">
+              {lead.relationship_reminders.map((reminder) => (
+                <RelationshipReminderCard key={`${reminder.kind}-${reminder.title}-${reminder.due_at ?? "none"}`} reminder={reminder} />
+              ))}
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
       <section className="mt-6 rounded-[1.5rem] border bg-slate-50 p-5">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Latest context</p>
         <p className="mt-3 text-sm leading-6 text-slate-700">{lead.notes}</p>
+      </section>
+
+      <section className="mt-6 rounded-[1.5rem] border bg-white p-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Auto Email Designer</p>
+            <h3 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">Draft the next follow-up without starting from zero.</h3>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              Brivoly uses the lead stage, next step, and your saved business profile to draft a follow-up you can edit before sending.
+            </p>
+          </div>
+          <div className="rounded-[1.2rem] border bg-slate-50 px-4 py-3 text-sm text-slate-600 lg:max-w-xs">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Brand source</p>
+            <p className="mt-2">
+              Sender: <span className="font-medium text-slate-900">{settings?.outbound_sender_name || settings?.business_name || "Fallback defaults"}</span>
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-5 grid gap-4 md:grid-cols-3">
+          <label className="block">
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Objective</span>
+            <select
+              value={emailObjective}
+              onChange={(event) => onEmailObjectiveChange(event.target.value as CRMEmailDraft["objective"])}
+              className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:bg-white"
+            >
+              <option value="follow_up">General follow-up</option>
+              <option value="recap">Send recap</option>
+              <option value="revive">Revive the thread</option>
+              <option value="close_loop">Close the loop</option>
+            </select>
+          </label>
+          <label className="block">
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Tone</span>
+            <select
+              value={emailTone}
+              onChange={(event) => onEmailToneChange(event.target.value as CRMEmailDraft["tone"])}
+              className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:bg-white"
+            >
+              <option value="warm">Warm</option>
+              <option value="direct">Direct</option>
+              <option value="confident">Confident</option>
+            </select>
+          </label>
+          <label className="block">
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Length</span>
+            <select
+              value={emailLength}
+              onChange={(event) => onEmailLengthChange(event.target.value as CRMEmailDraft["length"])}
+              className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:bg-white"
+            >
+              <option value="short">Short</option>
+              <option value="medium">Medium</option>
+            </select>
+          </label>
+        </div>
+
+        <div className="mt-5 flex flex-wrap items-center gap-3">
+          <Button onClick={onGenerateEmailDraft} disabled={isGeneratingEmail}>
+            {isGeneratingEmail ? "Designing..." : emailDraft ? "Redesign draft" : "Design email"}
+          </Button>
+          {launchHref ? (
+            <a
+              href={launchHref}
+              className="inline-flex items-center rounded-full border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-500 hover:text-slate-950"
+            >
+              Open in email app
+            </a>
+          ) : null}
+          {emailStatus ? <p className="text-sm text-slate-500">{emailStatus}</p> : null}
+        </div>
+
+        {emailDraft ? (
+          <>
+            <div className="mt-5 rounded-[1.4rem] border bg-slate-50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Why this draft</p>
+              <div className="mt-3 space-y-2">
+                {emailDraft.rationale.map((item) => (
+                  <p key={item} className="text-sm leading-6 text-slate-700">
+                    {item}
+                  </p>
+                ))}
+              </div>
+            </div>
+            <label className="mt-5 block">
+              <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Subject</span>
+              <input
+                value={emailSubjectDraft}
+                onChange={(event) => onEmailSubjectDraftChange(event.target.value)}
+                className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:bg-white"
+              />
+            </label>
+            <label className="mt-4 block">
+              <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Body</span>
+              <textarea
+                value={emailBodyDraft}
+                onChange={(event) => onEmailBodyDraftChange(event.target.value)}
+                rows={12}
+                className="mt-2 min-h-56 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 font-mono text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:bg-white"
+              />
+            </label>
+          </>
+        ) : null}
       </section>
 
       <section className="mt-6 rounded-[1.5rem] border bg-white p-5">
@@ -1067,6 +1306,82 @@ function LeadMemoryPanel({
   );
 }
 
+function RelationshipSignalsPanel({ summary }: { summary: NonNullable<CRMFollowUpOverview["relationship_summary"]> }) {
+  return (
+    <section className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm">
+      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Relationship Intelligence</p>
+      <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">See who is slipping, not just who is due.</h2>
+      <div className="mt-5 grid gap-3 md:grid-cols-3">
+        <CompactMetricLight label="Healthy" value={String(summary.healthy_count)} tone="positive" />
+        <CompactMetricLight label="Watch" value={String(summary.watch_count)} tone="warning" />
+        <CompactMetricLight label="At risk" value={String(summary.at_risk_count)} tone="critical" />
+      </div>
+      <div className="mt-4 grid gap-3 md:grid-cols-3">
+        <TimelineTile label="Dormant clients" value={String(summary.dormant_count)} />
+        <TimelineTile label="Referral reminders" value={String(summary.referral_reminder_count)} />
+        <TimelineTile label="Birthday + milestone reminders" value={String(summary.milestone_reminder_count)} />
+      </div>
+    </section>
+  );
+}
+
+function WarmIntroGraphPanel({ summary }: { summary: NonNullable<CRMFollowUpOverview["relationship_summary"]> }) {
+  return (
+    <section className="rounded-[1.75rem] border bg-slate-950 p-6 text-slate-50 shadow-[0_24px_80px_-55px_rgba(15,23,42,0.9)]">
+      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300">Warm Intro Graph</p>
+      <h2 className="mt-3 text-3xl font-semibold tracking-tight">Keep track of who can reopen a thread.</h2>
+      <p className="mt-3 text-sm leading-6 text-slate-300">
+        Brivoly maps referral-backed relationships so follow-up pressure can turn into a warmer path instead of another cold nudge.
+      </p>
+      <div className="mt-5 space-y-3">
+        {summary.warm_intro_connections.length ? (
+          summary.warm_intro_connections.map((connection) => (
+            <div key={`${connection.source_name}-${connection.target_lead_id}`} className="rounded-[1.2rem] border border-white/10 bg-white/5 px-4 py-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">{connection.source_name}</p>
+              <p className="mt-2 text-sm text-slate-200">
+                can reopen <span className="font-medium text-white">{connection.target_lead_name}</span> at {connection.target_company_name}
+              </p>
+              <p className="mt-2 text-xs text-slate-400">Owner: {connection.owner_name}</p>
+            </div>
+          ))
+        ) : (
+          <div className="rounded-[1.2rem] border border-dashed border-white/10 bg-white/5 px-4 py-4 text-sm text-slate-300">
+            No warm intro links are mapped yet. Capture referral sources on leads so Brivoly can turn them into usable paths.
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function RelationshipReminderCard({ reminder }: { reminder: CRMRelationshipReminder }) {
+  return (
+    <div className="rounded-[1.2rem] border border-amber-200 bg-white/80 px-4 py-4">
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">{formatReminderKind(reminder.kind)}</p>
+        <p className="text-xs text-slate-500">{reminder.due_at ? formatDateTime(reminder.due_at) : "No due time set"}</p>
+      </div>
+      <p className="mt-2 text-sm font-medium text-slate-900">{reminder.title}</p>
+      <p className="mt-2 text-sm leading-6 text-slate-700">{reminder.message}</p>
+    </div>
+  );
+}
+
+function buildMailtoHref(subject: string, body: string) {
+  if (!subject.trim() && !body.trim()) {
+    return null;
+  }
+  const recipientHint = "";
+  const params = new URLSearchParams();
+  if (subject.trim()) {
+    params.set("subject", subject.trim());
+  }
+  if (body.trim()) {
+    params.set("body", body.trim());
+  }
+  return `mailto:${recipientHint}?${params.toString()}`;
+}
+
 function MetricCard({ label, value, tone }: { label: string; value: string; tone: "neutral" | "warning" | "critical" | "positive" }) {
   const toneClass =
     tone === "positive"
@@ -1090,6 +1405,29 @@ function CompactMetric({ label, value }: { label: string; value: string }) {
     <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{label}</p>
       <p className="mt-2 text-xl font-semibold text-white">{value}</p>
+    </div>
+  );
+}
+
+function CompactMetricLight({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone: "positive" | "warning" | "critical";
+}) {
+  const className =
+    tone === "positive"
+      ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+      : tone === "warning"
+        ? "border-amber-200 bg-amber-50 text-amber-900"
+        : "border-rose-200 bg-rose-50 text-rose-900";
+  return (
+    <div className={`rounded-2xl border px-4 py-3 ${className}`}>
+      <p className="text-xs font-semibold uppercase tracking-[0.18em]">{label}</p>
+      <p className="mt-2 text-xl font-semibold">{value}</p>
     </div>
   );
 }
@@ -1141,6 +1479,20 @@ function formatDateTime(value: string | null) {
   }).format(date);
 }
 
+function formatDateOnly(value: string | null) {
+  if (!value) {
+    return "Not set";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+  }).format(date);
+}
+
 function formatDateTimeInputValue(value: string | null) {
   if (!value) {
     return "";
@@ -1162,6 +1514,14 @@ function formatImportFieldLabel(value: string) {
     .split("_")
     .map((part) => part.slice(0, 1).toUpperCase() + part.slice(1))
     .join(" ");
+}
+
+function formatHealthLabel(value: string) {
+  return value.replaceAll("_", " ");
+}
+
+function formatReminderKind(value: string) {
+  return value.replaceAll("_", " ");
 }
 
 function hasAdvancedAiAccess(billing: BillingOverview | null) {

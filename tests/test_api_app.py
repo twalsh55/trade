@@ -360,6 +360,11 @@ def test_crm_follow_up_overview_dto_and_use_case_sort_and_count_values() -> None
     assert payload["high_priority"] == 1
     assert payload["items"][0]["id"] == "a"
     assert payload["items"][1]["last_contacted_at"] is None
+    assert payload["items"][0]["last_meaningful_interaction_at"] == now.isoformat()
+    assert payload["items"][0]["relationship_health_score"] >= 75
+    assert payload["items"][0]["relationship_health_label"] == "healthy"
+    assert payload["relationship_summary"]["healthy_count"] == 1
+    assert payload["relationship_summary"]["watch_count"] == 1
 
 
 def test_extract_telegram_command_parses_supported_message_shapes() -> None:
@@ -1480,6 +1485,8 @@ def test_crm_followups_endpoint_requires_auth_and_returns_queue() -> None:
     assert payload["items"][0]["lead_name"] == "Amber Flores"
     assert payload["items"][0]["stage"] == "Discovery"
     assert payload["items"][0]["timeline"]
+    assert payload["items"][0]["last_meaningful_interaction_at"]
+    assert payload["relationship_summary"]["warm_intro_connections"]
 
 
 def test_crm_followups_endpoint_supports_complete_snooze_and_notes() -> None:
@@ -1551,6 +1558,50 @@ def test_crm_followups_endpoint_supports_complete_snooze_and_notes() -> None:
         json={"action": "archive"},
     )
     assert bad_action.status_code == 422
+
+
+def test_crm_followup_email_draft_endpoint_returns_designed_draft() -> None:
+    repository = InMemoryLeadFollowUpRepository(now=lambda: datetime(2024, 5, 6, 12, 30, tzinfo=UTC))
+    personalization = InMemoryPersonalizationRepository()
+    user = make_user()
+    personalization.save_dashboard_settings(
+        UserDashboardSettings(
+            user_id=user.id,
+            universe=["SPY"],
+            benchmark="SPY",
+            vix_symbol="^VIX",
+            risk_proxy="HYG",
+            short_yield_symbol="^IRX",
+            long_yield_symbol="^TNX",
+            lookback_years=4,
+            telegram_enabled=False,
+            business_name="Northstar Studio",
+            business_website="https://northstar.example",
+            outbound_sender_name="Ada from Northstar",
+            business_logo_data_url="",
+            onboarding_profile_deferred=False,
+            crm_ai_prompt="",
+            crm_preferred_import_formats=[],
+            crm_image_intake_channels=[],
+            crm_image_intake_notes="",
+        )
+    )
+    client = make_client(user=user, lead_follow_up_repository=repository, personalization_repository=personalization)
+
+    response = client.post(
+        "/api/crm/followups/lead-riverbridge/email-draft",
+        headers={"Authorization": "Bearer session-token"},
+        json={"objective": "follow_up", "tone": "warm", "length": "medium"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["follow_up_id"] == "lead-riverbridge"
+    assert payload["subject"]
+    assert "Northstar Studio" in payload["body"]
+    assert "Ada from Northstar" in payload["body"]
+    assert "Follow up on proposal review" in payload["body"]
+    assert payload["rationale"]
 
 
 def test_crm_import_preview_and_commit_endpoints_support_csv_and_google_sheets(monkeypatch) -> None:

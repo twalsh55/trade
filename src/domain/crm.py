@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 
 
 @dataclass(frozen=True)
@@ -11,6 +11,34 @@ class LeadTimelineEntry:
     kind: str
     channel: str
     summary: str
+
+
+@dataclass(frozen=True)
+class LeadRelationshipReminder:
+    kind: str
+    title: str
+    message: str
+    due_at: datetime | None
+
+
+@dataclass(frozen=True)
+class LeadWarmIntroConnection:
+    source_name: str
+    target_lead_id: str
+    target_lead_name: str
+    target_company_name: str
+    owner_name: str
+
+
+@dataclass(frozen=True)
+class LeadRelationshipSummary:
+    healthy_count: int
+    watch_count: int
+    at_risk_count: int
+    dormant_count: int
+    referral_reminder_count: int
+    milestone_reminder_count: int
+    warm_intro_connections: list[LeadWarmIntroConnection]
 
 
 @dataclass(frozen=True)
@@ -27,6 +55,15 @@ class LeadFollowUp:
     next_step: str
     notes: str
     timeline: tuple[LeadTimelineEntry, ...]
+    referral_source_name: str = ""
+    birthday: date | None = None
+    company_milestone_name: str = ""
+    company_milestone_date: date | None = None
+    last_meaningful_interaction_at: datetime | None = None
+    relationship_health_score: int = 0
+    relationship_health_label: str = ""
+    dormant: bool = False
+    relationship_reminders: tuple[LeadRelationshipReminder, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -44,6 +81,18 @@ class LeadFollowUpOverview:
     overdue: int
     high_priority: int
     items: list[LeadFollowUp]
+    relationship_summary: LeadRelationshipSummary | None = None
+
+
+@dataclass(frozen=True)
+class LeadFollowUpEmailDraft:
+    follow_up_id: str
+    objective: str
+    tone: str
+    length: str
+    subject: str
+    body: str
+    rationale: tuple[str, ...]
 
 
 @dataclass(frozen=True)

@@ -5,7 +5,10 @@ from uuid import UUID
 
 import pandas as pd
 
-from src.application.crm import AddLeadFollowUpNoteUseCase, CompleteLeadFollowUpUseCase, SnoozeLeadFollowUpUseCase
+from src.application.account import UserDashboardSettings
+from src.application.crm import AddLeadFollowUpNoteUseCase, CompleteLeadFollowUpUseCase, DesignLeadFollowUpEmailUseCase, GetLeadFollowUpOverviewUseCase, SnoozeLeadFollowUpUseCase
+from src.application.dashboard import build_default_dashboard_settings
+from src.adapters.crm.in_memory_follow_up_repository import InMemoryLeadFollowUpRepository
 from src.application.use_cases import BuildCrashDashboardUseCase
 from src.domain.auth import User
 from src.domain.models import DashboardConfig
@@ -154,3 +157,71 @@ def test_add_lead_follow_up_note_requires_non_empty_body() -> None:
         assert str(exc) == "Note body is required."
     else:
         raise AssertionError("Expected ValueError for empty note")
+
+
+def test_design_lead_follow_up_email_uses_lead_context_and_business_profile() -> None:
+    now = datetime(2024, 5, 6, 12, 30, tzinfo=UTC)
+    repository = InMemoryLeadFollowUpRepository(now=lambda: now)
+    user = make_user()
+    settings = build_default_dashboard_settings(user.id, telegram_enabled=False)
+    settings = UserDashboardSettings(
+        user_id=settings.user_id,
+        universe=settings.universe,
+        benchmark=settings.benchmark,
+        vix_symbol=settings.vix_symbol,
+        risk_proxy=settings.risk_proxy,
+        short_yield_symbol=settings.short_yield_symbol,
+        long_yield_symbol=settings.long_yield_symbol,
+        lookback_years=settings.lookback_years,
+        telegram_enabled=settings.telegram_enabled,
+        business_name="Northstar Studio",
+        business_website="https://northstar.example",
+        outbound_sender_name="Ada from Northstar",
+        business_logo_data_url=settings.business_logo_data_url,
+        onboarding_profile_deferred=settings.onboarding_profile_deferred,
+        crm_ai_prompt=settings.crm_ai_prompt,
+        crm_preferred_import_formats=settings.crm_preferred_import_formats,
+        crm_image_intake_channels=settings.crm_image_intake_channels,
+        crm_image_intake_notes=settings.crm_image_intake_notes,
+    )
+
+    draft = DesignLeadFollowUpEmailUseCase(
+        repository=repository,
+        settings_loader=lambda authenticated_user: settings,
+    ).execute(
+        user,
+        "lead-riverbridge",
+        objective="follow_up",
+        tone="warm",
+        length="medium",
+    )
+
+    assert draft.follow_up_id == "lead-riverbridge"
+    assert "proposal" in draft.subject.lower()
+    assert "Northstar Studio" in draft.body
+    assert "Follow up on proposal review" in draft.body
+    assert "Ada from Northstar" in draft.body
+    assert draft.rationale
+
+
+def test_follow_up_overview_enriches_relationship_intelligence() -> None:
+    now = datetime(2024, 5, 17, 12, 30, tzinfo=UTC)
+    repository = InMemoryLeadFollowUpRepository(now=lambda: now)
+    overview = GetLeadFollowUpOverviewUseCase(repository=repository, now=lambda: now).execute(make_user())
+
+    amber = next(item for item in overview.items if item.id == "lead-amber-studio")
+    lattice = next(item for item in overview.items if item.id == "lead-lattice")
+    cedar = next(item for item in overview.items if item.id == "lead-cedar")
+
+    assert lattice.last_meaningful_interaction_at is not None
+    assert lattice.referral_source_name == "Nina at Harbor Circle"
+    assert any(reminder.kind == "referral" for reminder in amber.relationship_reminders)
+    assert any(reminder.kind == "birthday" for reminder in lattice.relationship_reminders)
+    assert cedar.dormant is True
+    assert cedar.relationship_health_label in {"watch", "at_risk"}
+    assert cedar.relationship_health_score < 75
+    assert overview.relationship_summary is not None
+    assert overview.relationship_summary.dormant_count >= 1
+    assert overview.relationship_summary.referral_reminder_count >= 1
+    assert overview.relationship_summary.milestone_reminder_count >= 1
+    assert overview.relationship_summary.warm_intro_connections
