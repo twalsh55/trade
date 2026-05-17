@@ -195,7 +195,7 @@ cd web && npm run e2e
   - add fast timeline summaries for `last 30 days`, `meeting prep`, and `what changed recently`, especially for mobile context recovery
   - make AI feel invisible by surfacing memory and suggestions exactly where users hesitate, instead of adding dedicated AI surfaces
   - make dropzones feel more like lightweight client handoff pages and less like intake tooling
-  - deeper AI-assisted messy file / image intake behind the paid gate
+  - deeper AI-assisted messy file / image intake
   - richer stage memory / handoff history
   - spreadsheet cleanup and field-mapping controls after preview
   - consultant / agency templates
