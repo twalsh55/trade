@@ -218,7 +218,7 @@ export function DashboardWorkspace({ initialDashboard, settings, bootstrap }: Da
             <InfoTile label="Universe size" value={String(filters.universe.length)} />
           </div>
 
-          <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <div className="mt-6 grid gap-3 md:grid-cols-2">
             <InfoTile label="252D Drawdown" value={formatMetricPercent(metrics.drawdown_252)} />
             <InfoTile label="20D Vol (Ann.)" value={formatMetricPercent(metrics.vol20)} />
             <InfoTile label="Breadth >200D" value={formatMetricPercent(metrics.breadth_ratio)} />

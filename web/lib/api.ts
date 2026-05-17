@@ -198,7 +198,7 @@ export async function generateCrmFollowUpEmailDraft(
   options: ApiRequestOptions = {},
 ): Promise<CRMEmailDraft> {
   return apiRequest<CRMEmailDraft>(
-    `/api/crm/followups/email-draft/${followUpId}`,
+    `/api/crm/followups/${followUpId}/email-draft`,
     {
       method: "POST",
       body: JSON.stringify(payload),

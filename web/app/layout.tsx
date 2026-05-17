@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { IBM_Plex_Mono, Manrope, Space_Grotesk } from "next/font/google";
 import type { ReactNode } from "react";
 
+import { SiteConstructionBanner } from "@/components/site-construction-banner";
+
 import "./globals.css";
 
 const manrope = Manrope({
@@ -37,6 +39,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${manrope.variable} ${spaceGrotesk.variable} ${ibmPlexMono.variable} antialiased`}>
+        <SiteConstructionBanner />
         {children}
       </body>
     </html>

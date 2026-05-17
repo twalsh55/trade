@@ -105,6 +105,7 @@ export function CRMFollowUpWorkspace({
   const [isEmailPending, startEmailTransition] = useTransition();
   const [isInboxPending, startInboxTransition] = useTransition();
   const [queuedTodayDraft, setQueuedTodayDraft] = useState<{ leadId: string; preset: TodayDraftPreset } | null>(null);
+  const [draftFocusToken, setDraftFocusToken] = useState(0);
 
   useEffect(() => {
     if (!selectedLeadId && initialOverview.items[0]) {
@@ -134,12 +135,12 @@ export function CRMFollowUpWorkspace({
   const intakeTask = resolveIntakeTask(pathname ?? "/clientos/intake");
 
   useEffect(() => {
-    if (!queuedTodayDraft || !selectedLead || selectedLead.id !== queuedTodayDraft.leadId) {
+    if (view !== "followups" || !queuedTodayDraft || !selectedLead || selectedLead.id !== queuedTodayDraft.leadId) {
       return;
     }
     generateEmailDraftForLead(selectedLead, queuedTodayDraft.preset);
     setQueuedTodayDraft(null);
-  }, [queuedTodayDraft, selectedLead]);
+  }, [queuedTodayDraft, selectedLead, view]);
 
   useEffect(() => {
     setAiPromptDraft(initialSettings?.crm_ai_prompt ?? "");
@@ -521,12 +522,23 @@ export function CRMFollowUpWorkspace({
     generateEmailDraftForLead(lead, overrides);
   }
 
-  function runTodayPriorityAction(leadId: string, route: string, preset?: TodayDraftPreset) {
+  function focusLeadForFollowUp(leadId: string) {
+    setRelationshipQuery("");
+    setRelationshipFilter("all");
     setSelectedLeadId(leadId);
-    router.push(route);
+  }
+
+  function requestDraftFocus() {
+    setDraftFocusToken((value) => value + 1);
+  }
+
+  function runTodayPriorityAction(leadId: string, route: string, preset?: TodayDraftPreset) {
+    focusLeadForFollowUp(leadId);
     if (preset) {
+      requestDraftFocus();
       setQueuedTodayDraft({ leadId, preset });
     }
+    router.push(route);
   }
 
   function syncInboxThread() {
@@ -876,6 +888,7 @@ export function CRMFollowUpWorkspace({
               emailBodyDraft={emailBodyDraft}
               emailStatus={emailStatus}
               isGeneratingEmail={isEmailPending}
+              draftFocusToken={draftFocusToken}
               onEmailObjectiveChange={setEmailObjective}
               onEmailToneChange={setEmailTone}
               onEmailLengthChange={setEmailLength}
@@ -906,7 +919,7 @@ export function CRMFollowUpWorkspace({
               Brivoly turns email activity into living relationship memory: it matches contacts by email, creates missing contacts automatically, and keeps the right conversation attached to the right person.
             </p>
 
-            <div className="mt-6 grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
+            <div className="mt-6 grid gap-4 md:grid-cols-2">
               <CompactMetricLight label="Reply soon" value={String(overview.inbox_summary?.needs_reply_count ?? 0)} tone="critical" />
               <CompactMetricLight label="Waiting on them" value={String(overview.inbox_summary?.waiting_on_contact_count ?? 0)} tone="warning" />
               <CompactMetricLight label="Quiet threads" value={String(overview.inbox_summary?.stale_thread_count ?? 0)} tone="neutral" />
@@ -964,11 +977,10 @@ export function CRMFollowUpWorkspace({
             selectedLeadId={selectedLead?.id ?? null}
             onSelectLead={setSelectedLeadId}
             onDraftAction={(leadId, draft) => {
-              setSelectedLeadId(leadId);
+              focusLeadForFollowUp(leadId);
+              requestDraftFocus();
+              setQueuedTodayDraft({ leadId, preset: draft });
               void router.push("/clientos/follow-ups");
-              startTransition(() => {
-                setQueuedTodayDraft({ leadId, preset: draft });
-              });
             }}
             inboxQuery={inboxQuery}
             inboxFilter={inboxFilter}
@@ -1834,7 +1846,7 @@ function InboxThreadCard({
             </div>
           </div>
         </div>
-        <div className="mt-4 grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
+        <div className="mt-4 grid gap-3 lg:grid-cols-2">
           <TimelineTile label="Brivoly read" value={thread.next_touch_hint} />
           <TimelineTile label="Open loop" value={thread.open_loop} />
           <TimelineTile label="What changed" value={thread.recent_change_hint} />
@@ -2167,7 +2179,7 @@ function IntakeTaskHub({
   const normalizedChannels = normalizeDisplayChannels(preferredChannels);
 
   return (
-    <section className="grid gap-6 md:grid-cols-2 2xl:grid-cols-3">
+    <section className="grid gap-6 md:grid-cols-2">
       <TaskSummaryCard
         href="/clientos/intake/profile"
         eyebrow="Step 1"
@@ -2468,7 +2480,7 @@ function ImportPreviewPanel({
     <section className="rounded-[1.4rem] border bg-slate-950 p-6 text-slate-50 shadow-[0_24px_80px_-55px_rgba(15,23,42,0.9)]">
       <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300">Preview</p>
       <h3 className="mt-3 text-2xl font-semibold tracking-tight">{preview.source_label} import check</h3>
-      <div className="mt-5 grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
+      <div className="mt-5 grid gap-3 md:grid-cols-2">
         <CompactMetric label="Rows" value={String(preview.total_rows)} />
         <CompactMetric label="Importable" value={String(preview.importable_rows)} />
         <CompactMetric label="Skipped" value={String(preview.duplicate_rows + preview.invalid_rows)} />
@@ -2659,7 +2671,7 @@ function ImportPreviewRowCard({
           <p className="mt-2 text-sm text-slate-200">{formatDateTime(row.next_follow_up_at)}</p>
         </div>
       </div>
-      <div className="mt-3 grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
+      <div className="mt-3 grid gap-3 md:grid-cols-2">
         <TimelineTileDark label="Priority" value={row.priority ? `${row.priority} priority` : "Auto after import"} />
         <TimelineTileDark label="Channel" value={row.contact_channel || "Spreadsheet default"} />
         <TimelineTileDark label="Next step" value={row.next_step || "Brivoly will draft a default follow-up task"} />
@@ -2712,6 +2724,7 @@ function LeadMemoryPanel({
   emailBodyDraft,
   emailStatus,
   isGeneratingEmail,
+  draftFocusToken,
   onEmailObjectiveChange,
   onEmailToneChange,
   onEmailLengthChange,
@@ -2733,6 +2746,7 @@ function LeadMemoryPanel({
   emailBodyDraft: string;
   emailStatus: string | null;
   isGeneratingEmail: boolean;
+  draftFocusToken: number;
   onEmailObjectiveChange: (value: CRMEmailDraft["objective"]) => void;
   onEmailToneChange: (value: CRMEmailDraft["tone"]) => void;
   onEmailLengthChange: (value: CRMEmailDraft["length"]) => void;
@@ -2747,6 +2761,7 @@ function LeadMemoryPanel({
 }) {
   const launchHref = buildMailtoHref(emailSubjectDraft, emailBodyDraft);
   const suggestedResponses = buildSuggestedResponsePresets(lead);
+  const composerSectionRef = useRef<HTMLElement | null>(null);
   const [memoryView, setMemoryView] = useState<"overview" | "last_30_days" | "meeting_prep" | "recent_changes" | "recent_upload">("overview");
   const memoryPanels = [
     { value: "overview" as const, label: "What matters", body: lead.relationship_context_summary || lead.notes || "No summary yet." },
@@ -2764,19 +2779,27 @@ function LeadMemoryPanel({
       : []),
   ];
   const activeMemoryPanel = memoryPanels.find((item) => item.value === memoryView) ?? memoryPanels[0];
+
+  useEffect(() => {
+    if (!draftFocusToken) {
+      return;
+    }
+    composerSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [draftFocusToken, lead.id]);
+
   return (
     <section className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm">
       <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Relationship memory</p>
       <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">{lead.lead_name}</h2>
       <p className="mt-1 text-sm text-slate-600">{lead.company_name}</p>
 
-      <div className="mt-5 grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
+      <div className="mt-5 grid gap-3 md:grid-cols-2">
         <TimelineTile label="Where it stands" value={formatStageLabel(lead.stage)} />
         <TimelineTile label="Best channel" value={lead.contact_channel} />
         <TimelineTile label="Point person" value={lead.owner_name} />
       </div>
 
-      <div className="mt-4 grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
+      <div className="mt-4 grid gap-3 md:grid-cols-2">
         <TimelineTile label="Last meaningful interaction" value={formatDateTime(lead.last_meaningful_interaction_at)} />
         <TimelineTile label="Relationship state" value={formatRelationshipState(lead.relationship_state)} />
         <TimelineTile
@@ -2811,7 +2834,7 @@ function LeadMemoryPanel({
               </Button>
             </div>
           </div>
-          <div className="mt-4 grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
+          <div className="mt-4 grid gap-3 lg:grid-cols-2">
             <TimelineTile label="Why now" value={lead.relationship_reconnect_why_now || lead.relationship_timing_nudge || "Brivoly is keeping a reconnect path ready."} />
             <TimelineTile label="Why it can still land" value={describeReconnectWindow(lead)} />
             <TimelineTile label="Best re-entry" value={lead.relationship_reconnect_next_move || lead.next_step} />
@@ -2887,7 +2910,7 @@ function LeadMemoryPanel({
         ) : null}
       </section>
 
-      <section className="mt-6 rounded-[1.5rem] border bg-white p-5">
+      <section ref={composerSectionRef} className="mt-6 rounded-[1.5rem] border bg-white p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <p className="ui-eyebrow">Suggested next note</p>
@@ -2928,7 +2951,7 @@ function LeadMemoryPanel({
           <p className="mt-3 text-xs text-slate-500">Pick the message shape that fits this moment, then edit before sending.</p>
         </div>
 
-        <div className="mt-5 grid gap-4 md:grid-cols-3">
+        <div className="mt-5 grid gap-4 xl:grid-cols-3">
           <label className="block">
             <span className="ui-eyebrow">Objective</span>
             <select
