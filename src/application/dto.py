@@ -297,6 +297,8 @@ class LeadAmbientMemorySummaryDTO:
     warm_calendar_count: int
     suggested_action_label: str
     suggested_action_route: str
+    warm_source_labels: list[str]
+    quiet_source_labels: list[str]
     attention_source_labels: list[str]
     paused_source_labels: list[str]
 
@@ -801,6 +803,8 @@ def build_lead_ambient_memory_summary_dto(summary: LeadAmbientMemorySummary | No
         warm_calendar_count=summary.warm_calendar_count,
         suggested_action_label=summary.suggested_action_label,
         suggested_action_route=summary.suggested_action_route,
+        warm_source_labels=list(summary.warm_source_labels),
+        quiet_source_labels=list(summary.quiet_source_labels),
         attention_source_labels=list(summary.attention_source_labels),
         paused_source_labels=list(summary.paused_source_labels),
     )

@@ -2060,6 +2060,24 @@ function TodayPrioritiesPanel({
       </p>
       <p className="mt-3 text-sm font-medium text-slate-700">Start with one relationship and one next move. Brivoly will hold the rest.</p>
       <p className="mt-2 text-sm leading-6 text-slate-600">{memoryCoverageLine}</p>
+      {ambientMemorySummary?.warm_source_labels?.length ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {ambientMemorySummary.warm_source_labels.map((label) => (
+            <span key={`warm-${label}`} className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800">
+              Warm: {label}
+            </span>
+          ))}
+        </div>
+      ) : null}
+      {ambientMemorySummary?.quiet_source_labels?.length ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {ambientMemorySummary.quiet_source_labels.map((label) => (
+            <span key={`quiet-${label}`} className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-medium text-sky-800">
+              Quiet: {label}
+            </span>
+          ))}
+        </div>
+      ) : null}
       {ambientMemorySummary?.attention_source_labels?.length ? (
         <div className="mt-3 flex flex-wrap gap-2">
           {ambientMemorySummary.attention_source_labels.map((label) => (
@@ -2323,6 +2341,24 @@ function PipelineBoardPanel({
             This page is for quiet threads, overdue replies, and gentle re-entry moments. The goal is continuity and warmth, not system-heavy tracking.
           </p>
           <p className="mt-3 text-sm leading-6 text-slate-600">{memoryCoverageLine}</p>
+          {ambientMemorySummary?.warm_source_labels?.length ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {ambientMemorySummary.warm_source_labels.map((label) => (
+                <span key={`warm-${label}`} className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800">
+                  Warm: {label}
+                </span>
+              ))}
+            </div>
+          ) : null}
+          {ambientMemorySummary?.quiet_source_labels?.length ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {ambientMemorySummary.quiet_source_labels.map((label) => (
+                <span key={`quiet-${label}`} className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-medium text-sky-800">
+                  Quiet: {label}
+                </span>
+              ))}
+            </div>
+          ) : null}
           {ambientMemorySummary?.attention_source_labels?.length ? (
             <div className="mt-3 flex flex-wrap gap-2">
               {ambientMemorySummary.attention_source_labels.map((label) => (

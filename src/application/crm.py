@@ -946,46 +946,101 @@ def _build_ambient_memory_summary(
     mailbox_connections: list[MailboxConnection],
     calendar_connections: list[CalendarConnection],
 ) -> LeadAmbientMemorySummary:
+    active_mailboxes = [
+        item for item in mailbox_connections if item.background_sync_enabled and item.status == "connected"
+    ]
+    active_calendars = [
+        item for item in calendar_connections if item.background_sync_enabled and item.status == "connected"
+    ]
+    paused_mailboxes = [item for item in mailbox_connections if not item.background_sync_enabled]
+    paused_calendars = [item for item in calendar_connections if not item.background_sync_enabled]
+    attention_mailboxes = [
+        item for item in mailbox_connections if item.reauth_required or item.status in {"attention_needed", "needs_reauth"}
+    ]
+    attention_calendars = [item for item in calendar_connections if item.status not in {"", "connected"}]
+    event_ready_mailboxes = [
+        item
+        for item in active_mailboxes
+        if item.watch_status == "active" and item.last_watch_event_at is not None
+    ]
+    quiet_mailboxes = [
+        item
+        for item in active_mailboxes
+        if item.last_sync_at is not None and not (item.watch_status == "active" and item.last_watch_event_at is not None)
+    ]
+    warm_calendars = [
+        item for item in active_calendars if item.last_event_ingested_at is not None
+    ]
+    quiet_calendars = [
+        item
+        for item in active_calendars
+        if item.last_sync_at is not None and item.last_event_ingested_at is None
+    ]
+    warm_source_labels = tuple(
+        [
+            *[_format_mailbox_source_label(item) for item in event_ready_mailboxes],
+            *[_format_calendar_source_label(item) for item in warm_calendars],
+        ][:4]
+    )
+    quiet_source_labels = tuple(
+        [
+            *[_format_mailbox_source_label(item) for item in quiet_mailboxes],
+            *[_format_calendar_source_label(item) for item in quiet_calendars],
+        ][:4]
+    )
     attention_source_labels = tuple(
         [
-            *[
-                _format_mailbox_source_label(item)
-                for item in mailbox_connections
-                if item.reauth_required or item.status in {"attention_needed", "needs_reauth"}
-            ],
-            *[
-                _format_calendar_source_label(item)
-                for item in calendar_connections
-                if item.status not in {"", "connected"}
-            ],
+            *[_format_mailbox_source_label(item) for item in attention_mailboxes],
+            *[_format_calendar_source_label(item) for item in attention_calendars],
         ][:4]
     )
     paused_source_labels = tuple(
         [
-            *[_format_mailbox_source_label(item) for item in mailbox_connections if not item.background_sync_enabled],
-            *[_format_calendar_source_label(item) for item in calendar_connections if not item.background_sync_enabled],
+            *[_format_mailbox_source_label(item) for item in paused_mailboxes],
+            *[_format_calendar_source_label(item) for item in paused_calendars],
         ][:4]
     )
-    active_mailbox_count = sum(1 for item in mailbox_connections if item.background_sync_enabled and item.status == "connected")
-    paused_mailbox_count = sum(1 for item in mailbox_connections if not item.background_sync_enabled)
-    attention_mailbox_count = sum(1 for item in mailbox_connections if item.reauth_required or item.status in {"attention_needed", "needs_reauth"})
-    event_ready_mailbox_count = sum(
-        1
-        for item in mailbox_connections
-        if item.background_sync_enabled and item.status == "connected" and item.watch_status == "active" and item.last_watch_event_at is not None
-    )
-    active_calendar_count = sum(1 for item in calendar_connections if item.background_sync_enabled and item.status == "connected")
-    paused_calendar_count = sum(1 for item in calendar_connections if not item.background_sync_enabled)
-    attention_calendar_count = sum(1 for item in calendar_connections if item.status not in {"", "connected"})
-    warm_calendar_count = sum(
-        1
-        for item in calendar_connections
-        if item.background_sync_enabled and item.status == "connected" and item.last_event_ingested_at is not None
-    )
+    active_mailbox_count = len(active_mailboxes)
+    paused_mailbox_count = len(paused_mailboxes)
+    attention_mailbox_count = len(attention_mailboxes)
+    event_ready_mailbox_count = len(event_ready_mailboxes)
+    active_calendar_count = len(active_calendars)
+    paused_calendar_count = len(paused_calendars)
+    attention_calendar_count = len(attention_calendars)
+    warm_calendar_count = len(warm_calendars)
 
     active_memory_count = active_mailbox_count + active_calendar_count
     paused_memory_count = paused_mailbox_count + paused_calendar_count
     attention_count = attention_mailbox_count + attention_calendar_count
+
+    suggested_action_route = "/clientos/inbox"
+    if active_mailbox_count and not active_calendar_count:
+        waiting_action_label = "Open inbox"
+    elif active_calendar_count and not active_mailbox_count:
+        waiting_action_label = "Check meeting context"
+    else:
+        waiting_action_label = "Open inbox"
+
+    if paused_mailbox_count and not paused_calendar_count:
+        paused_action_label = "Resume inbox memory"
+    elif paused_calendar_count and not paused_mailbox_count:
+        paused_action_label = "Resume meeting memory"
+    else:
+        paused_action_label = "Resume memory"
+
+    if attention_mailbox_count and not attention_calendar_count:
+        attention_action_label = "Check inboxes"
+    elif attention_calendar_count and not attention_mailbox_count:
+        attention_action_label = "Check calendars"
+    else:
+        attention_action_label = "Check connections"
+
+    if active_mailbox_count and not active_calendar_count:
+        disconnected_action_label = "Connect an inbox"
+    elif active_calendar_count and not active_mailbox_count:
+        disconnected_action_label = "Connect a calendar"
+    else:
+        disconnected_action_label = "Connect one source"
 
     if attention_count:
         continuity_state = "attention_needed"
@@ -995,8 +1050,7 @@ def _build_ambient_memory_summary(
             if active_memory_count
             else f"{attention_count} connection{'s' if attention_count != 1 else ''} need attention before Brivoly can hold relationship memory quietly again."
         )
-        suggested_action_label = "Check connections"
-        suggested_action_route = "/clientos/inbox"
+        suggested_action_label = attention_action_label
     elif event_ready_mailbox_count or warm_calendar_count:
         continuity_state = "warm"
         continuity_summary = (
@@ -1011,21 +1065,18 @@ def _build_ambient_memory_summary(
             f"Background memory is on across {active_mailbox_count} inbox{'es' if active_mailbox_count != 1 else ''} "
             f"and {active_calendar_count} calendar{'s' if active_calendar_count != 1 else ''}, and Brivoly is waiting for the next live context to land."
         )
-        suggested_action_label = "Open inbox"
-        suggested_action_route = "/clientos/inbox"
+        suggested_action_label = waiting_action_label
     elif paused_memory_count:
         continuity_state = "paused"
         continuity_summary = (
             f"Background memory is paused on {paused_mailbox_count} inbox{'es' if paused_mailbox_count != 1 else ''} "
             f"and {paused_calendar_count} calendar{'s' if paused_calendar_count != 1 else ''}. Resume one if you want quieter continuity."
         )
-        suggested_action_label = "Resume memory"
-        suggested_action_route = "/clientos/inbox"
+        suggested_action_label = paused_action_label
     else:
         continuity_state = "disconnected"
         continuity_summary = "Connect an inbox or calendar once and Brivoly can keep more of this context warm for you."
-        suggested_action_label = "Connect one source"
-        suggested_action_route = "/clientos/inbox"
+        suggested_action_label = disconnected_action_label
 
     return LeadAmbientMemorySummary(
         continuity_state=continuity_state,
@@ -1040,6 +1091,8 @@ def _build_ambient_memory_summary(
         warm_calendar_count=warm_calendar_count,
         suggested_action_label=suggested_action_label,
         suggested_action_route=suggested_action_route,
+        warm_source_labels=warm_source_labels,
+        quiet_source_labels=quiet_source_labels,
         attention_source_labels=attention_source_labels,
         paused_source_labels=paused_source_labels,
     )

@@ -231,6 +231,8 @@ export type CRMAmbientMemorySummary = {
   warm_calendar_count: number;
   suggested_action_label: string;
   suggested_action_route: string;
+  warm_source_labels: string[];
+  quiet_source_labels: string[];
   attention_source_labels: string[];
   paused_source_labels: string[];
 };
