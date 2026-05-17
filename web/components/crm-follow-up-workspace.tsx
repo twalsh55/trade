@@ -2060,6 +2060,17 @@ function TodayPrioritiesPanel({
       </p>
       <p className="mt-3 text-sm font-medium text-slate-700">Start with one relationship and one next move. Brivoly will hold the rest.</p>
       <p className="mt-2 text-sm leading-6 text-slate-600">{memoryCoverageLine}</p>
+      {ambientMemorySummary?.suggested_action_label && ambientMemorySummary.suggested_action_route ? (
+        <div className="mt-3">
+          <button
+            type="button"
+            onClick={() => window.location.assign(ambientMemorySummary.suggested_action_route)}
+            className="rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-700 transition hover:border-slate-400 hover:bg-white hover:text-slate-950"
+          >
+            {ambientMemorySummary.suggested_action_label}
+          </button>
+        </div>
+      ) : null}
       <div className="mt-4 flex flex-wrap gap-2">
         {visiblePriorities.slice(0, 2).map((item) => (
           <button
@@ -2295,6 +2306,17 @@ function PipelineBoardPanel({
             This page is for quiet threads, overdue replies, and gentle re-entry moments. The goal is continuity and warmth, not system-heavy tracking.
           </p>
           <p className="mt-3 text-sm leading-6 text-slate-600">{memoryCoverageLine}</p>
+          {ambientMemorySummary?.suggested_action_label && ambientMemorySummary.suggested_action_route ? (
+            <div className="mt-3">
+              <button
+                type="button"
+                onClick={() => window.location.assign(ambientMemorySummary.suggested_action_route)}
+                className="rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-700 transition hover:border-slate-400 hover:bg-white hover:text-slate-950"
+              >
+                {ambientMemorySummary.suggested_action_label}
+              </button>
+            </div>
+          ) : null}
         </div>
         <div className="rounded-[1.2rem] border bg-slate-50/80 px-4 py-4 lg:max-w-sm">
           <p className="text-sm leading-6 text-slate-700">

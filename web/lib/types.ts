@@ -229,6 +229,8 @@ export type CRMAmbientMemorySummary = {
   paused_calendar_count: number;
   attention_calendar_count: number;
   warm_calendar_count: number;
+  suggested_action_label: string;
+  suggested_action_route: string;
 };
 
 export type CRMMailboxConnection = {

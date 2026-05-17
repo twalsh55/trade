@@ -105,6 +105,8 @@ class LeadAmbientMemorySummary:
     paused_calendar_count: int
     attention_calendar_count: int
     warm_calendar_count: int
+    suggested_action_label: str = ""
+    suggested_action_route: str = ""
 
 
 @dataclass(frozen=True)

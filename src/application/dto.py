@@ -295,6 +295,8 @@ class LeadAmbientMemorySummaryDTO:
     paused_calendar_count: int
     attention_calendar_count: int
     warm_calendar_count: int
+    suggested_action_label: str
+    suggested_action_route: str
 
 
 @dataclass(frozen=True)
@@ -795,6 +797,8 @@ def build_lead_ambient_memory_summary_dto(summary: LeadAmbientMemorySummary | No
         paused_calendar_count=summary.paused_calendar_count,
         attention_calendar_count=summary.attention_calendar_count,
         warm_calendar_count=summary.warm_calendar_count,
+        suggested_action_label=summary.suggested_action_label,
+        suggested_action_route=summary.suggested_action_route,
     )
 
 

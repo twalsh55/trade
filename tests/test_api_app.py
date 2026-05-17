@@ -1122,6 +1122,11 @@ def test_crm_calendar_connect_event_ingest_and_delete_endpoints_manage_meeting_m
     assert list_response.json()["items"][0]["last_event_ingested_at"] is not None
     assert list_response.json()["items"][0]["health_note"] == ""
     assert list_response.json()["items"][0]["continuity_state"] == "warm"
+    overview_response = client.get("/api/crm/followups", headers={"Authorization": "Bearer session-token"})
+    assert overview_response.status_code == 200
+    assert overview_response.json()["ambient_memory_summary"]["continuity_state"] in {"warm", "waiting", "attention_needed", "paused", "disconnected"}
+    assert "suggested_action_label" in overview_response.json()["ambient_memory_summary"]
+    assert "suggested_action_route" in overview_response.json()["ambient_memory_summary"]
 
     pause_response = client.patch(
         f"/api/crm/calendars/{connection['id']}",

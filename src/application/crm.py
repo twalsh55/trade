@@ -975,27 +975,37 @@ def _build_ambient_memory_summary(
             if active_memory_count
             else f"{attention_count} connection{'s' if attention_count != 1 else ''} need attention before Brivoly can hold relationship memory quietly again."
         )
+        suggested_action_label = "Check connections"
+        suggested_action_route = "/clientos/inbox"
     elif event_ready_mailbox_count or warm_calendar_count:
         continuity_state = "warm"
         continuity_summary = (
             f"Brivoly is quietly holding fresh context from {event_ready_mailbox_count} event-ready inbox{'es' if event_ready_mailbox_count != 1 else ''} "
             f"and {warm_calendar_count} warm calendar{'s' if warm_calendar_count != 1 else ''}."
         )
+        suggested_action_label = ""
+        suggested_action_route = ""
     elif active_memory_count:
         continuity_state = "waiting"
         continuity_summary = (
             f"Background memory is on across {active_mailbox_count} inbox{'es' if active_mailbox_count != 1 else ''} "
             f"and {active_calendar_count} calendar{'s' if active_calendar_count != 1 else ''}, and Brivoly is waiting for the next live context to land."
         )
+        suggested_action_label = "Open inbox"
+        suggested_action_route = "/clientos/inbox"
     elif paused_memory_count:
         continuity_state = "paused"
         continuity_summary = (
             f"Background memory is paused on {paused_mailbox_count} inbox{'es' if paused_mailbox_count != 1 else ''} "
             f"and {paused_calendar_count} calendar{'s' if paused_calendar_count != 1 else ''}. Resume one if you want quieter continuity."
         )
+        suggested_action_label = "Resume memory"
+        suggested_action_route = "/clientos/inbox"
     else:
         continuity_state = "disconnected"
         continuity_summary = "Connect an inbox or calendar once and Brivoly can keep more of this context warm for you."
+        suggested_action_label = "Connect one source"
+        suggested_action_route = "/clientos/inbox"
 
     return LeadAmbientMemorySummary(
         continuity_state=continuity_state,
@@ -1008,6 +1018,8 @@ def _build_ambient_memory_summary(
         paused_calendar_count=paused_calendar_count,
         attention_calendar_count=attention_calendar_count,
         warm_calendar_count=warm_calendar_count,
+        suggested_action_label=suggested_action_label,
+        suggested_action_route=suggested_action_route,
     )
 
 
