@@ -15,13 +15,13 @@ export function IntakeMagicLinkUpload({ token }: { token: string }) {
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!file) {
-      setState({ kind: "error", message: "Choose a note image before uploading." });
+      setState({ kind: "error", message: "Choose a screenshot or note image before sending it." });
       return;
     }
 
     const payload = new FormData();
     payload.set("file", file, file.name);
-    setState({ kind: "submitting", message: "Uploading your note image into Brivoly..." });
+    setState({ kind: "submitting", message: "Sending your update..." });
 
     const response = await fetch(`/api/intake/${encodeURIComponent(token)}`, {
       method: "POST",
@@ -32,7 +32,7 @@ export function IntakeMagicLinkUpload({ token }: { token: string }) {
       | null;
 
     if (!response.ok) {
-      setState({ kind: "error", message: body?.error || "Unable to import this note image right now." });
+      setState({ kind: "error", message: body?.error || "Unable to send this update right now." });
       return;
     }
 
@@ -48,15 +48,20 @@ export function IntakeMagicLinkUpload({ token }: { token: string }) {
     }
     setState({
       kind: "success",
-      message: body?.message ? `${body.message} ${details.join(" · ")}.` : `Brivoly imported your note image. ${details.join(" · ")}.`,
+      message: body?.message ? `${body.message} ${details.join(" · ")}.` : `Your update was sent. ${details.join(" · ")}.`,
     });
   }
 
   return (
     <form onSubmit={handleSubmit} className="mt-6 space-y-4 rounded-[1.75rem] border bg-white/92 p-6 shadow-sm">
+      <div className="rounded-[1.3rem] border bg-slate-50 px-4 py-4 text-sm leading-6 text-slate-700">
+        <p className="font-medium text-slate-900">No login is needed.</p>
+        <p className="mt-1">This works well for quick screenshots, whiteboard photos, handwritten notes, and other visual updates from your phone.</p>
+      </div>
+
       <div>
         <label htmlFor="intake-file" className="text-sm font-medium text-slate-900">
-          Note image
+          Screenshot or note image
         </label>
         <input
           id="intake-file"
@@ -75,7 +80,7 @@ export function IntakeMagicLinkUpload({ token }: { token: string }) {
         disabled={state.kind === "submitting"}
         className="inline-flex items-center rounded-full bg-slate-950 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {state.kind === "submitting" ? "Importing..." : "Upload into CRM"}
+        {state.kind === "submitting" ? "Sending..." : "Send update"}
       </button>
 
       {state.message ? (

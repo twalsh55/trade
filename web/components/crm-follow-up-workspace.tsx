@@ -1489,13 +1489,30 @@ function RemoteImageCapturePanel({
   routingNotes: string;
 }) {
   const normalizedChannels = normalizeDisplayChannels(preferredChannels);
+  const [shareStatus, setShareStatus] = useState<string | null>(null);
+  const shareLink = intakeChannel?.magic_link_url ?? "";
+  const shareMessage = shareLink
+    ? `Send any screenshot, whiteboard photo, or handwritten note here whenever you have an update: ${shareLink}`
+    : "";
+
+  async function copyText(value: string, successMessage: string) {
+    if (!value) {
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(value);
+      setShareStatus(successMessage);
+    } catch {
+      setShareStatus("Copy did not work in this browser. You can still copy the link manually.");
+    }
+  }
 
   return (
     <section className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm">
       <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Client Dropzones</p>
-      <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Share a no-login upload link with clients.</h2>
+      <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Give clients an easy place to send updates.</h2>
       <p className="mt-3 text-sm leading-6 text-slate-600">
-        Brivoly gives freelancers a simple mobile-first dropzone for files, screenshots, and note images. Clients can upload without logging in, and that context lands back in the relationship timeline.
+        Brivoly gives you a simple no-login handoff page for screenshots, whiteboard photos, and note images. Clients can send context from their phone, and it lands back in the relationship history without extra back-and-forth.
       </p>
 
       {!advancedAiUnlocked ? (
@@ -1504,8 +1521,23 @@ function RemoteImageCapturePanel({
         </div>
       ) : null}
 
+      <div className="mt-5 grid gap-4 md:grid-cols-2">
+        <div className="rounded-[1.3rem] border bg-slate-50 px-4 py-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">What clients can send</p>
+          <p className="mt-2 text-sm leading-6 text-slate-700">
+            Screenshot updates, whiteboard photos, handwritten notes, or other quick visual context that would otherwise get lost in text threads.
+          </p>
+        </div>
+        <div className="rounded-[1.3rem] border bg-slate-50 px-4 py-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">What Brivoly does next</p>
+          <p className="mt-2 text-sm leading-6 text-slate-700">
+            The upload is attached to the right relationship memory so you can reopen the context later without hunting through email or messages.
+          </p>
+        </div>
+      </div>
+
       <div className="mt-5 rounded-[1.3rem] border bg-slate-50 px-4 py-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Current channel</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Share-ready link</p>
         <p className="mt-2 text-sm font-medium text-slate-900">
           {intakeChannel?.magic_link_url ? "No-login client dropzone is live." : "Client dropzone is not configured yet."}
         </p>
@@ -1529,9 +1561,16 @@ function RemoteImageCapturePanel({
             >
               {intakeChannel.magic_link_url}
             </a>
-            <p className="mt-3 text-xs text-slate-500">
-              Share that link with a client or open it yourself on mobile. Uploads flow back into Brivoly without requiring a login.
-            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button type="button" variant="outline" onClick={() => copyText(shareLink, "Client link copied.")}>
+                Copy link
+              </Button>
+              <Button type="button" variant="outline" onClick={() => copyText(shareMessage, "Client handoff text copied.")}>
+                Copy handoff text
+              </Button>
+            </div>
+            <p className="mt-3 text-xs text-slate-500">Share that link with a client or open it yourself on mobile. No login is required.</p>
+            {shareStatus ? <p className="mt-2 text-sm text-slate-600">{shareStatus}</p> : null}
           </>
         ) : null}
       </div>

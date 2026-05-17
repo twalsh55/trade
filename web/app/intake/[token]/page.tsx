@@ -20,15 +20,15 @@ export default async function IntakeMagicLinkPage({ params }: IntakePageProps) {
         />
         <div>
           <p className="bg-gradient-to-r from-[#034CFD] to-[#01113B] bg-clip-text text-xs font-semibold uppercase tracking-[0.28em] text-transparent">
-            CRM Intake
+            Client Update Link
           </p>
           <h1 className="mt-2 text-4xl font-semibold tracking-tight text-slate-950 md:text-5xl">
-            Upload a note image straight into Brivoly.
+            Send a file or screenshot without logging in.
           </h1>
         </div>
 
         <p className="mt-6 max-w-2xl text-base leading-7 text-slate-600">
-          Snap the whiteboard, handwritten note, or screenshot on your phone, upload it here, and Brivoly will turn it into CRM follow-up rows using the saved intake guidance for this account.
+          Use this page from your phone to send a screenshot, whiteboard photo, or handwritten note. Brivoly will attach it to the right relationship history so the context is easy to pick back up later.
         </p>
 
         <IntakeMagicLinkUpload token={token} />
