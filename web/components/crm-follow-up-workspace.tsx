@@ -441,20 +441,32 @@ export function CRMFollowUpWorkspace({
     });
   }
 
-  function generateEmailDraft() {
-    if (!selectedLead) {
+  function generateEmailDraft(overrides?: {
+    objective?: CRMEmailDraft["objective"];
+    tone?: CRMEmailDraft["tone"];
+    length?: CRMEmailDraft["length"];
+    status?: string;
+  }) {
+    const lead = selectedLead;
+    if (!lead) {
       return;
     }
-    setEmailStatus("Designing a follow-up email...");
+    const objective = overrides?.objective ?? emailObjective;
+    const tone = overrides?.tone ?? emailTone;
+    const length = overrides?.length ?? emailLength;
+    setEmailObjective(objective);
+    setEmailTone(tone);
+    setEmailLength(length);
+    setEmailStatus(overrides?.status ?? "Designing a follow-up email...");
     startEmailTransition(async () => {
       try {
-        const response = await fetch(`/api/crm/followups/email-draft/${selectedLead.id}`, {
+        const response = await fetch(`/api/crm/followups/email-draft/${lead.id}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            objective: emailObjective,
-            tone: emailTone,
-            length: emailLength,
+            objective,
+            tone,
+            length,
           }),
         });
         const body = (await response.json().catch(() => null)) as CRMEmailDraft | { error?: string } | null;
@@ -897,10 +909,12 @@ export function CRMFollowUpWorkspace({
               <InboxNextMovePanel
                 lead={selectedLead}
                 onDraftReply={() => {
-                  setEmailObjective("follow_up");
-                  setEmailTone("warm");
-                  setEmailLength("short");
-                  generateEmailDraft();
+                  generateEmailDraft({
+                    objective: "follow_up",
+                    tone: "warm",
+                    length: "short",
+                    status: "Drafting a reply that keeps the thread moving...",
+                  });
                 }}
                 isDrafting={isEmailPending}
                 draftStatus={emailStatus}
@@ -2063,9 +2077,15 @@ function LeadMemoryPanel({
   onEmailLengthChange: (value: CRMEmailDraft["length"]) => void;
   onEmailSubjectDraftChange: (value: string) => void;
   onEmailBodyDraftChange: (value: string) => void;
-  onGenerateEmailDraft: () => void;
+  onGenerateEmailDraft: (overrides?: {
+    objective?: CRMEmailDraft["objective"];
+    tone?: CRMEmailDraft["tone"];
+    length?: CRMEmailDraft["length"];
+    status?: string;
+  }) => void;
 }) {
   const launchHref = buildMailtoHref(emailSubjectDraft, emailBodyDraft);
+  const suggestedResponses = buildSuggestedResponsePresets(lead);
   const [memoryView, setMemoryView] = useState<"overview" | "last_30_days" | "meeting_prep" | "recent_changes">("overview");
   const memoryPanels = [
     { value: "overview" as const, label: "What matters", body: lead.relationship_context_summary || lead.notes || "No summary yet." },
@@ -2163,6 +2183,30 @@ function LeadMemoryPanel({
           </div>
         </div>
 
+        <div className="mt-5 rounded-[1.2rem] border bg-slate-50/80 px-4 py-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Suggested responses</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {suggestedResponses.map((item) => (
+              <button
+                key={item.label}
+                type="button"
+                onClick={() => {
+                  onGenerateEmailDraft({
+                    objective: item.objective,
+                    tone: item.tone,
+                    length: item.length,
+                    status: `Drafting a ${item.label.toLowerCase()} message...`,
+                  });
+                }}
+                className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-700 transition hover:border-slate-400 hover:text-slate-950"
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+          <p className="mt-3 text-xs text-slate-500">Pick the message shape that fits this moment, then edit before sending.</p>
+        </div>
+
         <div className="mt-5 grid gap-4 md:grid-cols-3">
           <label className="block">
             <span className="ui-eyebrow">Objective</span>
@@ -2203,7 +2247,7 @@ function LeadMemoryPanel({
         </div>
 
         <div className="mt-5 flex flex-wrap items-center gap-3">
-          <Button onClick={onGenerateEmailDraft} disabled={isGeneratingEmail}>
+          <Button onClick={() => onGenerateEmailDraft()} disabled={isGeneratingEmail}>
             {isGeneratingEmail ? "Designing..." : emailDraft ? "Redesign draft" : "Design email"}
           </Button>
           {launchHref ? (
@@ -2747,6 +2791,43 @@ function buildRelationshipNudge(lead: CRMLeadFollowUp) {
     return "This relationship still feels warm. Keep the next touch easy.";
   }
   return "Things are active here. Brivoly is keeping the context ready.";
+}
+
+function buildSuggestedResponsePresets(lead: CRMLeadFollowUp) {
+  const presets: Array<{
+    label: string;
+    objective: CRMEmailDraft["objective"];
+    tone: CRMEmailDraft["tone"];
+    length: CRMEmailDraft["length"];
+  }> = [];
+
+  const hasReplyPressure = lead.recent_email_threads.some((thread) => thread.needs_reply);
+  const isProposalMoment = lead.stage.trim().toLowerCase() === "proposal";
+  const isReconnectionMoment = lead.relationship_state === "stale" || lead.relationship_state === "drifting";
+
+  if (hasReplyPressure) {
+    presets.push({ label: "Reply", objective: "follow_up", tone: "warm", length: "short" });
+    presets.push({ label: "Schedule", objective: "follow_up", tone: "direct", length: "short" });
+  }
+  if (isProposalMoment) {
+    presets.push({ label: "Proposal nudge", objective: "follow_up", tone: "confident", length: "short" });
+    presets.push({ label: "Send recap", objective: "recap", tone: "warm", length: "medium" });
+  }
+  if (isReconnectionMoment) {
+    presets.push({ label: "Reconnect", objective: "revive", tone: "warm", length: "short" });
+  }
+
+  presets.push({ label: "Recap", objective: "recap", tone: "warm", length: "medium" });
+  presets.push({ label: "Close loop", objective: "close_loop", tone: "direct", length: "short" });
+
+  const seen = new Set<string>();
+  return presets.filter((item) => {
+    if (seen.has(item.label)) {
+      return false;
+    }
+    seen.add(item.label);
+    return true;
+  });
 }
 
 function formatReminderKind(value: string) {
