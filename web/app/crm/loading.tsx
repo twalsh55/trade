@@ -26,11 +26,12 @@ export default function CRMRouteLoading() {
         <div className="mt-4 h-4 w-full max-w-3xl animate-pulse rounded-full bg-slate-200" />
       </section>
 
-      <section className="mt-6 grid gap-6 md:grid-cols-4">
+      <section className="mt-6 grid gap-4 md:grid-cols-2">
         {Array.from({ length: 4 }).map((_, index) => (
           <div key={index} className="rounded-[1.4rem] border bg-white p-5 shadow-sm">
             <div className="h-3 w-20 animate-pulse rounded-full bg-slate-200" />
             <div className="mt-4 h-8 w-14 animate-pulse rounded-full bg-slate-200" />
+            <div className="mt-3 h-3 w-2/3 animate-pulse rounded-full bg-slate-200" />
           </div>
         ))}
       </section>
