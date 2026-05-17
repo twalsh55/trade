@@ -107,7 +107,6 @@ Railway API deployment:
 Container behavior:
 
 - installs Python dependencies with `uv sync --frozen`
-- sends the optional Telegram startup notification
 - starts `uvicorn` on `0.0.0.0:$PORT` with proxy headers enabled
 - exposes `GET /healthz` for Railway health checks
 - exposes `GET /readyz` for config/readiness inspection
