@@ -2042,7 +2042,7 @@ function RemoteImageCapturePanel({
       <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Client dropzone</p>
       <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Give clients an easy place to send updates.</h2>
       <p className="mt-3 text-sm leading-6 text-slate-600">
-        Brivoly gives you a simple no-login page for screenshots, whiteboard photos, and note images. Save the defaults once, then let clients send context from their phone whenever something changes.
+        Brivoly gives you one simple no-login page for screenshots, whiteboard photos, and note images. Save the defaults once, then reuse the same link whenever something changes.
       </p>
 
       {!advancedAiUnlocked ? (
@@ -2061,7 +2061,7 @@ function RemoteImageCapturePanel({
         <div className="rounded-[1.3rem] border bg-slate-50 px-4 py-4">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">What happens next</p>
           <p className="mt-2 text-sm leading-6 text-slate-700">
-            The upload is attached to the right relationship memory so you can reopen the context later without hunting through email or messages.
+            Brivoly attaches the update to the right relationship memory so you can reopen the context later without hunting through email or messages.
           </p>
         </div>
       </div>
@@ -2072,11 +2072,11 @@ function RemoteImageCapturePanel({
           {intakeChannel?.magic_link_url ? "No-login update page is live." : "The client update page is not ready yet."}
         </p>
         <p className="mt-2 text-sm leading-6 text-slate-600">
-          {intakeChannel?.instructions ?? "Turn this on once so clients have a phone-friendly page they can reuse whenever something changes."}
+          {intakeChannel?.instructions ?? "Turn this on once so clients have a phone-friendly page they can keep using whenever something changes."}
         </p>
         {normalizedChannels.length ? (
           <p className="mt-3 text-sm text-slate-700">
-            Best handoff paths for this account: <span className="font-medium">{normalizedChannels.join(", ")}</span>
+            Usual paths for this account: <span className="font-medium">{normalizedChannels.join(", ")}</span>
           </p>
         ) : null}
         {routingNotes ? <p className="mt-2 text-sm leading-6 text-slate-600">{routingNotes}</p> : null}
@@ -2110,10 +2110,10 @@ function RemoteImageCapturePanel({
 
 function IntakeTaskNav({ activeTask }: { activeTask: CRMIntakeTask }) {
   const items: Array<{ href: string; title: string; body: string; task: CRMIntakeTask }> = [
-    { href: "/clientos/intake", title: "Overview", body: "See the dropzone flow at a glance.", task: "hub" },
-    { href: "/clientos/intake/profile", title: "Usual formats", body: "Show what clients usually send.", task: "profile" },
-    { href: "/clientos/intake/routing", title: "Default path", body: "Choose the easiest path once.", task: "routing" },
-    { href: "/clientos/intake/capture", title: "Share link", body: "Reuse the phone-friendly page anytime.", task: "capture" },
+    { href: "/clientos/intake", title: "Overview", body: "See the default flow at a glance.", task: "hub" },
+    { href: "/clientos/intake/profile", title: "Usual formats", body: "Show what usually comes in.", task: "profile" },
+    { href: "/clientos/intake/routing", title: "Default path", body: "Choose the easiest route once.", task: "routing" },
+    { href: "/clientos/intake/capture", title: "Share link", body: "Keep one phone-friendly page ready.", task: "capture" },
   ];
 
   return (
@@ -2155,19 +2155,19 @@ function IntakeTaskHub({
     <section className="grid gap-6 md:grid-cols-2 2xl:grid-cols-3">
       <TaskSummaryCard
         href="/clientos/intake/profile"
-        eyebrow="Step 1"
+        eyebrow="Default 1"
         title="Show the kinds of updates you usually get"
-        body={advancedAiUnlocked ? "Your AI memory defaults are ready. Keep them close to how clients actually send updates." : "Unlock the paid AI layer before relying on note images and messy files to carry client context back in."}
+        body={advancedAiUnlocked ? "Your AI memory defaults are ready. Keep them close to what clients actually send." : "Unlock the paid AI layer before relying on note images and messy files to carry client context back in."}
       />
       <TaskSummaryCard
         href="/clientos/intake/routing"
-        eyebrow="Step 2"
+        eyebrow="Default 2"
         title="Choose the easiest default path"
-        body={normalizedChannels.length ? `Default paths are set: ${normalizedChannels.join(", ")}.` : "Set the path and one short note that make sending updates feel obvious."}
+        body={normalizedChannels.length ? `Default paths are set: ${normalizedChannels.join(", ")}.` : "Set one path and one short note so sending updates feels obvious."}
       />
       <TaskSummaryCard
         href="/clientos/intake/capture"
-        eyebrow="Step 3"
+        eyebrow="Default 3"
         title="Share the update link"
         body={hasMagicLink ? "A signed no-login page is live and ready to reuse with clients." : "Turn this on once so clients can send updates from their phone without friction."}
       />
@@ -2219,7 +2219,7 @@ function IntakeRoutingPanel({
       <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Default handoff path</p>
       <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Set the easiest path once.</h2>
       <p className="mt-3 text-sm leading-6 text-slate-600">
-        Keep this simple: choose the usual paths for this account and leave one short note so the next update arrives in the right place.
+        Keep this simple: choose the usual paths for this account and leave one short note so every new update lands in the right place.
       </p>
 
       <div className="mt-5 space-y-4">
@@ -2267,7 +2267,7 @@ function IntakeRoutingPanel({
             }
             className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
           >
-            Fill in a note
+            Use starter note
           </button>
         </div>
         <label className="block">
@@ -2386,7 +2386,7 @@ function AIIntakePanel({
             }
             className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
           >
-            Fill in the cue
+            Use starter cue
           </button>
         </div>
         <label className="block">
