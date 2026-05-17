@@ -173,6 +173,7 @@ cd web && npm run e2e
   - that shared ambient memory summary now also carries warm and quiet source labels, and its recovery actions are more specific about whether Brivoly wants the user to check inboxes, calendars, or resume one kind of memory instead of showing one generic fix for every continuity state
   - those ambient-memory recovery actions now also carry a short Python-owned note and route through in-app navigation, so Today and Attention can explain the smallest useful fix without bouncing the user through a full page reload
   - Inbox now honors those recovery routes more directly by focusing and visually lifting the mailbox or calendar memory section Brivoly wants the user to check next, and calendar-only waiting states now route there instead of opening a vague meeting-prep screen without a specific relationship in view
+  - the shared ambient-memory summary now also carries an explicit focus hint for mailbox, calendar, or both, so Inbox can follow one Python-owned recovery contract instead of reverse-engineering the right source focus from routes alone
 
 ### Relationship OS Todo
 

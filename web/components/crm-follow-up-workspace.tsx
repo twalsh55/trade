@@ -166,6 +166,13 @@ export function CRMFollowUpWorkspace({
   const requestedLeadId = searchParams?.get("lead");
   const requestedMemoryView = searchParams?.get("memory") === "meeting_prep" ? "meeting_prep" : null;
   const requestedConnectionFocus = searchParams?.get("connections");
+  const ambientConnectionFocus = overview.ambient_memory_summary?.suggested_action_focus || "";
+  const connectionFocus =
+    requestedConnectionFocus === "mailbox" || requestedConnectionFocus === "calendar" || requestedConnectionFocus === "all"
+      ? requestedConnectionFocus
+      : ambientConnectionFocus === "mailbox" || ambientConnectionFocus === "calendar" || ambientConnectionFocus === "all"
+        ? ambientConnectionFocus
+        : null;
 
   useEffect(() => {
     if (view !== "followups" || !queuedTodayDraft || !selectedLead || selectedLead.id !== queuedTodayDraft.leadId) {
@@ -268,23 +275,23 @@ export function CRMFollowUpWorkspace({
   }, [pathname, router, searchParams, view]);
 
   useEffect(() => {
-    if (view !== "inbox" || !requestedConnectionFocus) {
+    if (view !== "inbox" || !connectionFocus) {
       return;
     }
-    if (requestedConnectionFocus === "mailbox") {
+    if (connectionFocus === "mailbox") {
       setMailboxStatus((current) => current ?? "This is the inbox connection area Brivoly wants you to check next.");
       mailboxSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       return;
     }
-    if (requestedConnectionFocus === "calendar") {
+    if (connectionFocus === "calendar") {
       setCalendarStatus((current) => current ?? "This is the calendar memory area Brivoly wants you to check next.");
       calendarSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       return;
     }
-    if (requestedConnectionFocus === "all") {
+    if (connectionFocus === "all") {
       mailboxSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     }
-  }, [requestedConnectionFocus, view]);
+  }, [connectionFocus, view]);
 
   async function refreshAmbientMemory() {
     const [overviewResponse, mailboxResponse, calendarResponse] = await Promise.all([
@@ -1433,6 +1440,11 @@ export function CRMFollowUpWorkspace({
             <p className="mt-3 text-sm leading-6 text-slate-600">
               Brivoly turns email activity into living relationship memory: it matches contacts by email, creates missing contacts automatically, and keeps the right conversation attached to the right person.
             </p>
+            {connectionFocus && overview.ambient_memory_summary?.suggested_action_note ? (
+              <div className="mt-4 rounded-[1.2rem] border border-slate-200 bg-slate-50/80 px-4 py-4">
+                <p className="text-sm leading-6 text-slate-700">{overview.ambient_memory_summary.suggested_action_note}</p>
+              </div>
+            ) : null}
 
             <div className="mt-6 grid gap-4 md:grid-cols-2">
               <CompactMetricLight label="Reply soon" value={String(overview.inbox_summary?.needs_reply_count ?? 0)} tone="critical" />
@@ -1443,7 +1455,7 @@ export function CRMFollowUpWorkspace({
             <section
               ref={mailboxSectionRef}
               className={`mt-6 rounded-[1.4rem] border bg-slate-50/80 p-5 ${
-                requestedConnectionFocus === "mailbox" || requestedConnectionFocus === "all"
+                connectionFocus === "mailbox" || connectionFocus === "all"
                   ? "border-slate-400 bg-white/95 shadow-[0_18px_60px_-40px_rgba(15,23,42,0.35)]"
                   : ""
               }`}
@@ -1586,7 +1598,7 @@ export function CRMFollowUpWorkspace({
             <section
               ref={calendarSectionRef}
               className={`mt-6 rounded-[1.4rem] border bg-slate-50/80 p-5 ${
-                requestedConnectionFocus === "calendar"
+                connectionFocus === "calendar" || connectionFocus === "all"
                   ? "border-slate-400 bg-white/95 shadow-[0_18px_60px_-40px_rgba(15,23,42,0.35)]"
                   : ""
               }`}
