@@ -2216,6 +2216,40 @@ function LeadMemoryPanel({
         <TimelineTile label="Brivoly nudge" value={lead.relationship_timing_nudge || "Brivoly is keeping the timing in view."} />
       </div>
 
+      {isReconnectMoment(lead) ? (
+        <section className="mt-6 rounded-[1.5rem] border bg-sky-50/70 p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="max-w-2xl">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-700">Gentle re-entry</p>
+              <h3 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">Reopen this relationship without sounding abrupt.</h3>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Brivoly is surfacing a low-pressure path back in so you do not have to reconstruct the opening from scratch.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <Button
+                onClick={() =>
+                  onGenerateEmailDraft({
+                    objective: "revive",
+                    tone: "warm",
+                    length: "short",
+                    status: "Drafting a gentle reconnect...",
+                  })
+                }
+                disabled={isGeneratingEmail}
+              >
+                {isGeneratingEmail ? "Drafting..." : "Draft gentle reconnect"}
+              </Button>
+            </div>
+          </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-3">
+            <TimelineTile label="Why now" value={lead.relationship_reconnect_why_now || lead.relationship_timing_nudge || "Brivoly is keeping a reconnect path ready."} />
+            <TimelineTile label="Best re-entry" value={lead.relationship_reconnect_next_move || lead.next_step} />
+            <TimelineTile label="Message angle" value={lead.relationship_reconnect_message_hint || "Keep it short, warm, and easy to answer."} />
+          </div>
+        </section>
+      ) : null}
+
       {lead.referral_source_name || lead.birthday || lead.company_milestone_date || lead.relationship_reminders.length ? (
         <section className="mt-6 rounded-[1.5rem] border bg-amber-50/70 p-5">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">Keep this relationship warm</p>
@@ -2932,7 +2966,7 @@ function buildSuggestedResponsePresets(lead: CRMLeadFollowUp) {
 
   const hasReplyPressure = lead.recent_email_threads.some((thread) => thread.needs_reply);
   const isProposalMoment = lead.stage.trim().toLowerCase() === "proposal";
-  const isReconnectionMoment = lead.relationship_state === "stale" || lead.relationship_state === "drifting";
+  const isReconnectionMoment = isReconnectMoment(lead);
 
   if (hasReplyPressure) {
     presets.push({ label: "Reply", objective: "follow_up", tone: "warm", length: "short" });
@@ -2957,6 +2991,10 @@ function buildSuggestedResponsePresets(lead: CRMLeadFollowUp) {
     seen.add(item.label);
     return true;
   });
+}
+
+function isReconnectMoment(lead: CRMLeadFollowUp) {
+  return lead.relationship_state === "stale" || lead.relationship_state === "drifting" || lead.relationship_state === "at_risk";
 }
 
 function formatReminderKind(value: string) {

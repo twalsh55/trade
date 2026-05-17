@@ -894,6 +894,9 @@ def test_crm_inbox_thread_ingest_updates_overview(monkeypatch) -> None:
     assert lead["recent_email_threads"][0]["needs_reply"] is True
     assert lead["recent_email_threads"][0]["memory_summary"]
     assert "Reply to Priya Nair" in lead["recent_email_threads"][0]["next_touch_hint"]
+    assert lead["relationship_reconnect_why_now"]
+    assert lead["relationship_reconnect_next_move"]
+    assert lead["relationship_reconnect_message_hint"]
     assert any(entry["id"] == "email-msg-1" for entry in lead["timeline"])
 
 

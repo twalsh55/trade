@@ -111,6 +111,9 @@ class LeadFollowUp:
     relationship_recent_changes_summary: str = ""
     relationship_last_30_days_summary: str = ""
     relationship_meeting_prep_summary: str = ""
+    relationship_reconnect_why_now: str = ""
+    relationship_reconnect_next_move: str = ""
+    relationship_reconnect_message_hint: str = ""
     dormant: bool = False
     relationship_reminders: tuple[LeadRelationshipReminder, ...] = ()
     recent_email_threads: tuple[LeadEmailThreadSummary, ...] = ()

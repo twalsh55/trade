@@ -105,6 +105,9 @@ export type CRMLeadFollowUp = {
   relationship_recent_changes_summary: string;
   relationship_last_30_days_summary: string;
   relationship_meeting_prep_summary: string;
+  relationship_reconnect_why_now: string;
+  relationship_reconnect_next_move: string;
+  relationship_reconnect_message_hint: string;
   dormant: boolean;
   relationship_reminders: CRMRelationshipReminder[];
   recent_email_threads: CRMEmailThreadSummary[];

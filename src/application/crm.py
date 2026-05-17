@@ -73,6 +73,9 @@ def _enrich_follow_up(item: LeadFollowUp, current_time: datetime) -> LeadFollowU
     recent_changes_summary = _build_recent_changes_summary(item_with_reminders, current_time)
     last_30_days_summary = _build_last_30_days_summary(item_with_reminders, current_time)
     meeting_prep_summary = _build_meeting_prep_summary(item_with_reminders, current_time)
+    reconnect_why_now = _build_reconnect_why_now(item_with_reminders, current_time)
+    reconnect_next_move = _build_reconnect_next_move(item_with_reminders, current_time)
+    reconnect_message_hint = _build_reconnect_message_hint(item_with_reminders, current_time)
     return replace(
         item_with_reminders,
         last_meaningful_interaction_at=last_meaningful,
@@ -84,6 +87,9 @@ def _enrich_follow_up(item: LeadFollowUp, current_time: datetime) -> LeadFollowU
         relationship_recent_changes_summary=recent_changes_summary,
         relationship_last_30_days_summary=last_30_days_summary,
         relationship_meeting_prep_summary=meeting_prep_summary,
+        relationship_reconnect_why_now=reconnect_why_now,
+        relationship_reconnect_next_move=reconnect_next_move,
+        relationship_reconnect_message_hint=reconnect_message_hint,
         dormant=dormant,
     )
 
@@ -355,6 +361,64 @@ def _build_meeting_prep_summary(item: LeadFollowUp, current_time: datetime) -> s
     if not parts:
         return "Brivoly does not have enough context yet to prep this meeting."
     return " ".join(parts[:3])
+
+
+def _build_reconnect_why_now(item: LeadFollowUp, current_time: datetime) -> str:
+    if item.relationship_state == "stale":
+        if item.last_meaningful_interaction_at:
+            return f"It has been {_relative_days(item.last_meaningful_interaction_at, current_time).lower()} since the last meaningful touch."
+        return "This relationship has been quiet long enough that a gentle restart would help."
+    if item.relationship_state == "at_risk":
+        return item.relationship_timing_nudge or "Momentum is slipping and this relationship could go cold without a light touch."
+    if item.relationship_state == "drifting":
+        return "The relationship is still warm enough to reopen naturally, but momentum is starting to fade."
+    if item.relationship_reminders:
+        return _sentence_case(item.relationship_reminders[0].message.rstrip(".")) + "."
+    return "Brivoly is keeping a low-pressure reconnect path ready."
+
+
+def _build_reconnect_next_move(item: LeadFollowUp, current_time: datetime) -> str:
+    if item.relationship_reminders:
+        reminder = item.relationship_reminders[0]
+        if reminder.kind == "referral":
+            return f"Reopen the conversation by referencing {item.referral_source_name} and offering one simple next step."
+        if reminder.kind in {"birthday", "company_milestone"}:
+            return "Use the upcoming personal or company moment as a natural reason to reach out."
+
+    latest_thread = sorted(item.recent_email_threads, key=lambda thread: thread.last_message_at, reverse=True)[:1]
+    if latest_thread:
+        thread = latest_thread[0]
+        if thread.waiting_on_contact:
+            return "Pick back up from the last note you sent and make the reply feel easy."
+        if thread.snippet.strip():
+            return f"Restart around the last open thread: {_truncate_sentence(thread.snippet.strip(), 120)}"
+
+    if item.next_step.strip():
+        return _sentence_case(_ensure_sentence(item.next_step))
+    if item.last_meaningful_interaction_at:
+        return f"Reference the last meaningful touch from {_relative_days(item.last_meaningful_interaction_at, current_time).lower()} and suggest one small next step."
+    return "Keep it simple: acknowledge the gap, offer context, and make the next move easy."
+
+
+def _build_reconnect_message_hint(item: LeadFollowUp, current_time: datetime) -> str:
+    if item.relationship_reminders:
+        reminder = item.relationship_reminders[0]
+        if reminder.kind == "referral" and item.referral_source_name.strip():
+            return f'Quick angle: "Wanted to follow up on the introduction from {item.referral_source_name} and make the next step easy."'
+        if reminder.kind in {"birthday", "company_milestone"}:
+            return 'Quick angle: "This felt like a natural moment to check back in and see where things stand."'
+
+    latest_thread = sorted(item.recent_email_threads, key=lambda thread: thread.last_message_at, reverse=True)[:1]
+    if latest_thread:
+        thread = latest_thread[0]
+        if thread.snippet.strip():
+            return f'Quick angle: "Wanted to circle back on {_truncate_sentence(thread.snippet.strip(), 90)}"'
+
+    if item.relationship_context_summary.strip() and item.relationship_context_summary != "Brivoly has not captured enough relationship context yet.":
+        return f'Quick angle: "Wanted to circle back while the context around {_truncate_sentence(item.relationship_context_summary, 90)} is still fresh."'
+    if item.last_meaningful_interaction_at:
+        return f'Quick angle: "Wanted to reconnect after {_relative_days(item.last_meaningful_interaction_at, current_time).lower()} and make the next step easy from here."'
+    return 'Quick angle: "Wanted to check back in and see if this is worth picking up again."'
 
 
 def summarize_timeline_kind(kind: str) -> str:

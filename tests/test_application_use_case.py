@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
 from uuid import UUID
 
@@ -26,6 +27,9 @@ from src.application.crm import (
     _build_relationship_context_summary,
     _build_last_30_days_summary,
     _build_meeting_prep_summary,
+    _build_reconnect_message_hint,
+    _build_reconnect_next_move,
+    _build_reconnect_why_now,
     _build_recent_changes_summary,
     _build_relationship_timing_nudge,
     _build_thread_memory_summary,
@@ -118,6 +122,7 @@ def build_follow_up(
     next_step: str = "Send a quick recap",
     notes: str = "Shared spreadsheet-heavy workflow pain.",
     email_address: str = "lead@example.com",
+    referral_source_name: str = "",
     last_contacted_at: datetime | None = None,
     next_follow_up_at: datetime | None = None,
     timeline: tuple[LeadTimelineEntry, ...] = (),
@@ -140,6 +145,7 @@ def build_follow_up(
         notes=notes,
         timeline=timeline,
         email_address=email_address,
+        referral_source_name=referral_source_name,
         relationship_reminders=reminders,
         recent_email_threads=threads,
         relationship_state=relationship_state,
@@ -307,6 +313,9 @@ def test_follow_up_overview_enriches_relationship_intelligence() -> None:
     assert amber.relationship_recent_changes_summary
     assert amber.relationship_last_30_days_summary
     assert amber.relationship_meeting_prep_summary
+    assert amber.relationship_reconnect_why_now
+    assert amber.relationship_reconnect_next_move
+    assert amber.relationship_reconnect_message_hint
     assert amber.recent_email_threads[0].memory_summary
     assert amber.recent_email_threads[0].next_touch_hint
     assert overview.relationship_summary is not None
@@ -496,6 +505,52 @@ def test_crm_helper_branches_cover_relationship_summaries() -> None:
     assert _build_recent_changes_summary(build_follow_up(now=now, next_step="ping again"), now) == "No major relationship changes were captured recently."
     assert _build_last_30_days_summary(build_follow_up(now=now, timeline=(), threads=()), now) == "There has not been much relationship activity in the last 30 days."
     assert _build_meeting_prep_summary(build_follow_up(now=now, timeline=(), threads=(), next_step="   ", notes="   "), now) == "Brivoly does not have enough context yet to prep this meeting."
+
+
+def test_crm_helper_branches_cover_reconnect_guidance() -> None:
+    now = datetime(2024, 5, 17, 12, 30, tzinfo=UTC)
+    reminder = LeadRelationshipReminder(kind="referral", title="Referral", message="send Nina an update", due_at=now)
+    reminder_lead = build_follow_up(now=now, relationship_state="warm", reminders=(reminder,), referral_source_name="Nina")
+    stale_lead = build_follow_up(now=now, relationship_state="stale", last_meaningful_interaction_at=now - timedelta(days=30))
+    stale_without_context = build_follow_up(now=now, relationship_state="stale", last_meaningful_interaction_at=None)
+    at_risk_lead = build_follow_up(now=now, relationship_state="at_risk", next_step="check in next week")
+    drifting_lead = build_follow_up(now=now, relationship_state="drifting")
+    plain_lead = build_follow_up(now=now, relationship_state="warm", reminders=(), last_meaningful_interaction_at=None, next_step="   ")
+    waiting_thread = LeadEmailThreadSummary(
+        thread_id="thread-reconnect",
+        subject="Checking in",
+        counterpart_name="Jordan",
+        counterpart_email="jordan@example.com",
+        last_message_at=now - timedelta(days=9),
+        last_message_direction="outbound",
+        message_count=2,
+        snippet="lighter pilot option before busy season",
+        needs_reply=False,
+        waiting_on_contact=True,
+    )
+    thread_lead = build_follow_up(now=now, relationship_state="drifting", threads=(waiting_thread,))
+
+    assert "last meaningful touch" in _build_reconnect_why_now(stale_lead, now)
+    assert "gentle restart would help" in _build_reconnect_why_now(stale_without_context, now)
+    assert "could go cold" in _build_reconnect_why_now(at_risk_lead, now)
+    assert "momentum is starting to fade" in _build_reconnect_why_now(drifting_lead, now)
+    assert _build_reconnect_why_now(reminder_lead, now) == "Send Nina an update."
+    assert _build_reconnect_why_now(plain_lead, now) == "Brivoly is keeping a low-pressure reconnect path ready."
+
+    assert "referencing Nina" in _build_reconnect_next_move(reminder_lead, now)
+    assert "Pick back up from the last note" in _build_reconnect_next_move(thread_lead, now)
+    assert "Restart around the last open thread" in _build_reconnect_next_move(build_follow_up(now=now, threads=(replace(waiting_thread, waiting_on_contact=False),)), now)
+    assert _build_reconnect_next_move(build_follow_up(now=now, next_step="send a lighter pilot option", threads=()), now) == "Send a lighter pilot option."
+    assert "last meaningful touch" in _build_reconnect_next_move(build_follow_up(now=now, next_step="   ", last_meaningful_interaction_at=now - timedelta(days=12), threads=()), now)
+    assert _build_reconnect_next_move(plain_lead, now) == "Keep it simple: acknowledge the gap, offer context, and make the next move easy."
+
+    assert "introduction from Nina" in _build_reconnect_message_hint(reminder_lead, now)
+    assert "lighter pilot option" in _build_reconnect_message_hint(thread_lead, now)
+    context_lead = build_follow_up(now=now, next_step="   ", notes="   ")
+    context_lead = replace(context_lead, relationship_context_summary="Pricing concerns and rollout timing")
+    assert "Pricing concerns and rollout timing" in _build_reconnect_message_hint(context_lead, now)
+    assert "12 days ago" in _build_reconnect_message_hint(build_follow_up(now=now, next_step="   ", last_meaningful_interaction_at=now - timedelta(days=12)), now)
+    assert "check back in" in _build_reconnect_message_hint(plain_lead, now)
 
 
 def test_crm_helper_branches_cover_email_ingest_validation_and_email_variants() -> None:
