@@ -29,7 +29,7 @@ export function CRMShell({ data }: { data: CRMPageData }) {
         <p className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-700">Before you continue</p>
         <h2 className="mt-3 text-3xl font-semibold tracking-tight text-amber-950">Sign in to unlock the real CRM workspace.</h2>
         <p className="mt-3 max-w-2xl text-sm leading-7 text-amber-900">
-          The live product now includes dedicated CRM pages for follow-ups, pipeline, imports, and intake. Signing in connects your account so Brivoly can load that workspace cleanly.
+          Sign in to load your CRM pages, follow-up queue, imports, and intake settings.
         </p>
         {data.bootstrap?.clerk_sign_in_url ? (
           <div className="mt-5">
@@ -42,8 +42,8 @@ export function CRMShell({ data }: { data: CRMPageData }) {
       <section className="mt-6 grid gap-6 lg:grid-cols-4">
         <FeatureCard title="Overview" body="See the current health of the CRM without skimming every section." />
         <FeatureCard title="Follow-Ups" body="Work the next actions and keep relationship memory attached to the right lead." />
-        <FeatureCard title="Pipeline" body="Move across dedicated stage pages instead of treating the CRM as one long page." />
-        <FeatureCard title="Import + Intake" body="Bring in spreadsheets and note images from dedicated CRM pages." />
+        <FeatureCard title="Pipeline" body="Review stage progression, overdue items, and current pressure." />
+        <FeatureCard title="Import + Intake" body="Bring in spreadsheets and note images, then review intake settings." />
       </section>
     </>
   );
@@ -59,7 +59,7 @@ function resolveCRMView(pathname: string): CRMWorkspaceView {
   if (pathname === "/crm/import") {
     return "import";
   }
-  if (pathname === "/crm/intake") {
+  if (pathname === "/crm/intake" || pathname.startsWith("/crm/intake/")) {
     return "intake";
   }
   return "overview";

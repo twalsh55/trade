@@ -116,7 +116,7 @@ cd web && npm run e2e
   - paid AI intake profile per user
   - first-login business onboarding with skip-for-now path
   - paid image-note intake
-  - Telegram remote note capture with signed `/intake ...` captions
+  - magic-link remote note capture for phone image uploads
 
 ### Agent / Automation State
 

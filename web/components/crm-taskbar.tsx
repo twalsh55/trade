@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { BrandMark } from "@/components/brand-mark";
+
 const items = [
   { href: "/crm", label: "Overview", body: "High-level CRM status" },
   { href: "/crm/follow-ups", label: "Follow-Ups", body: "Queue, memory, and email" },
@@ -16,8 +18,17 @@ export function CRMTaskbar() {
 
   return (
     <aside className="h-fit rounded-[1.9rem] border bg-slate-950 p-5 text-slate-50 shadow-[0_24px_80px_-50px_rgba(15,23,42,0.85)] xl:sticky xl:top-6">
-      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300">CRM Taskbar</p>
-      <h2 className="mt-3 text-2xl font-semibold tracking-tight">Move like an app, not a landing page.</h2>
+      <div className="flex items-center gap-3">
+        <BrandMark
+          size="sm"
+          className="rounded-[1rem] border border-white/10 bg-white/5 p-1"
+          imageClassName="opacity-90"
+        />
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300">CRM Taskbar</p>
+          <p className="mt-1 text-xs text-slate-400">Brivoly</p>
+        </div>
+      </div>
       <nav className="mt-6 space-y-3">
         {items.map((item) => {
           const active = pathname === item.href;

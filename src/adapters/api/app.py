@@ -170,7 +170,14 @@ class CRMRemoteIntakeDTO(BaseModel):
     telegram_available: bool
     intake_channel: str | None
     intake_caption: str | None
+    magic_link_url: str | None
     instructions: str
+
+
+class CRMRemoteIntakeUploadPayload(BaseModel):
+    intake_token: str = Field(min_length=1, max_length=400)
+    file_name: str = Field(min_length=1, max_length=255)
+    file_content_base64: str = Field(min_length=1)
 
 
 def create_app(dependencies: ApiDependencies | None = None) -> FastAPI:
@@ -467,19 +474,41 @@ def create_app(dependencies: ApiDependencies | None = None) -> FastAPI:
                 telegram_available=False,
                 intake_channel=None,
                 intake_caption=None,
+                magic_link_url=None,
                 instructions="Remote note capture is unavailable until CRM_INTAKE_SECRET and the Telegram bot are configured.",
             )
             return dto.model_dump()
+        intake_token = _build_crm_intake_token(user.id, secret)
         dto = CRMRemoteIntakeDTO(
             telegram_available=bool(os.getenv("TELEGRAM_BOT_TOKEN", "").strip()),
-            intake_channel="telegram",
-            intake_caption=f"/intake {_build_crm_intake_token(user.id, secret)}",
+            intake_channel="magic_link",
+            intake_caption=None,
+            magic_link_url=f"{get_app_base_url().rstrip('/')}/intake/{intake_token}",
             instructions=(
-                "Send a note photo or screenshot to the Brivoly Telegram bot with this caption. "
-                "Brivoly will import it into your CRM queue using your saved AI Intake Profile."
+                "Open this secure link on your phone, upload a note photo or screenshot, "
+                "and Brivoly will import it into your CRM queue using your saved AI Intake Profile."
             ),
         )
         return dto.model_dump()
+
+    @app.post("/api/crm/intake/upload")
+    def crm_intake_upload(payload: CRMRemoteIntakeUploadPayload) -> dict[str, object]:
+        try:
+            result = _commit_crm_image_intake(
+                intake_token=payload.intake_token,
+                file_name=payload.file_name,
+                file_bytes=decode_base64_file_content(payload.file_content_base64),
+                deps=deps,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+        return {
+            "imported_count": result.imported_count,
+            "skipped_duplicates": result.skipped_duplicates,
+            "skipped_invalid": result.skipped_invalid,
+            "message": "Brivoly imported your note image into CRM.",
+        }
 
     @app.get("/api/account/billing")
     def billing_overview(
@@ -1007,6 +1036,57 @@ def _download_telegram_file(bot_token: str, file_id: str) -> bytes:
         raise ValueError("Unable to download the Telegram note image.") from exc
 
 
+def _is_supported_crm_image_file_name(file_name: str) -> bool:
+    normalized = file_name.lower()
+    return normalized.endswith(".png") or normalized.endswith(".jpg") or normalized.endswith(".jpeg") or normalized.endswith(".webp")
+
+
+def _commit_crm_image_intake(
+    *,
+    intake_token: str,
+    file_name: str,
+    file_bytes: bytes,
+    deps: ApiDependencies,
+):
+    secret = _get_crm_intake_secret()
+    if not secret:
+        raise ValueError("Remote CRM note capture is not configured yet.")
+    if not _is_supported_crm_image_file_name(file_name):
+        raise ValueError("Upload a supported image file: .png, .jpg, .jpeg, or .webp.")
+    if not file_bytes:
+        raise ValueError("Choose an image file before uploading.")
+
+    user_id = _parse_crm_intake_token(intake_token, secret)
+    user_repository = deps.user_repository_factory()
+    if user_repository is None:
+        raise ValueError("Remote CRM note capture needs the app database to be configured.")
+    user = user_repository.get_user_by_id(user_id)
+    if user is None:
+        raise ValueError("That CRM intake link no longer points to an active Brivoly account.")
+    _ensure_advanced_ai_intake_access(user, deps)
+    settings = GetUserDashboardSettingsUseCase(
+        repository=deps.personalization_repository_factory(),
+        default_factory=_build_default_dashboard_settings,
+    ).execute(user)
+    csv_content = GenerateLeadImportFromImageUseCase(
+        image_intake=build_crm_image_intake_agent_from_env(),
+    ).execute(
+        prompt=settings.crm_ai_prompt,
+        preferred_formats=settings.crm_preferred_import_formats,
+        file_name=file_name,
+        file_bytes=file_bytes,
+    )
+    return CommitLeadImportUseCase(
+        repository=deps.lead_follow_up_repository_factory(),
+        now=deps.now,
+    ).execute(
+        user,
+        csv_content,
+        "image",
+        file_name,
+    )
+
+
 def _run_telegram_crm_image_intake(
     notifier: TelegramNotifier,
     intake: _TelegramImageIntake,
@@ -1022,32 +1102,17 @@ def _run_telegram_crm_image_intake(
             raise ValueError("Remote CRM note capture needs the app database to be configured.")
         user = user_repository.get_user_by_id(user_id)
         if user is None:
-            raise ValueError("That CRM intake code no longer points to an active Brivoly account.")
+            raise ValueError("That CRM intake link no longer points to an active Brivoly account.")
         _ensure_advanced_ai_intake_access(user, deps)
-        settings = GetUserDashboardSettingsUseCase(
-            repository=deps.personalization_repository_factory(),
-            default_factory=_build_default_dashboard_settings,
-        ).execute(user)
         bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
         if not bot_token:
             raise ValueError("Telegram bot token is not configured.")
         file_bytes = _download_telegram_file(bot_token, intake.file_id)
-        csv_content = GenerateLeadImportFromImageUseCase(
-            image_intake=build_crm_image_intake_agent_from_env(),
-        ).execute(
-            prompt=settings.crm_ai_prompt,
-            preferred_formats=settings.crm_preferred_import_formats,
+        result = _commit_crm_image_intake(
+            intake_token=intake.intake_token,
             file_name=intake.file_name,
             file_bytes=file_bytes,
-        )
-        result = CommitLeadImportUseCase(
-            repository=deps.lead_follow_up_repository_factory(),
-            now=deps.now,
-        ).execute(
-            user,
-            csv_content,
-            "image",
-            intake.file_name,
+            deps=deps,
         )
         notifier.send_message(
             "Brivoly imported your note image into CRM.\n"

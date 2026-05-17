@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 
 import { BusinessProfileOnboarding } from "@/components/settings/business-profile-onboarding";
@@ -21,6 +21,7 @@ import type {
 } from "@/lib/types";
 
 export type CRMWorkspaceView = "overview" | "followups" | "pipeline" | "import" | "intake";
+type CRMIntakeTask = "hub" | "profile" | "routing" | "capture";
 
 export function CRMFollowUpWorkspace({
   initialOverview,
@@ -36,6 +37,7 @@ export function CRMFollowUpWorkspace({
   view?: CRMWorkspaceView;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [overview, setOverview] = useState(initialOverview);
   const [settings, setSettings] = useState<AccountSettings | null>(initialSettings);
@@ -56,6 +58,9 @@ export function CRMFollowUpWorkspace({
   const [aiPromptDraft, setAiPromptDraft] = useState(initialSettings?.crm_ai_prompt ?? "");
   const [aiFormatsDraft, setAiFormatsDraft] = useState((initialSettings?.crm_preferred_import_formats ?? []).join(", "));
   const [aiSettingsStatus, setAiSettingsStatus] = useState<string | null>(null);
+  const [routingChannelsDraft, setRoutingChannelsDraft] = useState((initialSettings?.crm_image_intake_channels ?? []).join(", "));
+  const [routingNotesDraft, setRoutingNotesDraft] = useState(initialSettings?.crm_image_intake_notes ?? "");
+  const [routingSettingsStatus, setRoutingSettingsStatus] = useState<string | null>(null);
   const [emailObjective, setEmailObjective] = useState<CRMEmailDraft["objective"]>("follow_up");
   const [emailTone, setEmailTone] = useState<CRMEmailDraft["tone"]>("warm");
   const [emailLength, setEmailLength] = useState<CRMEmailDraft["length"]>("short");
@@ -91,6 +96,14 @@ export function CRMFollowUpWorkspace({
   const showingPipeline = view === "pipeline";
   const showingImport = view === "import";
   const showingIntake = view === "intake";
+  const intakeTask = resolveIntakeTask(pathname ?? "/crm/intake");
+
+  useEffect(() => {
+    setAiPromptDraft(initialSettings?.crm_ai_prompt ?? "");
+    setAiFormatsDraft((initialSettings?.crm_preferred_import_formats ?? []).join(", "));
+    setRoutingChannelsDraft((initialSettings?.crm_image_intake_channels ?? []).join(", "));
+    setRoutingNotesDraft(initialSettings?.crm_image_intake_notes ?? "");
+  }, [initialSettings]);
 
   function runAction(
     followUpId: string,
@@ -367,6 +380,40 @@ export function CRMFollowUpWorkspace({
         setAiSettingsStatus("AI intake preferences saved.");
       } catch (saveError) {
         setAiSettingsStatus(saveError instanceof Error ? saveError.message : "Unable to save AI intake settings.");
+      }
+    });
+  }
+
+  function saveIntakeRoutingSettings() {
+    if (!settings) {
+      return;
+    }
+    setRoutingSettingsStatus("Saving intake routing preferences...");
+    startAiSettingsTransition(async () => {
+      const payload: AccountSettings = {
+        ...settings,
+        crm_image_intake_channels: routingChannelsDraft
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean),
+        crm_image_intake_notes: routingNotesDraft.trim(),
+      };
+      try {
+        const response = await fetch("/api/account/settings", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const body = (await response.json().catch(() => null)) as AccountSettings | { error?: string } | null;
+        if (!response.ok || !body || !("benchmark" in body)) {
+          throw new Error((body && "error" in body && body.error) || "Unable to save intake routing settings.");
+        }
+        setSettings(body);
+        setRoutingChannelsDraft(body.crm_image_intake_channels.join(", "));
+        setRoutingNotesDraft(body.crm_image_intake_notes);
+        setRoutingSettingsStatus("Intake routing preferences saved.");
+      } catch (saveError) {
+        setRoutingSettingsStatus(saveError instanceof Error ? saveError.message : "Unable to save intake routing settings.");
       }
     });
   }
@@ -677,25 +724,49 @@ export function CRMFollowUpWorkspace({
       ) : null}
 
       {showingIntake ? (
-        <section className="mt-6 grid gap-6 xl:grid-cols-[1fr_1fr]">
-          <AIIntakePanel
-            advancedAiUnlocked={advancedAiUnlocked}
-            billingStatus={initialBilling?.subscription_status ?? null}
-            aiPromptDraft={aiPromptDraft}
-            aiFormatsDraft={aiFormatsDraft}
-            onAiPromptDraftChange={setAiPromptDraft}
-            onAiFormatsDraftChange={setAiFormatsDraft}
-            onSave={saveAiImportSettings}
-            saveStatus={aiSettingsStatus}
-            isSaving={isAiSettingsPending}
-            canPersistSettings={Boolean(settings)}
-          />
-          <RemoteImageCapturePanel
-            intakeChannel={initialIntakeChannel}
-            advancedAiUnlocked={advancedAiUnlocked}
-            preferredChannels={initialSettings?.crm_image_intake_channels ?? []}
-            routingNotes={initialSettings?.crm_image_intake_notes ?? ""}
-          />
+        <section className="mt-6 space-y-6">
+          <IntakeTaskNav activeTask={intakeTask} />
+          {intakeTask === "hub" ? (
+            <IntakeTaskHub
+              advancedAiUnlocked={advancedAiUnlocked}
+              preferredChannels={settings?.crm_image_intake_channels ?? []}
+              hasMagicLink={Boolean(initialIntakeChannel?.magic_link_url)}
+            />
+          ) : null}
+          {intakeTask === "profile" ? (
+            <AIIntakePanel
+              advancedAiUnlocked={advancedAiUnlocked}
+              billingStatus={initialBilling?.subscription_status ?? null}
+              aiPromptDraft={aiPromptDraft}
+              aiFormatsDraft={aiFormatsDraft}
+              onAiPromptDraftChange={setAiPromptDraft}
+              onAiFormatsDraftChange={setAiFormatsDraft}
+              onSave={saveAiImportSettings}
+              saveStatus={aiSettingsStatus}
+              isSaving={isAiSettingsPending}
+              canPersistSettings={Boolean(settings)}
+            />
+          ) : null}
+          {intakeTask === "routing" ? (
+            <IntakeRoutingPanel
+              channelsDraft={routingChannelsDraft}
+              routingNotesDraft={routingNotesDraft}
+              onChannelsDraftChange={setRoutingChannelsDraft}
+              onRoutingNotesDraftChange={setRoutingNotesDraft}
+              onSave={saveIntakeRoutingSettings}
+              saveStatus={routingSettingsStatus}
+              isSaving={isAiSettingsPending}
+              canPersistSettings={Boolean(settings)}
+            />
+          ) : null}
+          {intakeTask === "capture" ? (
+            <RemoteImageCapturePanel
+              intakeChannel={initialIntakeChannel}
+              advancedAiUnlocked={advancedAiUnlocked}
+              preferredChannels={settings?.crm_image_intake_channels ?? []}
+              routingNotes={settings?.crm_image_intake_notes ?? ""}
+            />
+          ) : null}
         </section>
       ) : null}
 
@@ -726,8 +797,8 @@ function CRMViewHeader({ view }: { view: CRMWorkspaceView }) {
   const copy = {
     overview: {
       eyebrow: "CRM Overview",
-      title: "Start from the current state, then dive into the right workflow.",
-      body: "Use the taskbar to switch into dedicated CRM pages instead of scanning through everything at once.",
+      title: "Overview",
+      body: "See current CRM activity, pipeline state, and intake status.",
     },
     followups: {
       eyebrow: "Follow-Ups",
@@ -746,8 +817,8 @@ function CRMViewHeader({ view }: { view: CRMWorkspaceView }) {
     },
     intake: {
       eyebrow: "Intake",
-      title: "Control how messy files and remote note images enter the CRM.",
-      body: "Set AI intake guidance and remote capture paths without mixing that setup into everyday queue work.",
+      title: "Work intake setup as clear, separate jobs.",
+      body: "Split intake into AI profile, routing preferences, and remote capture so each setup task has its own place.",
     },
   }[view];
 
@@ -758,6 +829,19 @@ function CRMViewHeader({ view }: { view: CRMWorkspaceView }) {
       <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">{copy.body}</p>
     </section>
   );
+}
+
+function resolveIntakeTask(pathname: string): CRMIntakeTask {
+  if (pathname === "/crm/intake/profile") {
+    return "profile";
+  }
+  if (pathname === "/crm/intake/routing") {
+    return "routing";
+  }
+  if (pathname === "/crm/intake/capture") {
+    return "capture";
+  }
+  return "hub";
 }
 
 function OverviewQuickLinks({
@@ -792,7 +876,7 @@ function OverviewQuickLinks({
         <QuickLinkCard
           href="/crm/intake"
           title="Intake"
-          body={intakeChannel?.telegram_available ? "Telegram remote note capture is configured." : "Set up AI intake guidance and remote note capture."}
+          body={intakeChannel?.magic_link_url ? "Magic-link remote note capture is configured." : "Set up AI intake guidance and remote note capture."}
         />
       </div>
     </section>
@@ -827,13 +911,13 @@ function PipelineBoardPanel({
   }
 
   return (
-    <section className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm xl:col-span-2">
+      <section className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm xl:col-span-2">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="max-w-2xl">
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">CRM Pipeline</p>
-          <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">See the whole deal flow, not just the next task.</h2>
+          <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Pipeline</h2>
           <p className="mt-3 text-sm leading-6 text-slate-600">
-            Brivoly now groups open leads by stage so you can spot where the pipeline is piling up, where urgency is concentrated, and which relationships need a push forward.
+            Review open leads by stage, urgency, and dormant risk.
           </p>
         </div>
         <div className="grid gap-3 sm:grid-cols-3">
@@ -921,8 +1005,8 @@ function RemoteImageCapturePanel({
       <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Remote Note Capture</p>
       <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Send note photos from your phone.</h2>
       <p className="mt-3 text-sm leading-6 text-slate-600">
-        Uploading inside Brivoly is great, but operators often snap notes on the move. Telegram is the first remote
-        intake channel because it is already wired into the product and can drop images straight into your account.
+        Uploading inside Brivoly is great, but operators often snap notes on the move. A signed magic link keeps
+        that phone-first capture simple without making people copy a command into Telegram first.
       </p>
 
       {!advancedAiUnlocked ? (
@@ -934,10 +1018,10 @@ function RemoteImageCapturePanel({
       <div className="mt-5 rounded-[1.3rem] border bg-slate-50 px-4 py-4">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Current channel</p>
         <p className="mt-2 text-sm font-medium text-slate-900">
-          {intakeChannel?.telegram_available ? "Telegram is live for remote note images." : "Remote note capture is not configured yet."}
+          {intakeChannel?.magic_link_url ? "Magic-link upload is live for remote note images." : "Remote note capture is not configured yet."}
         </p>
         <p className="mt-2 text-sm leading-6 text-slate-600">
-          {intakeChannel?.instructions ?? "Set the CRM intake secret and Telegram bot config to enable phone-first note capture."}
+          {intakeChannel?.instructions ?? "Set the CRM intake secret to enable phone-first note capture."}
         </p>
         {preferredChannels.length ? (
           <p className="mt-3 text-sm text-slate-700">
@@ -945,18 +1029,167 @@ function RemoteImageCapturePanel({
           </p>
         ) : null}
         {routingNotes ? <p className="mt-2 text-sm leading-6 text-slate-600">{routingNotes}</p> : null}
-        {intakeChannel?.intake_caption ? (
+        {intakeChannel?.magic_link_url ? (
           <>
-            <p className="mt-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Caption to send with the image</p>
-            <code className="mt-2 block overflow-x-auto rounded-2xl border bg-white px-4 py-3 text-sm text-slate-900">
-              {intakeChannel.intake_caption}
-            </code>
+            <p className="mt-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Secure upload link</p>
+            <a
+              href={intakeChannel.magic_link_url}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-2 block overflow-x-auto rounded-2xl border bg-white px-4 py-3 text-sm text-slate-900 underline decoration-slate-300 underline-offset-4"
+            >
+              {intakeChannel.magic_link_url}
+            </a>
             <p className="mt-3 text-xs text-slate-500">
-              Send a photo or image document to the bot with that exact caption. Brivoly will import the note into your CRM queue and reply with the result.
+              Open that link on your phone, upload a photo or screenshot, and Brivoly will import the note into your CRM queue.
             </p>
           </>
         ) : null}
       </div>
+    </section>
+  );
+}
+
+function IntakeTaskNav({ activeTask }: { activeTask: CRMIntakeTask }) {
+  const items: Array<{ href: string; title: string; body: string; task: CRMIntakeTask }> = [
+    { href: "/crm/intake", title: "Intake Hub", body: "See the overall intake setup.", task: "hub" },
+    { href: "/crm/intake/profile", title: "AI Profile", body: "Teach Brivoly your messy sources.", task: "profile" },
+    { href: "/crm/intake/routing", title: "Routing", body: "Define preferred channels and notes.", task: "routing" },
+    { href: "/crm/intake/capture", title: "Remote Capture", body: "Share the phone upload path.", task: "capture" },
+  ];
+
+  return (
+    <section className="rounded-[1.75rem] border bg-white/90 p-5 shadow-sm">
+      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Intake Tasks</p>
+      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        {items.map((item) => {
+          const active = item.task === activeTask;
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`rounded-[1.2rem] border px-4 py-4 transition ${
+                active ? "border-slate-900 bg-slate-950 text-white" : "bg-slate-50/80 hover:border-slate-400 hover:bg-white"
+              }`}
+            >
+              <p className={`text-xs font-semibold uppercase tracking-[0.18em] ${active ? "text-cyan-200" : "text-slate-400"}`}>{item.title}</p>
+              <p className={`mt-2 text-sm leading-6 ${active ? "text-slate-100" : "text-slate-700"}`}>{item.body}</p>
+            </Link>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function IntakeTaskHub({
+  advancedAiUnlocked,
+  preferredChannels,
+  hasMagicLink,
+}: {
+  advancedAiUnlocked: boolean;
+  preferredChannels: string[];
+  hasMagicLink: boolean;
+}) {
+  return (
+    <section className="grid gap-6 xl:grid-cols-3">
+      <TaskSummaryCard
+        href="/crm/intake/profile"
+        eyebrow="Task 1"
+        title="Set the AI profile"
+        body={advancedAiUnlocked ? "Your paid AI intake tools are available. Keep the prompt and common formats current." : "Unlock the paid AI intake layer before relying on note-image and messy-file interpretation."}
+      />
+      <TaskSummaryCard
+        href="/crm/intake/routing"
+        eyebrow="Task 2"
+        title="Define routing rules"
+        body={preferredChannels.length ? `Preferred channels are set: ${preferredChannels.join(", ")}.` : "Add preferred intake channels and operator notes so the team knows where raw material should come from."}
+      />
+      <TaskSummaryCard
+        href="/crm/intake/capture"
+        eyebrow="Task 3"
+        title="Share remote capture"
+        body={hasMagicLink ? "A signed phone upload link is live and ready to share with operators." : "Finish setup so the remote upload path can be used from a phone."}
+      />
+    </section>
+  );
+}
+
+function TaskSummaryCard({
+  href,
+  eyebrow,
+  title,
+  body,
+}: {
+  href: string;
+  eyebrow: string;
+  title: string;
+  body: string;
+}) {
+  return (
+    <Link href={href} className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm transition hover:border-slate-400 hover:bg-white">
+      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">{eyebrow}</p>
+      <h3 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">{title}</h3>
+      <p className="mt-3 text-sm leading-6 text-slate-600">{body}</p>
+    </Link>
+  );
+}
+
+function IntakeRoutingPanel({
+  channelsDraft,
+  routingNotesDraft,
+  onChannelsDraftChange,
+  onRoutingNotesDraftChange,
+  onSave,
+  saveStatus,
+  isSaving,
+  canPersistSettings,
+}: {
+  channelsDraft: string;
+  routingNotesDraft: string;
+  onChannelsDraftChange: (value: string) => void;
+  onRoutingNotesDraftChange: (value: string) => void;
+  onSave: () => void;
+  saveStatus: string | null;
+  isSaving: boolean;
+  canPersistSettings: boolean;
+}) {
+  return (
+    <section className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm">
+      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Intake Routing</p>
+      <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Tell the team how raw intake should arrive.</h2>
+      <p className="mt-3 text-sm leading-6 text-slate-600">
+        Use this task to define preferred image-intake channels and the operator notes that explain when each path should be used.
+      </p>
+
+      <div className="mt-5 space-y-4">
+        <label className="block">
+          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Preferred channels</span>
+          <input
+            value={channelsDraft}
+            onChange={(event) => onChannelsDraftChange(event.target.value)}
+            placeholder="upload, whatsapp, email"
+            className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:bg-white"
+          />
+        </label>
+        <label className="block">
+          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Routing notes</span>
+          <textarea
+            value={routingNotesDraft}
+            onChange={(event) => onRoutingNotesDraftChange(event.target.value)}
+            rows={6}
+            className="mt-2 min-h-36 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:bg-white"
+          />
+        </label>
+      </div>
+
+      <div className="mt-5 flex items-center gap-3">
+        <Button onClick={onSave} disabled={isSaving || !canPersistSettings}>
+          {isSaving ? "Saving..." : "Save intake routing"}
+        </Button>
+        {saveStatus ? <p className="text-sm text-slate-500">{saveStatus}</p> : null}
+      </div>
+      {!canPersistSettings ? <p className="mt-3 text-sm text-slate-500">Routing settings are unavailable until account settings finish loading.</p> : null}
     </section>
   );
 }

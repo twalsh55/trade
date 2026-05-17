@@ -1,7 +1,15 @@
+import { BrandMark } from "@/components/brand-mark";
+
 export default function CRMRouteLoading() {
   return (
     <div className="min-w-0">
-      <section className="rounded-[2rem] border bg-white/88 p-6 shadow-[0_30px_100px_-55px_rgba(15,23,42,0.4)] backdrop-blur md:p-8">
+      <section className="relative rounded-[2rem] border bg-white/88 p-6 shadow-[0_30px_100px_-55px_rgba(15,23,42,0.4)] backdrop-blur md:p-8">
+        <BrandMark
+          size="sm"
+          className="pointer-events-none absolute right-6 top-6 opacity-20"
+          imageClassName="saturate-[0.85]"
+          href={null}
+        />
         <div className="inline-flex items-center rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-cyan-800">
           Opening CRM
         </div>

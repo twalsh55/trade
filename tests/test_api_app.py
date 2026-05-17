@@ -724,9 +724,10 @@ def test_telegram_webhook_handles_remote_crm_image_intake(monkeypatch) -> None:
     assert tasks == [("456", "large", "telegram-photo.jpg")]
 
 
-def test_crm_intake_channel_returns_caption_for_authenticated_user(monkeypatch) -> None:
+def test_crm_intake_channel_returns_magic_link_for_authenticated_user(monkeypatch) -> None:
     user = make_user()
     client = make_client(user=user)
+    monkeypatch.setenv("APP_BASE_URL", "https://www.brivoly.com")
     monkeypatch.setenv("CRM_INTAKE_SECRET", "crm-secret")
     monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "bot")
 
@@ -735,9 +736,9 @@ def test_crm_intake_channel_returns_caption_for_authenticated_user(monkeypatch) 
     assert response.status_code == 200
     payload = response.json()
     assert payload["telegram_available"] is True
-    assert payload["intake_channel"] == "telegram"
-    assert payload["intake_caption"].startswith("/intake ")
-    assert len(payload["intake_caption"]) < 60
+    assert payload["intake_channel"] == "magic_link"
+    assert payload["intake_caption"] is None
+    assert payload["magic_link_url"] == f"https://www.brivoly.com/intake/{_build_crm_intake_token(user.id, 'crm-secret')}"
 
 
 def test_crm_intake_channel_reports_missing_configuration() -> None:
@@ -751,6 +752,50 @@ def test_crm_intake_channel_reports_missing_configuration() -> None:
     payload = response.json()
     assert payload["telegram_available"] is False
     assert payload["intake_caption"] is None
+    assert payload["magic_link_url"] is None
+
+
+def test_crm_intake_upload_imports_rows(monkeypatch) -> None:
+    user = make_user()
+    repository = InMemoryLeadFollowUpRepository(now=lambda: datetime(2024, 5, 6, 12, 30, tzinfo=UTC))
+    personalization = InMemoryPersonalizationRepository()
+    personalization.save_dashboard_settings(build_default_dashboard_settings(user.id, telegram_enabled=True))
+    client = make_client(
+        user=user,
+        personalization_repository=personalization,
+        lead_follow_up_repository=repository,
+        billing_port=FakeBillingPort(),
+    )
+
+    class FakeImageIntake:
+        def extract_spreadsheet_rows_from_image(self, prompt, preferred_formats, file_name, file_bytes) -> str:
+            assert file_name == "phone-note.jpg"
+            assert file_bytes == b"image-bytes"
+            return (
+                "lead_name,company_name,owner_name,stage,next_follow_up_at,notes,priority,contact_channel,next_step\n"
+                "Taylor Brooks,Beacon Ridge,Samir Patel,Discovery,2024-05-09,Imported from magic link image,high,image,Follow up\n"
+            )
+
+    monkeypatch.setenv("CRM_INTAKE_SECRET", "crm-secret")
+    monkeypatch.setattr("src.adapters.api.app.build_crm_image_intake_agent_from_env", lambda: FakeImageIntake())
+
+    response = client.post(
+        "/api/crm/intake/upload",
+        json={
+            "intake_token": _build_crm_intake_token(user.id, "crm-secret"),
+            "file_name": "phone-note.jpg",
+            "file_content_base64": b64encode(b"image-bytes").decode("ascii"),
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["imported_count"] == 1
+    assert payload["skipped_duplicates"] == 0
+    assert payload["skipped_invalid"] == 0
+    assert "imported your note image" in payload["message"].lower()
+    overview = GetLeadFollowUpOverviewUseCase(repository=repository, now=lambda: datetime(2024, 5, 6, 12, 30, tzinfo=UTC)).execute(user)
+    assert any(item.notes == "Imported from magic link image" for item in overview.items)
 
 
 def test_run_telegram_crm_image_intake_imports_rows(monkeypatch) -> None:

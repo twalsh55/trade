@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { BrandLockup } from "@/components/brand-lockup";
+import { BrandMark } from "@/components/brand-mark";
 import { ClerkAuthBridge } from "@/components/auth/clerk-auth-bridge";
 import { Button } from "@/components/ui/button";
 import { getSettingsBootstrap } from "@/lib/api";
@@ -20,19 +20,23 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-6xl px-4 py-6 lg:px-8">
-      <section className="overflow-hidden rounded-[2rem] border bg-white/85 p-6 shadow-[0_30px_100px_-55px_rgba(15,23,42,0.4)] backdrop-blur md:p-8">
+      <section className="relative overflow-hidden rounded-[2rem] border bg-white/85 p-6 shadow-[0_30px_100px_-55px_rgba(15,23,42,0.4)] backdrop-blur md:p-8">
+        <BrandMark
+          size="md"
+          priority
+          className="pointer-events-none absolute right-6 top-6 opacity-20 md:right-8 md:top-8"
+          imageClassName="saturate-[0.85]"
+          href={null}
+        />
         <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:justify-between">
           <div className="max-w-3xl">
-            <div className="flex items-center gap-4">
-              <BrandLockup size="lg" priority />
-              <div>
-                <p className="bg-gradient-to-r from-[#034CFD] to-[#01113B] bg-clip-text text-xs font-semibold uppercase tracking-[0.28em] text-transparent">
-                  CRM Portal
-                </p>
-                <h1 className="mt-2 text-4xl font-semibold tracking-tight text-slate-950 md:text-5xl">
-                  Sign in to open your relationship workspace.
-                </h1>
-              </div>
+            <div>
+              <p className="bg-gradient-to-r from-[#034CFD] to-[#01113B] bg-clip-text text-xs font-semibold uppercase tracking-[0.28em] text-transparent">
+                CRM Portal
+              </p>
+              <h1 className="mt-2 text-4xl font-semibold tracking-tight text-slate-950 md:text-5xl">
+                Sign in to open your relationship workspace.
+              </h1>
             </div>
             <p className="mt-6 max-w-2xl text-base leading-7 text-slate-600">
               You are one step away from the same CRM workspace you land in after sign-in. Brivoly will restore your

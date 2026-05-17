@@ -240,6 +240,7 @@ export type CRMRemoteIntakeChannel = {
   telegram_available: boolean;
   intake_channel: string | null;
   intake_caption: string | null;
+  magic_link_url: string | null;
   instructions: string;
 };
 
