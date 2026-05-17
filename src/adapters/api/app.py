@@ -64,10 +64,14 @@ from src.application.crm import GetLeadFollowUpOverviewUseCase
 from src.application.crm import (
     AddLeadFollowUpNoteUseCase,
     CompleteLeadFollowUpUseCase,
+    ConnectMailboxUseCase,
     DesignLeadFollowUpEmailUseCase,
     EmailThreadMessageInput,
     IngestLeadEmailThreadUseCase,
+    ListMailboxConnectionsUseCase,
+    SendLeadFollowUpEmailUseCase,
     SnoozeLeadFollowUpUseCase,
+    SyncMailboxConnectionUseCase,
 )
 from src.application.crm_import import (
     CommitLeadImportUseCase,
@@ -95,6 +99,9 @@ from src.application.dto import (
     build_lead_import_preview_dto,
     build_lead_follow_up_email_draft_dto,
     build_lead_follow_up_overview_dto,
+    build_mailbox_connection_dto,
+    build_mailbox_send_result_dto,
+    build_mailbox_sync_result_dto,
     build_user_dashboard_settings_dto,
     dto_to_dict,
 )
@@ -182,6 +189,19 @@ class CRMInboxThreadPayload(BaseModel):
     source: str = Field(default="api", max_length=80)
     thread_id: str = Field(min_length=1, max_length=255)
     messages: list[CRMInboxThreadMessagePayload] = Field(min_length=1, max_length=50)
+
+
+class MailboxConnectionPayload(BaseModel):
+    provider: str = Field(pattern="^(gmail|outlook)$")
+    email_address: str = Field(min_length=3, max_length=255)
+    display_name: str = Field(default="", max_length=160)
+
+
+class MailboxSendPayload(BaseModel):
+    connection_id: str | None = Field(default=None, min_length=1, max_length=255)
+    thread_id: str | None = Field(default=None, min_length=1, max_length=255)
+    subject: str = Field(min_length=1, max_length=255)
+    body: str = Field(min_length=1, max_length=10000)
 
 
 class FounderCodeRequestDTO(BaseModel):
@@ -447,6 +467,75 @@ def create_app(dependencies: ApiDependencies | None = None) -> FastAPI:
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         return dto_to_dict(build_lead_follow_up_overview_dto(overview))
+
+    @app.get("/api/crm/inbox/mailboxes")
+    def crm_mailbox_connections(
+        authorization: str | None = Header(default=None),
+        session_cookie: str | None = Cookie(default=None, alias=CLERK_SESSION_COOKIE),
+    ) -> dict[str, object]:
+        user = _require_crm_user(deps, authorization, session_cookie)
+        connections = ListMailboxConnectionsUseCase(repository=deps.lead_follow_up_repository_factory()).execute(user)
+        return {"items": [dto_to_dict(build_mailbox_connection_dto(item)) for item in connections]}
+
+    @app.post("/api/crm/inbox/mailboxes/connect")
+    def crm_connect_mailbox(
+        payload: MailboxConnectionPayload,
+        authorization: str | None = Header(default=None),
+        session_cookie: str | None = Cookie(default=None, alias=CLERK_SESSION_COOKIE),
+    ) -> dict[str, object]:
+        user = _require_crm_user(deps, authorization, session_cookie)
+        try:
+            connection = ConnectMailboxUseCase(repository=deps.lead_follow_up_repository_factory(), now=deps.now).execute(
+                user,
+                provider=payload.provider,
+                email_address=payload.email_address,
+                display_name=payload.display_name,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return dto_to_dict(build_mailbox_connection_dto(connection))
+
+    @app.post("/api/crm/inbox/mailboxes/{connection_id}/sync")
+    def crm_sync_mailbox(
+        connection_id: str,
+        authorization: str | None = Header(default=None),
+        session_cookie: str | None = Cookie(default=None, alias=CLERK_SESSION_COOKIE),
+    ) -> dict[str, object]:
+        user = _require_crm_user(deps, authorization, session_cookie)
+        repository = deps.lead_follow_up_repository_factory()
+        try:
+            result = SyncMailboxConnectionUseCase(repository=repository, now=deps.now).execute(user, connection_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="Mailbox connection not found.") from exc
+        return dto_to_dict(build_mailbox_sync_result_dto(result))
+
+    @app.post("/api/crm/followups/{follow_up_id}/send")
+    def crm_send_followup_email(
+        follow_up_id: str,
+        payload: MailboxSendPayload,
+        authorization: str | None = Header(default=None),
+        session_cookie: str | None = Cookie(default=None, alias=CLERK_SESSION_COOKIE),
+    ) -> dict[str, object]:
+        user = _require_crm_user(deps, authorization, session_cookie)
+        repository = deps.lead_follow_up_repository_factory()
+        try:
+            result = SendLeadFollowUpEmailUseCase(repository=repository, now=deps.now).execute(
+                user,
+                follow_up_id,
+                connection_id=payload.connection_id,
+                thread_id=payload.thread_id,
+                subject=payload.subject,
+                body=payload.body,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except KeyError as exc:
+            missing_id = str(exc).strip("'")
+            message = "Mailbox connection not found." if payload.connection_id and missing_id == payload.connection_id else "CRM follow-up not found."
+            raise HTTPException(status_code=404, detail=message) from exc
+        return dto_to_dict(build_mailbox_send_result_dto(result))
 
     @app.post("/api/crm/import/preview")
     def crm_import_preview(

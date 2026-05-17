@@ -205,6 +205,40 @@ export type CRMInboxSummary = {
   auto_created_contact_count: number;
 };
 
+export type CRMMailboxConnection = {
+  id: string;
+  provider: "gmail" | "outlook" | string;
+  email_address: string;
+  display_name: string;
+  status: string;
+  connected_at: string;
+  last_sync_at: string | null;
+  last_sync_status: string;
+  last_sync_error: string;
+  last_synced_thread_count: number;
+  sent_message_count: number;
+};
+
+export type CRMMailboxConnectionsResponse = {
+  items: CRMMailboxConnection[];
+};
+
+export type CRMMailboxSyncResult = {
+  connection: CRMMailboxConnection;
+  synced_threads: number;
+  created_contacts: number;
+  updated_relationships: number;
+  overview: CRMFollowUpOverview;
+};
+
+export type CRMMailboxSendResult = {
+  connection: CRMMailboxConnection;
+  follow_up_id: string;
+  thread_id: string;
+  sent_at: string;
+  overview: CRMFollowUpOverview;
+};
+
 export type CRMEmailDraft = {
   follow_up_id: string;
   objective: "follow_up" | "recap" | "revive" | "close_loop";

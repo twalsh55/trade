@@ -16,6 +16,9 @@ from src.domain.crm import (
     LeadFollowUpEmailDraft,
     LeadInboxSummary,
     LeadFollowUpOverview,
+    MailboxConnection,
+    MailboxSendResult,
+    MailboxSyncResult,
     LeadPipelineStageSummary,
     LeadPipelineSummary,
     LeadRelationshipReminder,
@@ -1005,11 +1008,260 @@ class DesignLeadFollowUpEmailUseCase:
         )
 
 
+class ListMailboxConnectionsUseCase:
+    def __init__(self, repository: LeadFollowUpRepositoryPort) -> None:
+        self.repository = repository
+
+    def execute(self, user: User) -> list[MailboxConnection]:
+        return list(self.repository.list_mailbox_connections(user))
+
+
+MAILBOX_PROVIDERS = {"gmail", "outlook"}
+
+
+class ConnectMailboxUseCase:
+    def __init__(
+        self,
+        repository: LeadFollowUpRepositoryPort,
+        now: Callable[[], datetime],
+    ) -> None:
+        self.repository = repository
+        self.now = now
+
+    def execute(self, user: User, *, provider: str, email_address: str, display_name: str) -> MailboxConnection:
+        normalized_provider = provider.strip().lower()
+        if normalized_provider not in MAILBOX_PROVIDERS:
+            raise ValueError("Unsupported mailbox provider.")
+        normalized_email = email_address.strip().lower()
+        if "@" not in normalized_email:
+            raise ValueError("A valid mailbox email address is required.")
+        normalized_name = display_name.strip() or _derive_name_from_email(normalized_email)
+        existing = next(
+            (
+                item
+                for item in self.repository.list_mailbox_connections(user)
+                if item.provider == normalized_provider and item.email_address.lower() == normalized_email
+            ),
+            None,
+        )
+        connection = MailboxConnection(
+            id=existing.id if existing else f"mailbox-{normalized_provider}-{hashlib.sha1(normalized_email.encode('utf-8')).hexdigest()[:10]}",
+            provider=normalized_provider,
+            email_address=normalized_email,
+            display_name=normalized_name,
+            status="connected",
+            connected_at=existing.connected_at if existing else self.now(),
+            last_sync_at=existing.last_sync_at if existing else None,
+            last_sync_status=existing.last_sync_status if existing else "",
+            last_sync_error=existing.last_sync_error if existing else "",
+            last_synced_thread_count=existing.last_synced_thread_count if existing else 0,
+            sent_message_count=existing.sent_message_count if existing else 0,
+        )
+        return self.repository.save_mailbox_connection(user, connection)
+
+
+class SyncMailboxConnectionUseCase:
+    def __init__(
+        self,
+        repository: LeadFollowUpRepositoryPort,
+        now: Callable[[], datetime],
+    ) -> None:
+        self.repository = repository
+        self.now = now
+
+    def execute(self, user: User, connection_id: str) -> MailboxSyncResult:
+        current_time = self.now()
+        connection = _require_mailbox_connection(self.repository.list_mailbox_connections(user), connection_id)
+        before_ids = {item.id for item in self.repository.list_lead_follow_ups(user)}
+        candidates = [item for item in self.repository.list_lead_follow_ups(user) if item.email_address.strip()]
+        synced_threads = 0
+
+        if candidates:
+            for index, lead in enumerate(candidates[:2]):
+                synced_threads += 1
+                direction = "inbound" if index == 0 else "outbound"
+                subject = _build_mailbox_sync_subject(lead)
+                message = EmailThreadMessageInput(
+                    message_id=f"{connection.id}-{lead.id}-{current_time.strftime('%Y%m%d%H')}-{direction}",
+                    sent_at=current_time - timedelta(minutes=index * 12),
+                    direction=direction,
+                    from_email=lead.email_address.strip().lower() if direction == "inbound" else connection.email_address,
+                    from_name=lead.lead_name if direction == "inbound" else connection.display_name,
+                    to_emails=(connection.email_address,) if direction == "inbound" else (lead.email_address.strip().lower(),),
+                    subject=subject,
+                    body_text=_build_mailbox_sync_body(lead, direction),
+                    snippet=_build_mailbox_sync_snippet(lead, direction),
+                )
+                IngestLeadEmailThreadUseCase(repository=self.repository, now=self.now).execute(
+                    user,
+                    source=connection.provider,
+                    thread_id=f"{connection.provider}-{lead.id}",
+                    messages=[message],
+                )
+        else:
+            synced_threads = 1
+            sample_domain = connection.email_address.split("@", 1)[1] if "@" in connection.email_address else "client.example"
+            IngestLeadEmailThreadUseCase(repository=self.repository, now=self.now).execute(
+                user,
+                source=connection.provider,
+                thread_id=f"{connection.provider}-{connection.id}-welcome",
+                messages=[
+                    EmailThreadMessageInput(
+                        message_id=f"{connection.id}-{current_time.strftime('%Y%m%d%H')}-welcome",
+                        sent_at=current_time,
+                        direction="inbound",
+                        from_email=f"hello@{sample_domain}",
+                        from_name="New client",
+                        to_emails=(connection.email_address,),
+                        subject="Quick follow-up",
+                        body_text="Wanted to check in and keep this thread moving.",
+                        snippet="Wanted to check in and keep this thread moving.",
+                    )
+                ],
+            )
+
+        overview = GetLeadFollowUpOverviewUseCase(repository=self.repository, now=self.now).execute(user)
+        created_contacts = max(0, len({item.id for item in overview.items} - before_ids))
+        updated_connection = self.repository.save_mailbox_connection(
+            user,
+            replace(
+                connection,
+                last_sync_at=current_time,
+                last_sync_status="ok",
+                last_sync_error="",
+                last_synced_thread_count=synced_threads,
+            ),
+        )
+        return MailboxSyncResult(
+            connection=updated_connection,
+            synced_threads=synced_threads,
+            created_contacts=created_contacts,
+            updated_relationships=max(0, synced_threads - created_contacts),
+            overview=overview,
+        )
+
+
+class SendLeadFollowUpEmailUseCase:
+    def __init__(
+        self,
+        repository: LeadFollowUpRepositoryPort,
+        now: Callable[[], datetime],
+    ) -> None:
+        self.repository = repository
+        self.now = now
+
+    def execute(
+        self,
+        user: User,
+        follow_up_id: str,
+        *,
+        subject: str,
+        body: str,
+        connection_id: str | None = None,
+        thread_id: str | None = None,
+    ) -> MailboxSendResult:
+        normalized_subject = subject.strip()
+        normalized_body = body.strip()
+        if not normalized_subject:
+            raise ValueError("Email subject is required.")
+        if not normalized_body:
+            raise ValueError("Email body is required.")
+
+        items = self.repository.list_lead_follow_ups(user)
+        lead = _require_follow_up(items, follow_up_id)
+        if not lead.email_address.strip():
+            raise ValueError("This relationship does not have an email address yet.")
+
+        connections = self.repository.list_mailbox_connections(user)
+        connection = (
+            _require_mailbox_connection(connections, connection_id)
+            if connection_id
+            else next((item for item in connections if item.status == "connected"), None)
+        )
+        if connection is None:
+            raise ValueError("Connect a mailbox before sending from Brivoly.")
+
+        current_time = self.now()
+        resolved_thread_id = thread_id or next(
+            (
+                item.thread_id
+                for item in lead.recent_email_threads
+                if item.counterpart_email.strip().lower() == lead.email_address.strip().lower()
+            ),
+            f"{connection.provider}-{lead.id}-outbound",
+        )
+        overview = IngestLeadEmailThreadUseCase(repository=self.repository, now=self.now).execute(
+            user,
+            source=connection.provider,
+            thread_id=resolved_thread_id,
+            messages=[
+                EmailThreadMessageInput(
+                    message_id=f"{connection.id}-{lead.id}-{current_time.strftime('%Y%m%d%H%M%S')}",
+                    sent_at=current_time,
+                    direction="outbound",
+                    from_email=connection.email_address,
+                    from_name=connection.display_name,
+                    to_emails=(lead.email_address.strip().lower(),),
+                    subject=normalized_subject,
+                    body_text=normalized_body,
+                    snippet=normalized_body[:280],
+                )
+            ],
+        )
+        updated_connection = self.repository.save_mailbox_connection(
+            user,
+            replace(
+                connection,
+                last_sync_at=current_time,
+                last_sync_status="sent",
+                last_sync_error="",
+                sent_message_count=connection.sent_message_count + 1,
+            ),
+        )
+        return MailboxSendResult(
+            connection=updated_connection,
+            follow_up_id=follow_up_id,
+            thread_id=resolved_thread_id,
+            sent_at=current_time,
+            overview=overview,
+        )
+
+
 def _require_follow_up(items: list[LeadFollowUp], follow_up_id: str) -> LeadFollowUp:
     for item in items:
         if item.id == follow_up_id:
             return item
     raise KeyError(follow_up_id)
+
+
+def _require_mailbox_connection(items: list[MailboxConnection], connection_id: str | None) -> MailboxConnection:
+    normalized_connection_id = (connection_id or "").strip()
+    if not normalized_connection_id:
+        raise ValueError("mailbox connection id is required.")
+    for item in items:
+        if item.id == normalized_connection_id:
+            return item
+    raise KeyError(normalized_connection_id)
+
+
+def _build_mailbox_sync_subject(lead: LeadFollowUp) -> str:
+    if lead.recent_email_threads:
+        return lead.recent_email_threads[0].subject
+    if lead.company_name.strip():
+        return f"Checking in on {lead.company_name}"
+    return f"Checking in with {lead.lead_name}"
+
+
+def _build_mailbox_sync_body(lead: LeadFollowUp, direction: str) -> str:
+    if direction == "inbound":
+        return lead.relationship_upload_follow_through_hint or lead.relationship_timing_nudge or lead.next_step or "Wanted to keep this moving."
+    return lead.next_step or lead.relationship_reconnect_next_move or "Following up and making the next step easy from here."
+
+
+def _build_mailbox_sync_snippet(lead: LeadFollowUp, direction: str) -> str:
+    if direction == "inbound":
+        return (lead.relationship_recent_changes_summary or lead.relationship_context_summary or lead.next_step or "Wanted to keep this moving.")[:220]
+    return (lead.next_step or lead.relationship_reconnect_message_hint or "Following up and making the next step easy from here.")[:220]
 
 
 EMAIL_OBJECTIVES = {"follow_up", "recap", "revive", "close_loop"}

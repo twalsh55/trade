@@ -91,6 +91,21 @@ class LeadInboxSummary:
 
 
 @dataclass(frozen=True)
+class MailboxConnection:
+    id: str
+    provider: str
+    email_address: str
+    display_name: str
+    status: str
+    connected_at: datetime
+    last_sync_at: datetime | None = None
+    last_sync_status: str = ""
+    last_sync_error: str = ""
+    last_synced_thread_count: int = 0
+    sent_message_count: int = 0
+
+
+@dataclass(frozen=True)
 class LeadFollowUp:
     id: str
     lead_name: str
@@ -157,6 +172,24 @@ class LeadFollowUpEmailDraft:
     subject: str
     body: str
     rationale: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class MailboxSyncResult:
+    connection: MailboxConnection
+    synced_threads: int
+    created_contacts: int
+    updated_relationships: int
+    overview: LeadFollowUpOverview
+
+
+@dataclass(frozen=True)
+class MailboxSendResult:
+    connection: MailboxConnection
+    follow_up_id: str
+    thread_id: str
+    sent_at: datetime
+    overview: LeadFollowUpOverview
 
 
 @dataclass(frozen=True)

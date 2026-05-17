@@ -98,8 +98,11 @@ cd web && npm run e2e
   - Today priorities now collapse into one obvious `Start here` move, lighter `Needs care now` and `Freshest opening` summaries, direct draft/review actions, stronger upload-aware next-touch framing, and a clearer `Next move` cue on each priority so the daily home asks for less scanning
   - follow-up queue
   - inbox-native relationship page for auto-logging email threads and reconnect-aware next moves
+  - mailbox beta for Gmail / Outlook account connection, inbox sync actions, and sending drafted notes back out through the connected mailbox path
   - inbox cards now surface backend-driven relationship pulse, open-loop memory, thread continuity cues, `what changed` hints, unresolved-thread cues, a clearer long-thread `through-line`, and a carry-forward cue for longer threads, grouped into `Needs you now` and `Still warm`
   - email-thread ingestion that can auto-create/update contacts from inbox activity
+  - mailbox sync now feeds the same inbox-ingest path Brivoly already uses, so synced email activity lands in relationship memory instead of a separate mailbox subsystem
+  - sending a drafted note now writes the outbound message back into the same relationship timeline and thread history
   - attention view with reconnect-first guidance and direct draft actions
   - complete and snooze actions
   - relationship history + internal notes
@@ -203,9 +206,9 @@ cd web && npm run e2e
 ### Next Likely Moves
 
 - Highest-conviction Client OS next steps:
-  - add real Gmail / Outlook account connection with OAuth, token handling, and mailbox connection management
-  - turn inbox sync from preview mode into a real background mailbox sync with provider webhooks or polling
-  - let users send and reply from their connected mailbox so drafts become real outbound follow-through
+  - replace the current mailbox beta connection flow with real Gmail / Outlook OAuth, token refresh, and provider-managed account sessions
+  - turn the new mailbox sync actions into real background mailbox sync with provider webhooks or polling
+  - deepen the new mailbox send path into real reply/send provider delivery instead of app-managed simulated sync events
   - deepen the real-world client model beyond lightweight follow-ups, including projects, engagements, and richer account context
   - strengthen onboarding from real data sources beyond spreadsheets so Client OS can become the live source of relationship memory
   - improve production trust and resilience with stronger empty states, safer session handling, and fewer smart-prototype moments

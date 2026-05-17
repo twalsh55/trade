@@ -7,7 +7,7 @@ from uuid import UUID
 import pandas as pd
 
 from src.domain.auth import ExternalIdentity, User
-from src.domain.crm import LeadFollowUp, LeadImportClarification
+from src.domain.crm import LeadFollowUp, LeadImportClarification, MailboxConnection
 from src.domain.prospecting import ProspectDraft, ProspectMatch, ProspectTokenUsage, SocialPost
 
 if TYPE_CHECKING:
@@ -77,6 +77,12 @@ class LeadFollowUpRepositoryPort(Protocol):
 
     def import_lead_follow_ups(self, user: User, follow_ups: list[LeadFollowUp]) -> int:
         """Insert imported follow-ups and return how many were stored."""
+
+    def list_mailbox_connections(self, user: User) -> list[MailboxConnection]:
+        """Return connected inbox accounts for the authenticated user."""
+
+    def save_mailbox_connection(self, user: User, connection: MailboxConnection) -> MailboxConnection:
+        """Persist one inbox connection and return the stored value."""
 
 
 class CRMImageIntakePort(Protocol):

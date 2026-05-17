@@ -942,6 +942,77 @@ def test_crm_inbox_thread_ingest_route_handles_use_case_value_error(monkeypatch)
     assert response.json()["detail"] == "bad thread"
 
 
+def test_crm_mailbox_connect_and_list_endpoints_persist_connections() -> None:
+    repository = InMemoryLeadFollowUpRepository(now=lambda: datetime(2024, 5, 17, 12, 30, tzinfo=UTC))
+    client = make_client(user=make_user(), lead_follow_up_repository=repository)
+
+    connect_response = client.post(
+        "/api/crm/inbox/mailboxes/connect",
+        headers={"Authorization": "Bearer session-token"},
+        json={"provider": "gmail", "email_address": "ada@northstar.example", "display_name": "Ada from Northstar"},
+    )
+
+    assert connect_response.status_code == 200
+    payload = connect_response.json()
+    assert payload["provider"] == "gmail"
+    assert payload["email_address"] == "ada@northstar.example"
+    assert payload["status"] == "connected"
+
+    list_response = client.get("/api/crm/inbox/mailboxes", headers={"Authorization": "Bearer session-token"})
+    assert list_response.status_code == 200
+    assert list_response.json()["items"][0]["email_address"] == "ada@northstar.example"
+
+
+def test_crm_mailbox_sync_endpoint_updates_relationship_memory() -> None:
+    repository = InMemoryLeadFollowUpRepository(now=lambda: datetime(2024, 5, 17, 12, 30, tzinfo=UTC))
+    client = make_client(user=make_user(), lead_follow_up_repository=repository)
+
+    connection = client.post(
+        "/api/crm/inbox/mailboxes/connect",
+        headers={"Authorization": "Bearer session-token"},
+        json={"provider": "gmail", "email_address": "ada@northstar.example", "display_name": "Ada from Northstar"},
+    ).json()
+
+    response = client.post(
+        f"/api/crm/inbox/mailboxes/{connection['id']}/sync",
+        headers={"Authorization": "Bearer session-token"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["synced_threads"] >= 1
+    assert payload["connection"]["last_sync_status"] == "ok"
+    assert payload["overview"]["inbox_summary"]["active_thread_count"] >= 1
+
+
+def test_crm_send_followup_email_endpoint_logs_outbound_thread_and_updates_connection() -> None:
+    repository = InMemoryLeadFollowUpRepository(now=lambda: datetime(2024, 5, 17, 12, 30, tzinfo=UTC))
+    client = make_client(user=make_user(), lead_follow_up_repository=repository)
+
+    connection = client.post(
+        "/api/crm/inbox/mailboxes/connect",
+        headers={"Authorization": "Bearer session-token"},
+        json={"provider": "outlook", "email_address": "ada@northstar.example", "display_name": "Ada from Northstar"},
+    ).json()
+
+    response = client.post(
+        "/api/crm/followups/lead-riverbridge/send",
+        headers={"Authorization": "Bearer session-token"},
+        json={
+            "connection_id": connection["id"],
+            "subject": "Proposal follow-up",
+            "body": "Wanted to make the next step easy and see if the proposal needs anything lighter.",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["connection"]["sent_message_count"] == 1
+    lead = next(item for item in payload["overview"]["items"] if item["id"] == "lead-riverbridge")
+    assert lead["recent_email_threads"][0]["last_message_direction"] == "outbound"
+    assert any(entry["summary"].startswith("Outbound email") for entry in lead["timeline"])
+
+
 def test_crm_intake_upload_imports_rows(monkeypatch) -> None:
     user = make_user()
     repository = InMemoryLeadFollowUpRepository(now=lambda: datetime(2024, 5, 6, 12, 30, tzinfo=UTC))

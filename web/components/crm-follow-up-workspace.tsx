@@ -15,6 +15,7 @@ import type {
   CRMImportPreview,
   CRMImportPreviewRow,
   CRMLeadFollowUp,
+  CRMMailboxConnection,
   CRMPipelineStageSummary,
   CRMRelationshipReminder,
   CRMRemoteIntakeChannel,
@@ -97,6 +98,11 @@ export function CRMFollowUpWorkspace({
   const [inboxSubject, setInboxSubject] = useState("");
   const [inboxMessageBody, setInboxMessageBody] = useState("");
   const [inboxStatus, setInboxStatus] = useState<string | null>(null);
+  const [mailboxConnections, setMailboxConnections] = useState<CRMMailboxConnection[]>([]);
+  const [mailboxProvider, setMailboxProvider] = useState<"gmail" | "outlook">("gmail");
+  const [mailboxEmail, setMailboxEmail] = useState("");
+  const [mailboxDisplayName, setMailboxDisplayName] = useState("");
+  const [mailboxStatus, setMailboxStatus] = useState<string | null>(null);
   const [inboxQuery, setInboxQuery] = useState("");
   const [inboxFilter, setInboxFilter] = useState<InboxFilter>("all");
   const [isPending, startTransition] = useTransition();
@@ -104,6 +110,7 @@ export function CRMFollowUpWorkspace({
   const [isAiSettingsPending, startAiSettingsTransition] = useTransition();
   const [isEmailPending, startEmailTransition] = useTransition();
   const [isInboxPending, startInboxTransition] = useTransition();
+  const [isMailboxPending, startMailboxTransition] = useTransition();
   const [queuedTodayDraft, setQueuedTodayDraft] = useState<{ leadId: string; preset: TodayDraftPreset } | null>(null);
   const [draftFocusToken, setDraftFocusToken] = useState(0);
 
@@ -154,6 +161,32 @@ export function CRMFollowUpWorkspace({
       setSelectedLeadId(filteredFollowUps[0]?.id ?? null);
     }
   }, [filteredFollowUps, selectedLeadId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadMailboxConnections() {
+      try {
+        const response = await fetch("/api/crm/inbox/mailboxes", { cache: "no-store" });
+        const body = (await response.json().catch(() => null)) as { items?: CRMMailboxConnection[]; error?: string } | null;
+        if (!response.ok || !body?.items) {
+          throw new Error(body?.error || "Unable to load mailbox connections.");
+        }
+        if (!cancelled) {
+          setMailboxConnections(body.items);
+        }
+      } catch (mailboxError) {
+        if (!cancelled) {
+          setMailboxStatus(mailboxError instanceof Error ? mailboxError.message : "Unable to load mailbox connections.");
+        }
+      }
+    }
+
+    void loadMailboxConnections();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function runAction(
     followUpId: string,
@@ -599,6 +632,98 @@ export function CRMFollowUpWorkspace({
     });
   }
 
+  function upsertMailboxConnection(connection: CRMMailboxConnection) {
+    setMailboxConnections((current) => {
+      const remaining = current.filter((item) => item.id !== connection.id);
+      return [connection, ...remaining];
+    });
+  }
+
+  function connectMailbox() {
+    setMailboxStatus("Connecting the mailbox to Brivoly...");
+    startMailboxTransition(async () => {
+      try {
+        const response = await fetch("/api/crm/inbox/mailboxes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            provider: mailboxProvider,
+            email_address: mailboxEmail.trim(),
+            display_name: mailboxDisplayName.trim(),
+          }),
+        });
+        const body = (await response.json().catch(() => null)) as CRMMailboxConnection | { error?: string } | null;
+        if (!response.ok || !body || !("id" in body)) {
+          throw new Error((body && "error" in body && body.error) || "Unable to connect the mailbox right now.");
+        }
+        upsertMailboxConnection(body);
+        setMailboxStatus(`${body.provider === "gmail" ? "Gmail" : "Outlook"} is now connected as ${body.email_address}.`);
+        setMailboxEmail("");
+        setMailboxDisplayName("");
+      } catch (mailboxError) {
+        setMailboxStatus(mailboxError instanceof Error ? mailboxError.message : "Unable to connect the mailbox right now.");
+      }
+    });
+  }
+
+  function syncMailboxConnection(connectionId: string) {
+    setMailboxStatus("Pulling recent mailbox activity into Brivoly...");
+    startMailboxTransition(async () => {
+      try {
+        const response = await fetch(`/api/crm/inbox/mailboxes/${connectionId}/sync`, { method: "POST" });
+        const body = (await response.json().catch(() => null)) as
+          | { connection: CRMMailboxConnection; overview: CRMFollowUpOverview; synced_threads: number; created_contacts: number; updated_relationships: number }
+          | { error?: string }
+          | null;
+        if (!response.ok || !body || !("connection" in body)) {
+          throw new Error((body && "error" in body && body.error) || "Unable to sync the mailbox right now.");
+        }
+        setOverview(body.overview);
+        upsertMailboxConnection(body.connection);
+        setSelectedLeadId((current) => current ?? body.overview.items[0]?.id ?? null);
+        setMailboxStatus(
+          `Mailbox synced. ${body.synced_threads} thread${body.synced_threads === 1 ? "" : "s"} refreshed, ${body.created_contacts} relationship${body.created_contacts === 1 ? "" : "s"} created, and ${body.updated_relationships} updated.`,
+        );
+        router.refresh();
+      } catch (mailboxError) {
+        setMailboxStatus(mailboxError instanceof Error ? mailboxError.message : "Unable to sync the mailbox right now.");
+      }
+    });
+  }
+
+  function sendCurrentDraftToMailbox() {
+    if (!selectedLead || !emailSubjectDraft.trim() || !emailBodyDraft.trim()) {
+      return;
+    }
+    setEmailStatus("Sending this note through the connected mailbox...");
+    startEmailTransition(async () => {
+      try {
+        const response = await fetch(`/api/crm/followups/send/${selectedLead.id}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            connection_id: mailboxConnections[0]?.id ?? null,
+            subject: emailSubjectDraft,
+            body: emailBodyDraft,
+          }),
+        });
+        const body = (await response.json().catch(() => null)) as
+          | { connection: CRMMailboxConnection; overview: CRMFollowUpOverview; sent_at: string }
+          | { error?: string }
+          | null;
+        if (!response.ok || !body || !("connection" in body)) {
+          throw new Error((body && "error" in body && body.error) || "Unable to send this note right now.");
+        }
+        setOverview(body.overview);
+        upsertMailboxConnection(body.connection);
+        setEmailStatus(`Sent through ${body.connection.provider === "gmail" ? "Gmail" : "Outlook"} at ${body.connection.email_address}.`);
+        router.refresh();
+      } catch (sendError) {
+        setEmailStatus(sendError instanceof Error ? sendError.message : "Unable to send this note right now.");
+      }
+    });
+  }
+
   return (
     <div className="mt-6">
       <BusinessProfileOnboarding
@@ -888,6 +1013,7 @@ export function CRMFollowUpWorkspace({
               emailBodyDraft={emailBodyDraft}
               emailStatus={emailStatus}
               isGeneratingEmail={isEmailPending}
+              canSendFromMailbox={mailboxConnections.length > 0}
               draftFocusToken={draftFocusToken}
               onEmailObjectiveChange={setEmailObjective}
               onEmailToneChange={setEmailTone}
@@ -895,6 +1021,7 @@ export function CRMFollowUpWorkspace({
               onEmailSubjectDraftChange={setEmailSubjectDraft}
               onEmailBodyDraftChange={setEmailBodyDraft}
               onGenerateEmailDraft={generateEmailDraft}
+              onSendDraftToMailbox={sendCurrentDraftToMailbox}
             />
           ) : null}
           <section className="rounded-[1.75rem] border bg-slate-950 p-6 text-slate-50 shadow-[0_24px_90px_-55px_rgba(15,23,42,0.9)]">
@@ -926,9 +1053,82 @@ export function CRMFollowUpWorkspace({
             </div>
 
             <section className="mt-6 rounded-[1.4rem] border bg-slate-50/80 p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Inbox sync preview</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Connected mailboxes</p>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Connect Gmail or Outlook once, then let Brivoly pull thread context back into relationship memory and send notes from the same account.
+              </p>
+              <div className="mt-4 grid gap-3 xl:grid-cols-[0.8fr_1.2fr_1fr_auto]">
+                <label className="block">
+                  <span className="ui-eyebrow">Provider</span>
+                  <select
+                    value={mailboxProvider}
+                    onChange={(event) => setMailboxProvider(event.target.value as "gmail" | "outlook")}
+                    className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400"
+                  >
+                    <option value="gmail">Gmail</option>
+                    <option value="outlook">Outlook</option>
+                  </select>
+                </label>
+                <label className="block">
+                  <span className="ui-eyebrow">Mailbox email</span>
+                  <input
+                    value={mailboxEmail}
+                    onChange={(event) => setMailboxEmail(event.target.value)}
+                    placeholder="you@yourstudio.com"
+                    className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400"
+                  />
+                </label>
+                <label className="block">
+                  <span className="ui-eyebrow">Name on the mailbox</span>
+                  <input
+                    value={mailboxDisplayName}
+                    onChange={(event) => setMailboxDisplayName(event.target.value)}
+                    placeholder="Ada from Northstar"
+                    className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400"
+                  />
+                </label>
+                <div className="flex items-end">
+                  <Button disabled={isMailboxPending} onClick={connectMailbox}>
+                    {isMailboxPending ? "Connecting..." : "Connect"}
+                  </Button>
+                </div>
+              </div>
+              <div className="mt-4 space-y-3">
+                {mailboxConnections.length ? (
+                  mailboxConnections.map((connection) => (
+                    <div key={connection.id} className="rounded-[1.2rem] border bg-white px-4 py-4">
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-950">
+                            {connection.provider === "gmail" ? "Gmail" : "Outlook"} · {connection.email_address}
+                          </p>
+                          <p className="mt-1 text-sm text-slate-600">
+                            {connection.display_name || "Mailbox account"} · {connection.last_sync_at ? `last synced ${formatDateTime(connection.last_sync_at)}` : "not synced yet"}
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <MiniFlag label={`${connection.sent_message_count} sent`} tone="neutral" />
+                          <MiniFlag label={`${connection.last_synced_thread_count} synced`} tone="warning" />
+                          <Button type="button" variant="outline" disabled={isMailboxPending} onClick={() => syncMailboxConnection(connection.id)}>
+                            {isMailboxPending ? "Syncing..." : "Sync now"}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="rounded-[1.2rem] border border-dashed bg-white px-4 py-4 text-sm leading-6 text-slate-600">
+                    No mailbox is connected yet. Add Gmail or Outlook above so Brivoly can start syncing conversation context instead of relying on manual thread previews.
+                  </div>
+                )}
+              </div>
+              {mailboxStatus ? <p className="mt-4 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">{mailboxStatus}</p> : null}
+            </section>
+
+            <section className="mt-6 rounded-[1.4rem] border bg-slate-50/80 p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Manual thread sync</p>
             <p className="mt-2 text-sm leading-6 text-slate-600">
-                Use this to test inbox memory before Gmail or Outlook connections are live.
+                Use this when you want to bring one thread in by hand or test relationship memory against a specific message.
             </p>
               <div className="mt-4 grid gap-3 md:grid-cols-2">
                 <input value={inboxThreadId} onChange={(event) => setInboxThreadId(event.target.value)} placeholder="Thread ID (optional)" className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400" />
@@ -2728,6 +2928,7 @@ function LeadMemoryPanel({
   emailBodyDraft,
   emailStatus,
   isGeneratingEmail,
+  canSendFromMailbox,
   draftFocusToken,
   onEmailObjectiveChange,
   onEmailToneChange,
@@ -2735,6 +2936,7 @@ function LeadMemoryPanel({
   onEmailSubjectDraftChange,
   onEmailBodyDraftChange,
   onGenerateEmailDraft,
+  onSendDraftToMailbox,
 }: {
   lead: CRMLeadFollowUp;
   settings: AccountSettings | null;
@@ -2750,6 +2952,7 @@ function LeadMemoryPanel({
   emailBodyDraft: string;
   emailStatus: string | null;
   isGeneratingEmail: boolean;
+  canSendFromMailbox: boolean;
   draftFocusToken: number;
   onEmailObjectiveChange: (value: CRMEmailDraft["objective"]) => void;
   onEmailToneChange: (value: CRMEmailDraft["tone"]) => void;
@@ -2762,6 +2965,7 @@ function LeadMemoryPanel({
     length?: CRMEmailDraft["length"];
     status?: string;
   }) => void;
+  onSendDraftToMailbox: () => void;
 }) {
   const launchHref = buildMailtoHref(emailSubjectDraft, emailBodyDraft);
   const suggestedResponses = buildSuggestedResponsePresets(lead);
@@ -2998,6 +3202,11 @@ function LeadMemoryPanel({
           <Button onClick={() => onGenerateEmailDraft()} disabled={isGeneratingEmail}>
             {isGeneratingEmail ? "Drafting..." : emailDraft ? "Refresh draft" : "Draft note"}
           </Button>
+          {canSendFromMailbox ? (
+            <Button variant="outline" onClick={onSendDraftToMailbox} disabled={isGeneratingEmail || !emailSubjectDraft.trim() || !emailBodyDraft.trim()}>
+              Send from mailbox
+            </Button>
+          ) : null}
           {launchHref ? (
             <a
               href={launchHref}

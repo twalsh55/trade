@@ -6,6 +6,10 @@ import type {
   CRMFollowUpOverview,
   CRMImportPreview,
   CRMImportResult,
+  CRMMailboxConnection,
+  CRMMailboxConnectionsResponse,
+  CRMMailboxSendResult,
+  CRMMailboxSyncResult,
   CRMRemoteIntakeChannel,
   DashboardFilters,
   DashboardSnapshot,
@@ -227,6 +231,59 @@ export async function ingestCrmInboxThread(
 ): Promise<CRMFollowUpOverview> {
   return apiRequest<CRMFollowUpOverview>(
     "/api/crm/inbox/threads",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+    options,
+  );
+}
+
+export async function listCrmMailboxConnections(options: ApiRequestOptions = {}): Promise<CRMMailboxConnection[]> {
+  const response = await apiRequest<CRMMailboxConnectionsResponse>("/api/crm/inbox/mailboxes", {}, options);
+  return response.items;
+}
+
+export async function connectCrmMailbox(
+  payload: {
+    provider: "gmail" | "outlook";
+    email_address: string;
+    display_name?: string;
+  },
+  options: ApiRequestOptions = {},
+): Promise<CRMMailboxConnection> {
+  return apiRequest<CRMMailboxConnection>(
+    "/api/crm/inbox/mailboxes/connect",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+    options,
+  );
+}
+
+export async function syncCrmMailbox(connectionId: string, options: ApiRequestOptions = {}): Promise<CRMMailboxSyncResult> {
+  return apiRequest<CRMMailboxSyncResult>(
+    `/api/crm/inbox/mailboxes/${connectionId}/sync`,
+    {
+      method: "POST",
+    },
+    options,
+  );
+}
+
+export async function sendCrmFollowUpEmail(
+  followUpId: string,
+  payload: {
+    connection_id?: string | null;
+    thread_id?: string | null;
+    subject: string;
+    body: string;
+  },
+  options: ApiRequestOptions = {},
+): Promise<CRMMailboxSendResult> {
+  return apiRequest<CRMMailboxSendResult>(
+    `/api/crm/followups/${followUpId}/send`,
     {
       method: "POST",
       body: JSON.stringify(payload),

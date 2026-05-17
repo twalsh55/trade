@@ -4,7 +4,7 @@ from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
 
 from src.domain.auth import User
-from src.domain.crm import LeadEmailThreadSummary, LeadFollowUp, LeadTimelineEntry
+from src.domain.crm import LeadEmailThreadSummary, LeadFollowUp, LeadTimelineEntry, MailboxConnection
 
 
 def build_seed_follow_ups(current_time: datetime) -> tuple[LeadFollowUp, ...]:
@@ -208,6 +208,7 @@ class InMemoryLeadFollowUpRepository:
     def __init__(self, now: callable | None = None) -> None:
         self.now = now or (lambda: datetime.now(tz=UTC))
         self._items = self._build_seed_data()
+        self._mailbox_connections: dict[str, MailboxConnection] = {}
 
     def list_lead_follow_ups(self, user: User) -> list[LeadFollowUp]:
         return [replace(item) for item in self._items.values()]
@@ -244,6 +245,13 @@ class InMemoryLeadFollowUpRepository:
         for item in follow_ups:
             self._items[item.id] = replace(item)
         return len(follow_ups)
+
+    def list_mailbox_connections(self, user: User) -> list[MailboxConnection]:
+        return [replace(item) for item in self._mailbox_connections.values()]
+
+    def save_mailbox_connection(self, user: User, connection: MailboxConnection) -> MailboxConnection:
+        self._mailbox_connections[connection.id] = replace(connection)
+        return replace(connection)
 
     def _build_seed_data(self) -> dict[str, LeadFollowUp]:
         items = build_seed_follow_ups(self.now())

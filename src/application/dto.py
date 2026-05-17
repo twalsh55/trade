@@ -14,6 +14,9 @@ from src.domain.crm import (
     LeadFollowUpEmailDraft,
     LeadFollowUpOverview,
     LeadInboxSummary,
+    MailboxConnection,
+    MailboxSendResult,
+    MailboxSyncResult,
     LeadPipelineStageSummary,
     LeadPipelineSummary,
     LeadRelationshipReminder,
@@ -264,6 +267,39 @@ class LeadInboxSummaryDTO:
     waiting_on_contact_count: int
     stale_thread_count: int
     auto_created_contact_count: int
+
+
+@dataclass(frozen=True)
+class MailboxConnectionDTO:
+    id: str
+    provider: str
+    email_address: str
+    display_name: str
+    status: str
+    connected_at: str
+    last_sync_at: str | None
+    last_sync_status: str
+    last_sync_error: str
+    last_synced_thread_count: int
+    sent_message_count: int
+
+
+@dataclass(frozen=True)
+class MailboxSyncResultDTO:
+    connection: MailboxConnectionDTO
+    synced_threads: int
+    created_contacts: int
+    updated_relationships: int
+    overview: "LeadFollowUpOverviewDTO"
+
+
+@dataclass(frozen=True)
+class MailboxSendResultDTO:
+    connection: MailboxConnectionDTO
+    follow_up_id: str
+    thread_id: str
+    sent_at: str
+    overview: "LeadFollowUpOverviewDTO"
 
 
 @dataclass(frozen=True)
@@ -660,6 +696,42 @@ def build_lead_inbox_summary_dto(summary: LeadInboxSummary | None) -> LeadInboxS
         waiting_on_contact_count=summary.waiting_on_contact_count,
         stale_thread_count=summary.stale_thread_count,
         auto_created_contact_count=summary.auto_created_contact_count,
+    )
+
+
+def build_mailbox_connection_dto(connection: MailboxConnection) -> MailboxConnectionDTO:
+    return MailboxConnectionDTO(
+        id=connection.id,
+        provider=connection.provider,
+        email_address=connection.email_address,
+        display_name=connection.display_name,
+        status=connection.status,
+        connected_at=connection.connected_at.isoformat(),
+        last_sync_at=connection.last_sync_at.isoformat() if connection.last_sync_at else None,
+        last_sync_status=connection.last_sync_status,
+        last_sync_error=connection.last_sync_error,
+        last_synced_thread_count=connection.last_synced_thread_count,
+        sent_message_count=connection.sent_message_count,
+    )
+
+
+def build_mailbox_sync_result_dto(result: MailboxSyncResult) -> MailboxSyncResultDTO:
+    return MailboxSyncResultDTO(
+        connection=build_mailbox_connection_dto(result.connection),
+        synced_threads=result.synced_threads,
+        created_contacts=result.created_contacts,
+        updated_relationships=result.updated_relationships,
+        overview=build_lead_follow_up_overview_dto(result.overview),
+    )
+
+
+def build_mailbox_send_result_dto(result: MailboxSendResult) -> MailboxSendResultDTO:
+    return MailboxSendResultDTO(
+        connection=build_mailbox_connection_dto(result.connection),
+        follow_up_id=result.follow_up_id,
+        thread_id=result.thread_id,
+        sent_at=result.sent_at.isoformat(),
+        overview=build_lead_follow_up_overview_dto(result.overview),
     )
 
 
