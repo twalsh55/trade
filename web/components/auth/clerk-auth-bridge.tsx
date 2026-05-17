@@ -28,6 +28,7 @@ declare global {
 export function ClerkAuthBridge({ publishableKey, host, redirectTo }: ClerkAuthBridgeProps) {
   const router = useRouter();
   const [status, setStatus] = useState("Loading secure sign-in...");
+  const [isCompleting, setIsCompleting] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -84,6 +85,7 @@ export function ClerkAuthBridge({ publishableKey, host, redirectTo }: ClerkAuthB
     }
 
     async function bootstrapSession(sessionToken: string) {
+      setIsCompleting(true);
       const response = await fetch("/api/session", {
         method: "POST",
         headers: {
@@ -94,11 +96,11 @@ export function ClerkAuthBridge({ publishableKey, host, redirectTo }: ClerkAuthB
 
       if (!response.ok) {
         const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+        setIsCompleting(false);
         throw new Error(payload?.error ?? "Unable to persist the authenticated session.");
       }
 
       router.replace(redirectTo);
-      router.refresh();
     }
 
     async function init() {
@@ -144,10 +146,15 @@ export function ClerkAuthBridge({ publishableKey, host, redirectTo }: ClerkAuthB
 
   return (
     <div className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm">
-      <div className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700">
-        Welcome back
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Secure Sign-In</p>
+          <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Open Brivoly and continue where you left off.</h2>
+        </div>
+        <div className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700">
+          Welcome back
+        </div>
       </div>
-      <h2 className="mt-4 text-3xl font-semibold tracking-tight text-slate-950">Sign in to continue to Brivoly</h2>
       <p className="mt-3 max-w-xl text-sm leading-6 text-slate-600">
         Use your account to open the CRM workspace. Once you sign in, Brivoly will take you straight back to where you
         were headed.
@@ -157,7 +164,41 @@ export function ClerkAuthBridge({ publishableKey, host, redirectTo }: ClerkAuthB
         <AuthStep label="Step 2" value="Secure your session" />
         <AuthStep label="Step 3" value="Open your workspace" />
       </div>
-      <div id="clerk-auth-root" className="mt-6 min-h-[360px] rounded-[1.5rem] border bg-slate-50 p-4" />
+      <div className="mt-5 rounded-[1.4rem] border bg-slate-50/80 px-4 py-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">What happens next</p>
+        <p className="mt-2 text-sm leading-6 text-slate-700">
+          Brivoly will restore your queue, reminders, and saved account context as soon as the secure session is ready.
+        </p>
+      </div>
+      <div className="relative mt-6 min-h-[360px] overflow-hidden rounded-[1.5rem] border bg-slate-50 p-4">
+        <div
+          id="clerk-auth-root"
+          className={`min-h-[328px] transition duration-300 ${isCompleting ? "translate-y-2 opacity-0" : "opacity-100"}`}
+        />
+        {isCompleting ? (
+          <div className="absolute inset-0 flex items-center justify-center bg-[linear-gradient(180deg,rgba(248,250,252,0.96),rgba(255,255,255,0.98))] px-6">
+            <div className="w-full max-w-md rounded-[1.6rem] border border-white bg-white/95 p-6 shadow-[0_24px_90px_-55px_rgba(15,23,42,0.35)]">
+              <div className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-800">
+                Signed in
+              </div>
+              <h3 className="mt-4 text-2xl font-semibold tracking-tight text-slate-950">Opening your CRM workspace.</h3>
+              <p className="mt-3 text-sm leading-6 text-slate-600">
+                We’re securing your session and loading the app so the handoff feels cleaner.
+              </p>
+              <div className="mt-5 flex items-center gap-3">
+                <div className="h-3 w-3 animate-pulse rounded-full bg-cyan-500" />
+                <div className="h-3 w-3 animate-pulse rounded-full bg-cyan-400 [animation-delay:120ms]" />
+                <div className="h-3 w-3 animate-pulse rounded-full bg-cyan-300 [animation-delay:240ms]" />
+              </div>
+              <div className="mt-6 space-y-3">
+                <div className="h-3 w-4/5 animate-pulse rounded-full bg-slate-200" />
+                <div className="h-3 w-full animate-pulse rounded-full bg-slate-200" />
+                <div className="h-3 w-2/3 animate-pulse rounded-full bg-slate-200" />
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </div>
       <div className={`mt-4 rounded-[1.25rem] border px-4 py-3 text-sm ${statusAppearance.className}`}>
         <p className="font-medium">{statusAppearance.label}</p>
         <p className="mt-1">{status}</p>
@@ -171,7 +212,7 @@ export function ClerkAuthBridge({ publishableKey, host, redirectTo }: ClerkAuthB
       </div>
       <p className="mt-4 text-sm text-slate-500">
         New here?{" "}
-        <Link className="font-medium text-slate-900 underline underline-offset-4" href="/?from=sign-in">
+        <Link className="font-medium text-slate-900 underline underline-offset-4" href="/crm">
           Start from the CRM app
         </Link>
         .
