@@ -670,12 +670,12 @@ export function CRMFollowUpWorkspace({
                   }}
                 />
                 <p className="mt-3 text-xs text-slate-500">
-                  Supported formats: CSV, XLSX, XLS, PNG, JPG, JPEG, and WEBP. Note images use the paid AI memory layer. Helpful columns include contact, company, owner, where things stand, next touch, and notes.
+                  Supported: CSV, XLSX, XLS, PNG, JPG, JPEG, and WEBP. Helpful columns include contact, company, owner, next touch, and notes.
                 </p>
                 {selectedFile ? <p className="mt-2 text-sm font-medium text-slate-700">{selectedFile.name}</p> : null}
                 {selectedFile && isImageFile(selectedFile.name) ? (
                   <p className="mt-2 text-xs text-slate-500">
-                    Brivoly will use your AI Intake Profile to turn this note image into relationship-ready rows before previewing them.
+                    Brivoly will use your AI Intake Profile to turn this note image into relationship-ready rows.
                   </p>
                 ) : null}
               </section>
@@ -795,9 +795,6 @@ export function CRMFollowUpWorkspace({
                 ))}
               </div>
             </div>
-            <p className="mt-3 text-xs text-slate-500">
-              {filteredFollowUps.length} relationship{filteredFollowUps.length === 1 ? "" : "s"} match this view.
-            </p>
           </div>
           <div className="mt-6 space-y-4">
             {filteredFollowUps.map((item) => {
@@ -917,9 +914,9 @@ export function CRMFollowUpWorkspace({
 
             <section className="mt-6 rounded-[1.4rem] border bg-slate-50/80 p-5">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Inbox sync preview</p>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
-                Use this to simulate inbox sync while real provider connections are being wired. The same API route is ready for Gmail- or Outlook-style thread events, so you can test how Brivoly remembers the thread before those links are live.
-              </p>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+                Use this to test inbox memory before Gmail or Outlook connections are live.
+            </p>
               <div className="mt-4 grid gap-3 md:grid-cols-2">
                 <input value={inboxThreadId} onChange={(event) => setInboxThreadId(event.target.value)} placeholder="Thread ID (optional)" className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400" />
                 <input value={inboxSource} onChange={(event) => setInboxSource(event.target.value)} placeholder="Source (gmail, outlook, api)" className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400" />
@@ -1734,9 +1731,6 @@ function InboxActivityPanel({
             ))}
           </div>
         </div>
-        <p className="mt-3 text-xs text-slate-500">
-          {filteredThreads.length} conversation{filteredThreads.length === 1 ? "" : "s"} match the current view.
-        </p>
       </div>
       <div className="mt-6 space-y-6">
         {urgentThreads.length ? (
