@@ -233,6 +233,11 @@ export type CRMMailboxConnection = {
   background_sync_enabled: boolean;
   last_watch_event_at: string | null;
   watch_event_count: number;
+  watch_status: string;
+  watch_expires_at: string | null;
+  reauth_required: boolean;
+  health_note: string;
+  last_sent_at: string | null;
 };
 
 export type AccountPrivacyExport = {

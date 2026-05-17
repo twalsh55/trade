@@ -174,10 +174,60 @@ class OAuthMailboxProviderAdapter(MailboxProviderPort):
         expires_in = _optional_int(payload.get("expires_in")) or 3600
         return replace(
             connection,
+            status="connected",
             access_token=_require_string(payload, "access_token"),
             refresh_token=_optional_string(payload.get("refresh_token")) or connection.refresh_token,
             token_expires_at=self.now() + timedelta(seconds=max(60, expires_in - 30)),
             scope=_optional_string(payload.get("scope")) or connection.scope,
+            reauth_required=False,
+            health_note="",
+        )
+
+    def ensure_watch_subscription(self, connection: MailboxConnection) -> MailboxConnection:
+        hydrated = self.refresh_connection(connection)
+        if hydrated.connection_mode != "oauth":
+            return replace(
+                hydrated,
+                watch_status="inactive",
+                health_note="Provider watch coverage only applies to OAuth-linked mailboxes.",
+            )
+        if hydrated.provider == "gmail":
+            topic_name = os.getenv("GOOGLE_GMAIL_WATCH_TOPIC", "").strip()
+            if not topic_name:
+                return replace(
+                    hydrated,
+                    watch_status="inactive",
+                    health_note="Add GOOGLE_GMAIL_WATCH_TOPIC to keep this Gmail inbox synced through provider watch events.",
+                )
+            payload = self._post_json(
+                "https://gmail.googleapis.com/gmail/v1/users/me/watch",
+                {
+                    "topicName": topic_name,
+                    "labelFilterBehavior": "INCLUDE",
+                    "labelIds": ["INBOX", "SENT"],
+                },
+                access_token=hydrated.access_token,
+            )
+            expiration_ms = _optional_int(payload.get("expiration")) or 0
+            expires_at = (
+                datetime.fromtimestamp(expiration_ms / 1000, tz=UTC)
+                if expiration_ms > 0
+                else self.now() + timedelta(hours=12)
+            )
+            history_id = _optional_string(payload.get("historyId")) or hydrated.sync_cursor
+            return replace(
+                hydrated,
+                status="connected",
+                watch_status="active",
+                watch_expires_at=expires_at,
+                sync_cursor=history_id,
+                reauth_required=False,
+                health_note="",
+            )
+        return replace(
+            hydrated,
+            watch_status="manual",
+            health_note="Outlook watch renewal is not configured yet, so Brivoly still relies on sync jobs for this mailbox.",
         )
 
     def pull_thread_updates(self, connection: MailboxConnection, max_results: int = 10) -> list[MailboxThreadSnapshot]:
@@ -232,34 +282,50 @@ class OAuthMailboxProviderAdapter(MailboxProviderPort):
             external_message_id = generated_message_id
         else:
             external_message_id = f"<outlook-{uuid4().hex[:18]}@brivoly.mail>"
-            self._post_json(
-                "https://graph.microsoft.com/v1.0/me/sendMail",
-                {
-                    "message": {
+            provider_message_id, conversation_id = (
+                self._find_outlook_message_for_reply(hydrated.access_token, reply_to_external_message_id)
+                if reply_to_external_message_id
+                else (None, None)
+            )
+            if provider_message_id:
+                draft_payload = self._post_json(
+                    f"https://graph.microsoft.com/v1.0/me/messages/{provider_message_id}/createReply",
+                    {},
+                    access_token=hydrated.access_token,
+                )
+                draft_id = _require_string(draft_payload, "id")
+                resolved_thread_id = _optional_string(draft_payload.get("conversationId")) or thread_id or conversation_id or f"outlook-{uuid4().hex[:12]}"
+                self._patch_json(
+                    f"https://graph.microsoft.com/v1.0/me/messages/{draft_id}",
+                    {
                         "subject": subject,
                         "body": {"contentType": "Text", "content": body},
-                        "toRecipients": [
-                            {"emailAddress": {"address": normalized_to, "name": to_name.strip() or normalized_to}}
-                        ],
                         "internetMessageHeaders": [
                             {"name": "Message-ID", "value": external_message_id},
-                            *(
-                                [
-                                    {"name": "In-Reply-To", "value": reply_to_external_message_id},
-                                    {"name": "References", "value": reply_to_external_message_id},
-                                ]
-                                if reply_to_external_message_id
-                                else []
-                            ),
+                            {"name": "In-Reply-To", "value": reply_to_external_message_id},
+                            {"name": "References", "value": reply_to_external_message_id},
                         ],
                     },
-                    "saveToSentItems": True,
-                },
-                access_token=hydrated.access_token,
-                expect_json=False,
-            )
-            resolved_thread_id = thread_id or f"outlook-{uuid4().hex[:12]}"
-            message_id = f"outlook-sent-{uuid4().hex[:12]}"
+                    access_token=hydrated.access_token,
+                )
+                self._post_json(
+                    f"https://graph.microsoft.com/v1.0/me/messages/{draft_id}/send",
+                    {},
+                    access_token=hydrated.access_token,
+                    expect_json=False,
+                )
+                message_id = draft_id
+            else:
+                resolved_thread_id, message_id = self._send_outlook_message(
+                    hydrated,
+                    normalized_to=normalized_to,
+                    to_name=to_name,
+                    subject=subject,
+                    body=body,
+                    thread_id=thread_id,
+                    external_message_id=external_message_id,
+                    reply_to_external_message_id=reply_to_external_message_id,
+                )
 
         sent_message = MailboxThreadMessage(
             message_id=message_id,
@@ -274,10 +340,74 @@ class OAuthMailboxProviderAdapter(MailboxProviderPort):
             snippet=body[:280],
         )
         return MailboxSendReceipt(
-            connection=replace(hydrated, last_sync_status="sent", last_sync_error=""),
+            connection=replace(
+                hydrated,
+                status="connected",
+                last_sync_status="sent",
+                last_sync_error="",
+                last_sent_at=now,
+                reauth_required=False,
+                health_note="",
+            ),
             thread_id=resolved_thread_id,
             message=sent_message,
         )
+
+    def _send_outlook_message(
+        self,
+        connection: MailboxConnection,
+        *,
+        normalized_to: str,
+        to_name: str,
+        subject: str,
+        body: str,
+        thread_id: str | None,
+        external_message_id: str,
+        reply_to_external_message_id: str | None,
+    ) -> tuple[str, str]:
+        self._post_json(
+            "https://graph.microsoft.com/v1.0/me/sendMail",
+            {
+                "message": {
+                    "subject": subject,
+                    "body": {"contentType": "Text", "content": body},
+                    "toRecipients": [
+                        {"emailAddress": {"address": normalized_to, "name": to_name.strip() or normalized_to}}
+                    ],
+                    "internetMessageHeaders": [
+                        {"name": "Message-ID", "value": external_message_id},
+                        *(
+                            [
+                                {"name": "In-Reply-To", "value": reply_to_external_message_id},
+                                {"name": "References", "value": reply_to_external_message_id},
+                            ]
+                            if reply_to_external_message_id
+                            else []
+                        ),
+                    ],
+                },
+                "saveToSentItems": True,
+            },
+            access_token=connection.access_token,
+            expect_json=False,
+        )
+        return thread_id or f"outlook-{uuid4().hex[:12]}", f"outlook-sent-{uuid4().hex[:12]}"
+
+    def _find_outlook_message_for_reply(self, access_token: str, external_message_id: str | None) -> tuple[str | None, str | None]:
+        if not external_message_id:
+            return (None, None)
+        escaped = external_message_id.replace("'", "''")
+        payload = self._get_json(
+            f"https://graph.microsoft.com/v1.0/me/messages?$filter=internetMessageId eq '{escaped}'&$select=id,conversationId&$top=1",
+            access_token=access_token,
+        )
+        values = payload.get("value")
+        if not isinstance(values, list) or not values:
+            return (None, None)
+        first = values[0]
+        if not isinstance(first, dict):
+            return (None, None)
+        return (_optional_string(first.get("id")), _optional_string(first.get("conversationId")))
 
     def _pull_gmail_threads(self, connection: MailboxConnection, *, max_results: int) -> list[MailboxThreadSnapshot]:
         params: dict[str, object] = {"maxResults": max(1, min(max_results, 25))}
@@ -433,6 +563,20 @@ class OAuthMailboxProviderAdapter(MailboxProviderPort):
         )
         if not expect_json and response.status_code in {200, 201, 202, 204}:
             return {}
+        return _read_json_response(response)
+
+    def _patch_json(
+        self,
+        url: str,
+        payload: dict[str, object],
+        *,
+        access_token: str,
+    ) -> dict[str, Any]:
+        response = self.http_client.patch(
+            url,
+            json=payload,
+            headers={"Authorization": f"Bearer {access_token}", "Accept": "application/json"},
+        )
         return _read_json_response(response)
 
 

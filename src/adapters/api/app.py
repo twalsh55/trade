@@ -74,6 +74,7 @@ from src.application.crm import (
     DisconnectMailboxConnectionUseCase,
     DesignLeadFollowUpEmailUseCase,
     EmailThreadMessageInput,
+    EnsureMailboxWatchUseCase,
     EraseRelationshipMemoryUseCase,
     IngestLeadEmailThreadUseCase,
     ListMailboxConnectionsUseCase,
@@ -759,6 +760,26 @@ def create_app(dependencies: ApiDependencies | None = None) -> FastAPI:
         except KeyError as exc:
             raise HTTPException(status_code=404, detail="Mailbox connection not found.") from exc
         return {"deleted": True, "connection_id": connection_id}
+
+    @app.post("/api/crm/inbox/mailboxes/{connection_id}/watch")
+    def crm_renew_mailbox_watch(
+        connection_id: str,
+        authorization: str | None = Header(default=None),
+        session_cookie: str | None = Cookie(default=None, alias=CLERK_SESSION_COOKIE),
+    ) -> dict[str, object]:
+        user = _require_crm_user(deps, authorization, session_cookie)
+        try:
+            connection = EnsureMailboxWatchUseCase(
+                repository=deps.lead_follow_up_repository_factory(),
+                mailbox_provider=deps.mailbox_provider_factory(),
+            ).execute(user, connection_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except RuntimeError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="Mailbox connection not found.") from exc
+        return dto_to_dict(build_mailbox_connection_dto(connection))
 
     @app.post("/api/crm/inbox/mailboxes/{connection_id}/sync")
     def crm_sync_mailbox(

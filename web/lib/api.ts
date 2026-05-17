@@ -326,6 +326,16 @@ export async function syncCrmMailbox(connectionId: string, options: ApiRequestOp
   );
 }
 
+export async function renewCrmMailboxWatch(connectionId: string, options: ApiRequestOptions = {}): Promise<CRMMailboxConnection> {
+  return apiRequest<CRMMailboxConnection>(
+    `/api/crm/inbox/mailboxes/${connectionId}/watch`,
+    {
+      method: "POST",
+    },
+    options,
+  );
+}
+
 export async function updateCrmMailboxConnection(
   connectionId: string,
   payload: { background_sync_enabled: boolean },

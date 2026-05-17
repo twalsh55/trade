@@ -719,6 +719,27 @@ export function CRMFollowUpWorkspace({
     });
   }
 
+  function renewMailboxWatch(connection: CRMMailboxConnection) {
+    setMailboxStatus(`Refreshing provider watch coverage for ${connection.email_address}...`);
+    startMailboxTransition(async () => {
+      try {
+        const response = await fetch(`/api/crm/inbox/mailboxes/${connection.id}/watch`, { method: "POST" });
+        const body = (await response.json().catch(() => null)) as CRMMailboxConnection | { error?: string } | null;
+        if (!response.ok || !body || !("id" in body)) {
+          throw new Error((body && "error" in body && body.error) || "Unable to refresh mailbox watch coverage right now.");
+        }
+        upsertMailboxConnection(body);
+        setMailboxStatus(
+          body.watch_status === "active"
+            ? "Provider watch coverage is active for this mailbox."
+            : body.health_note || "Mailbox watch coverage was refreshed.",
+        );
+      } catch (mailboxError) {
+        setMailboxStatus(mailboxError instanceof Error ? mailboxError.message : "Unable to refresh mailbox watch coverage right now.");
+      }
+    });
+  }
+
   function toggleMailboxBackgroundSync(connection: CRMMailboxConnection) {
     const nextEnabled = !connection.background_sync_enabled;
     setMailboxStatus(nextEnabled ? "Turning background sync back on..." : "Pausing background sync for this mailbox...");
@@ -1206,8 +1227,13 @@ export function CRMFollowUpWorkspace({
                           <MiniFlag label={`${connection.last_synced_thread_count} synced`} tone="warning" />
                           <MiniFlag label={connection.background_sync_enabled ? "background sync on" : "background sync paused"} tone={connection.background_sync_enabled ? "neutral" : "warning"} />
                           <MiniFlag label={`${connection.watch_event_count} watch event${connection.watch_event_count === 1 ? "" : "s"}`} tone="neutral" />
+                          <MiniFlag label={`watch ${connection.watch_status || "inactive"}`} tone={connection.watch_status === "active" ? "neutral" : connection.watch_status === "manual" ? "warning" : "warning"} />
+                          {connection.reauth_required ? <MiniFlag label="reauth needed" tone="warning" /> : null}
                           <Button type="button" variant="outline" disabled={isMailboxPending} onClick={() => toggleMailboxBackgroundSync(connection)}>
                             {connection.background_sync_enabled ? "Pause sync" : "Resume sync"}
+                          </Button>
+                          <Button type="button" variant="outline" disabled={isMailboxPending || connection.connection_mode !== "oauth"} onClick={() => renewMailboxWatch(connection)}>
+                            {isMailboxPending ? "Refreshing..." : "Refresh watch"}
                           </Button>
                           <Button type="button" variant="outline" disabled={isMailboxPending} onClick={() => syncMailboxConnection(connection.id)}>
                             {isMailboxPending ? "Syncing..." : "Sync now"}
@@ -1219,6 +1245,15 @@ export function CRMFollowUpWorkspace({
                       </div>
                       {connection.last_watch_event_at ? (
                         <p className="mt-3 text-xs text-slate-500">Last watch-triggered sync {formatDateTime(connection.last_watch_event_at)}.</p>
+                      ) : null}
+                      {connection.watch_expires_at ? (
+                        <p className="mt-2 text-xs text-slate-500">Watch coverage renews by {formatDateTime(connection.watch_expires_at)}.</p>
+                      ) : null}
+                      {connection.last_sent_at ? (
+                        <p className="mt-2 text-xs text-slate-500">Last provider-backed note sent {formatDateTime(connection.last_sent_at)}.</p>
+                      ) : null}
+                      {connection.health_note ? (
+                        <p className="mt-2 text-xs text-amber-700">{connection.health_note}</p>
                       ) : null}
                     </div>
                   ))

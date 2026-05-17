@@ -113,6 +113,9 @@ class MailboxProviderPort(Protocol):
     def refresh_connection(self, connection: MailboxConnection) -> MailboxConnection:
         """Refresh a connection token if needed and return the updated connection."""
 
+    def ensure_watch_subscription(self, connection: MailboxConnection) -> MailboxConnection:
+        """Register or renew provider-side watch coverage when supported."""
+
     def pull_thread_updates(self, connection: MailboxConnection, max_results: int = 10) -> list[MailboxThreadSnapshot]:
         """Return recent mailbox thread snapshots for one connected account."""
 

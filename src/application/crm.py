@@ -1166,6 +1166,11 @@ class CompleteMailboxOAuthUseCase:
             redirect_uri.strip(),
             existing_connection=existing,
         )
+        try:
+            connection = self.mailbox_provider.ensure_watch_subscription(connection)
+        except RuntimeError:
+            # Leave the mailbox connected even if watch renewal is not available yet.
+            pass
         return self.repository.save_mailbox_connection(
             user,
             replace(connection, background_sync_enabled=existing.background_sync_enabled if existing else True),
@@ -1214,6 +1219,37 @@ class ConnectMailboxUseCase:
         return self.repository.save_mailbox_connection(user, connection)
 
 
+class EnsureMailboxWatchUseCase:
+    def __init__(
+        self,
+        repository: LeadFollowUpRepositoryPort,
+        mailbox_provider: MailboxProviderPort | None,
+    ) -> None:
+        self.repository = repository
+        self.mailbox_provider = mailbox_provider
+
+    def execute(self, user: User, connection_id: str) -> MailboxConnection:
+        connection = _require_mailbox_connection(self.repository.list_mailbox_connections(user), connection_id)
+        if connection.connection_mode != "oauth":
+            return self.repository.save_mailbox_connection(
+                user,
+                replace(
+                    connection,
+                    watch_status="inactive",
+                    health_note="Provider watch coverage only applies to OAuth-linked mailboxes.",
+                ),
+            )
+        if self.mailbox_provider is None:
+            raise ValueError("Mailbox provider integration is not configured.")
+        try:
+            updated = self.mailbox_provider.ensure_watch_subscription(connection)
+        except RuntimeError as exc:
+            failed = _mark_mailbox_attention_needed(connection, str(exc))
+            self.repository.save_mailbox_connection(user, failed)
+            raise
+        return self.repository.save_mailbox_connection(user, updated)
+
+
 class SyncMailboxConnectionUseCase:
     def __init__(
         self,
@@ -1235,8 +1271,15 @@ class SyncMailboxConnectionUseCase:
         if connection.connection_mode == "oauth":
             if self.mailbox_provider is None:
                 raise ValueError("Mailbox provider integration is not configured.")
-            hydrated_connection = self.mailbox_provider.refresh_connection(connection)
-            thread_snapshots = self.mailbox_provider.pull_thread_updates(hydrated_connection, max_results=10)
+            try:
+                hydrated_connection = self.mailbox_provider.refresh_connection(connection)
+                if _mailbox_watch_renewal_due(hydrated_connection):
+                    hydrated_connection = self.mailbox_provider.ensure_watch_subscription(hydrated_connection)
+                thread_snapshots = self.mailbox_provider.pull_thread_updates(hydrated_connection, max_results=10)
+            except RuntimeError as exc:
+                failed_connection = _mark_mailbox_attention_needed(connection, str(exc))
+                self.repository.save_mailbox_connection(user, failed_connection)
+                raise
             updated_connection = hydrated_connection
             for snapshot in thread_snapshots:
                 if not snapshot.messages:
@@ -1395,22 +1438,27 @@ class SendLeadFollowUpEmailUseCase:
         if connection.connection_mode == "oauth":
             if self.mailbox_provider is None:
                 raise ValueError("Mailbox provider integration is not configured.")
-            receipt = self.mailbox_provider.send_message(
-                connection,
-                to_email=lead.email_address.strip().lower(),
-                to_name=lead.lead_name,
-                subject=normalized_subject,
-                body=normalized_body,
-                thread_id=resolved_thread_id,
-                reply_to_external_message_id=next(
-                    (
-                        item.last_external_message_id
-                        for item in lead.recent_email_threads
-                        if item.thread_id == resolved_thread_id and item.last_external_message_id.strip()
-                    ),
-                    "",
-                ) or None,
-            )
+            try:
+                receipt = self.mailbox_provider.send_message(
+                    connection,
+                    to_email=lead.email_address.strip().lower(),
+                    to_name=lead.lead_name,
+                    subject=normalized_subject,
+                    body=normalized_body,
+                    thread_id=resolved_thread_id,
+                    reply_to_external_message_id=next(
+                        (
+                            item.last_external_message_id
+                            for item in lead.recent_email_threads
+                            if item.thread_id == resolved_thread_id and item.last_external_message_id.strip()
+                        ),
+                        "",
+                    ) or None,
+                )
+            except RuntimeError as exc:
+                failed_connection = _mark_mailbox_attention_needed(connection, str(exc))
+                self.repository.save_mailbox_connection(user, failed_connection)
+                raise
             resolved_thread_id = receipt.thread_id
             outbound_message = receipt.message
             updated_connection = receipt.connection
@@ -1482,6 +1530,35 @@ def _require_mailbox_connection(items: list[MailboxConnection], connection_id: s
         if item.id == normalized_connection_id:
             return item
     raise KeyError(normalized_connection_id)
+
+
+def _mailbox_watch_renewal_due(connection: MailboxConnection) -> bool:
+    if connection.connection_mode != "oauth":
+        return False
+    if connection.provider == "gmail":
+        if connection.watch_status != "active" or connection.watch_expires_at is None:
+            return True
+        return connection.watch_expires_at <= datetime.now(tz=UTC) + timedelta(hours=1)
+    return False
+
+
+def _mark_mailbox_attention_needed(connection: MailboxConnection, reason: str) -> MailboxConnection:
+    normalized_reason = reason.strip() or "Mailbox provider action is required."
+    lower_reason = normalized_reason.lower()
+    needs_reauth = any(
+        token in lower_reason
+        for token in ("token", "oauth", "auth", "unauthorized", "forbidden", "expired", "refresh")
+    )
+    status = "needs_reauth" if needs_reauth else "attention_needed"
+    return replace(
+        connection,
+        status=status,
+        reauth_required=needs_reauth,
+        last_sync_status=status,
+        last_sync_error=normalized_reason,
+        health_note=normalized_reason,
+        watch_status="inactive" if needs_reauth else connection.watch_status,
+    )
 
 
 def _resolve_mailbox_sync_cursor(thread_snapshots: list[MailboxThreadSnapshot], current_time: datetime) -> str:

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from dataclasses import dataclass, replace
+from datetime import UTC, date, datetime, timedelta
 from base64 import b64encode
 from io import BytesIO
 import os
@@ -238,6 +238,16 @@ class FakeMailboxProvider:
 
     def refresh_connection(self, connection: MailboxConnection) -> MailboxConnection:
         return connection
+
+    def ensure_watch_subscription(self, connection: MailboxConnection) -> MailboxConnection:
+        now = datetime(2024, 5, 6, 12, 30, tzinfo=UTC)
+        return replace(
+            connection,
+            watch_status="active" if connection.provider == "gmail" else "manual",
+            watch_expires_at=now + timedelta(hours=12) if connection.provider == "gmail" else None,
+            reauth_required=False,
+            health_note="" if connection.provider == "gmail" else "Outlook watch renewal is not configured yet, so Brivoly still relies on sync jobs for this mailbox.",
+        )
 
     def pull_thread_updates(self, connection: MailboxConnection, max_results: int = 10):  # type: ignore[no-untyped-def]
         del max_results
@@ -1095,6 +1105,31 @@ def test_crm_mailbox_oauth_start_and_complete_endpoints_return_provider_connecti
     payload = complete_response.json()
     assert payload["connection_mode"] == "oauth"
     assert payload["email_address"] == "gmail@example.com"
+    assert payload["watch_status"] == "active"
+    assert payload["watch_expires_at"] is not None
+
+
+def test_crm_mailbox_watch_endpoint_renews_provider_watch_state() -> None:
+    repository = InMemoryLeadFollowUpRepository(now=lambda: datetime(2024, 5, 17, 12, 30, tzinfo=UTC))
+    client = make_client(user=make_user(), lead_follow_up_repository=repository)
+
+    connection = client.post(
+        "/api/crm/inbox/mailboxes/oauth/complete",
+        headers={"Authorization": "Bearer session-token"},
+        json={"provider": "gmail", "code": "auth-code", "state": api_app_module._build_mailbox_oauth_state(make_user(), "gmail", datetime(2024, 5, 6, 12, 30, tzinfo=UTC))},
+    )
+    assert connection.status_code == 200
+    connection_id = connection.json()["id"]
+
+    response = client.post(
+        f"/api/crm/inbox/mailboxes/{connection_id}/watch",
+        headers={"Authorization": "Bearer session-token"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["watch_status"] == "active"
+    assert payload["watch_expires_at"] is not None
 
 
 def test_crm_mailbox_sync_endpoint_updates_relationship_memory() -> None:

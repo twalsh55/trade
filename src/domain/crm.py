@@ -115,6 +115,11 @@ class MailboxConnection:
     background_sync_enabled: bool = True
     last_watch_event_at: datetime | None = None
     watch_event_count: int = 0
+    watch_status: str = "inactive"
+    watch_expires_at: datetime | None = None
+    reauth_required: bool = False
+    health_note: str = ""
+    last_sent_at: datetime | None = None
 
 
 @dataclass(frozen=True)

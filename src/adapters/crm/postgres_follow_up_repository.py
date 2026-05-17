@@ -385,6 +385,11 @@ def _payload_to_mailbox_connection(payload: dict[str, Any]) -> MailboxConnection
         background_sync_enabled=bool(payload.get("background_sync_enabled", True)),
         last_watch_event_at=_parse_datetime(payload.get("last_watch_event_at")),
         watch_event_count=int(payload.get("watch_event_count", 0) or 0),
+        watch_status=str(payload.get("watch_status", "inactive")),
+        watch_expires_at=_parse_datetime(payload.get("watch_expires_at")),
+        reauth_required=bool(payload.get("reauth_required", False)),
+        health_note=str(payload.get("health_note", "")),
+        last_sent_at=_parse_datetime(payload.get("last_sent_at")),
     )
 
 

@@ -298,6 +298,11 @@ class MailboxConnectionDTO:
     background_sync_enabled: bool
     last_watch_event_at: str | None
     watch_event_count: int
+    watch_status: str
+    watch_expires_at: str | None
+    reauth_required: bool
+    health_note: str
+    last_sent_at: str | None
 
 
 @dataclass(frozen=True)
@@ -744,6 +749,11 @@ def build_mailbox_connection_dto(connection: MailboxConnection) -> MailboxConnec
         background_sync_enabled=connection.background_sync_enabled,
         last_watch_event_at=connection.last_watch_event_at.isoformat() if connection.last_watch_event_at else None,
         watch_event_count=connection.watch_event_count,
+        watch_status=connection.watch_status,
+        watch_expires_at=connection.watch_expires_at.isoformat() if connection.watch_expires_at else None,
+        reauth_required=connection.reauth_required,
+        health_note=connection.health_note,
+        last_sent_at=connection.last_sent_at.isoformat() if connection.last_sent_at else None,
     )
 
 
