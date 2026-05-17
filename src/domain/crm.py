@@ -42,6 +42,21 @@ class LeadRelationshipSummary:
 
 
 @dataclass(frozen=True)
+class LeadPipelineStageSummary:
+    stage: str
+    lead_count: int
+    overdue_count: int
+    due_this_week_count: int
+    high_priority_count: int
+    dormant_count: int
+
+
+@dataclass(frozen=True)
+class LeadPipelineSummary:
+    stage_summaries: list[LeadPipelineStageSummary]
+
+
+@dataclass(frozen=True)
 class LeadFollowUp:
     id: str
     lead_name: str
@@ -82,6 +97,7 @@ class LeadFollowUpOverview:
     high_priority: int
     items: list[LeadFollowUp]
     relationship_summary: LeadRelationshipSummary | None = None
+    pipeline_summary: LeadPipelineSummary | None = None
 
 
 @dataclass(frozen=True)

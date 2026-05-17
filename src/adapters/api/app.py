@@ -947,13 +947,21 @@ def _get_crm_intake_secret() -> str:
 
 
 def _build_crm_intake_token(user_id: UUID, secret: str) -> str:
-    user_text = str(user_id)
-    signature = hmac.new(secret.encode("utf-8"), user_text.encode("utf-8"), hashlib.sha256).hexdigest()[:24]
-    payload = json.dumps({"user_id": user_text, "signature": signature}, separators=(",", ":")).encode("utf-8")
-    return base64.urlsafe_b64encode(payload).decode("ascii").rstrip("=")
+    user_text = user_id.hex
+    signature = hmac.new(secret.encode("utf-8"), user_text.encode("utf-8"), hashlib.sha256).hexdigest()[:12]
+    return f"{user_text}.{signature}"
 
 
 def _parse_crm_intake_token(token: str, secret: str) -> UUID:
+    compact_user_id, separator, compact_signature = token.partition(".")
+    if separator:
+        if len(compact_user_id) != 32 or len(compact_signature) != 12:
+            raise ValueError("The CRM intake code is invalid.")
+        expected_signature = hmac.new(secret.encode("utf-8"), compact_user_id.encode("utf-8"), hashlib.sha256).hexdigest()[:12]
+        if not hmac.compare_digest(compact_signature, expected_signature):
+            raise ValueError("The CRM intake code is invalid.")
+        return UUID(compact_user_id)
+
     padded = token + "=" * (-len(token) % 4)
     try:
         payload = base64.urlsafe_b64decode(padded.encode("ascii"))

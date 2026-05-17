@@ -92,6 +92,7 @@ cd web && npm run e2e
 - `/crm` is authenticated and production live.
 - Current CRM capabilities:
   - follow-up queue
+  - pipeline board view by stage
   - complete and snooze actions
   - contact timeline + internal notes
   - auto email designer for CRM follow-ups with in-app draft editing

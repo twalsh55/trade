@@ -15,6 +15,7 @@ import type {
   CRMImportPreview,
   CRMImportPreviewRow,
   CRMLeadFollowUp,
+  CRMPipelineStageSummary,
   CRMRelationshipReminder,
   CRMRemoteIntakeChannel,
 } from "@/lib/types";
@@ -551,6 +552,17 @@ export function CRMFollowUpWorkspace({
         </div>
       </section>
 
+      {overview.pipeline_summary?.stage_summaries?.length ? (
+        <div className="mt-6">
+          <PipelineBoardPanel
+            summary={overview.pipeline_summary.stage_summaries}
+            items={overview.items}
+            selectedLeadId={selectedLead?.id ?? null}
+            onSelectLead={setSelectedLeadId}
+          />
+        </div>
+      ) : null}
+
       <section className="mt-6 grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
         <section className="rounded-[1.75rem] border bg-white/80 p-6 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Lead Follow-Up Queue</p>
@@ -667,6 +679,103 @@ export function CRMFollowUpWorkspace({
         </section>
       </section>
     </>
+  );
+}
+
+function PipelineBoardPanel({
+  summary,
+  items,
+  selectedLeadId,
+  onSelectLead,
+}: {
+  summary: CRMPipelineStageSummary[];
+  items: CRMLeadFollowUp[];
+  selectedLeadId: string | null;
+  onSelectLead: (leadId: string) => void;
+}) {
+  const itemsByStage = new Map<string, CRMLeadFollowUp[]>();
+  for (const item of items) {
+    const bucket = itemsByStage.get(item.stage) ?? [];
+    bucket.push(item);
+    itemsByStage.set(item.stage, bucket);
+  }
+
+  return (
+    <section className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm xl:col-span-2">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="max-w-2xl">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">CRM Pipeline</p>
+          <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">See the whole deal flow, not just the next task.</h2>
+          <p className="mt-3 text-sm leading-6 text-slate-600">
+            Brivoly now groups open leads by stage so you can spot where the pipeline is piling up, where urgency is concentrated, and which relationships need a push forward.
+          </p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <CompactMetricLight label="Stages" value={String(summary.length)} tone="neutral" />
+          <CompactMetricLight label="Overdue across pipeline" value={String(summary.reduce((total, stage) => total + stage.overdue_count, 0))} tone="warning" />
+          <CompactMetricLight label="High priority in flow" value={String(summary.reduce((total, stage) => total + stage.high_priority_count, 0))} tone="critical" />
+        </div>
+      </div>
+
+      <div className="mt-6 flex gap-4 overflow-x-auto pb-2">
+        {summary.map((stage) => {
+          const stageItems = itemsByStage.get(stage.stage) ?? [];
+          return (
+            <section
+              key={stage.stage}
+              className="min-w-[280px] flex-1 rounded-[1.5rem] border bg-slate-50/80 p-4"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Stage</p>
+                  <h3 className="mt-2 text-xl font-semibold tracking-tight text-slate-950">{stage.stage}</h3>
+                </div>
+                <div className="rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-semibold text-slate-700">
+                  {stage.lead_count}
+                </div>
+              </div>
+
+              <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                <TimelineTile label="Overdue" value={String(stage.overdue_count)} />
+                <TimelineTile label="Due in 7 days" value={String(stage.due_this_week_count)} />
+                <TimelineTile label="High priority" value={String(stage.high_priority_count)} />
+                <TimelineTile label="Dormant" value={String(stage.dormant_count)} />
+              </div>
+
+              <div className="mt-4 space-y-3">
+                {stageItems.map((item) => {
+                  const selected = item.id === selectedLeadId;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => onSelectLead(item.id)}
+                      className={`block w-full rounded-[1.2rem] border px-4 py-4 text-left transition ${
+                        selected
+                          ? "border-slate-900 bg-white shadow-sm"
+                          : "border-slate-200 bg-white/85 hover:border-slate-400"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-950">{item.lead_name}</p>
+                          <p className="mt-1 text-xs text-slate-500">{item.company_name}</p>
+                        </div>
+                        <PriorityBadge priority={item.priority} />
+                      </div>
+                      <p className="mt-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Next follow-up</p>
+                      <p className="mt-1 text-sm text-slate-700">{formatDateTime(item.next_follow_up_at)}</p>
+                      <p className="mt-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Next step</p>
+                      <p className="mt-1 text-sm leading-6 text-slate-600">{item.next_step}</p>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
@@ -1416,14 +1525,16 @@ function CompactMetricLight({
 }: {
   label: string;
   value: string;
-  tone: "positive" | "warning" | "critical";
+  tone: "positive" | "warning" | "critical" | "neutral";
 }) {
   const className =
     tone === "positive"
       ? "border-emerald-200 bg-emerald-50 text-emerald-900"
       : tone === "warning"
         ? "border-amber-200 bg-amber-50 text-amber-900"
-        : "border-rose-200 bg-rose-50 text-rose-900";
+        : tone === "critical"
+          ? "border-rose-200 bg-rose-50 text-rose-900"
+          : "border-slate-200 bg-white text-slate-900";
   return (
     <div className={`rounded-2xl border px-4 py-3 ${className}`}>
       <p className="text-xs font-semibold uppercase tracking-[0.18em]">{label}</p>

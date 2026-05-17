@@ -12,6 +12,8 @@ from src.domain.crm import (
     LeadFollowUpActionResult,
     LeadFollowUpEmailDraft,
     LeadFollowUpOverview,
+    LeadPipelineStageSummary,
+    LeadPipelineSummary,
     LeadRelationshipReminder,
     LeadRelationshipSummary,
     LeadWarmIntroConnection,
@@ -41,6 +43,7 @@ class GetLeadFollowUpOverviewUseCase:
             high_priority=sum(1 for item in ordered_items if item.priority == "high"),
             items=[_clone_follow_up(item) for item in ordered_items],
             relationship_summary=_build_relationship_summary(ordered_items),
+            pipeline_summary=_build_pipeline_summary(ordered_items, current_time),
         )
 
 
@@ -221,6 +224,43 @@ def _build_relationship_summary(items: list[LeadFollowUp]) -> LeadRelationshipSu
         milestone_reminder_count=milestone_reminder_count,
         warm_intro_connections=warm_intro_connections,
     )
+
+
+PIPELINE_STAGE_ORDER = {
+    "lead": 10,
+    "inbound": 20,
+    "qualification": 30,
+    "discovery": 40,
+    "proposal": 50,
+    "negotiation": 60,
+    "closed won": 90,
+    "closed lost": 100,
+}
+
+
+def _build_pipeline_summary(items: list[LeadFollowUp], current_time: datetime) -> LeadPipelineSummary:
+    grouped: dict[str, list[LeadFollowUp]] = {}
+    for item in items:
+        grouped.setdefault(item.stage, []).append(item)
+
+    ordered_stages = sorted(
+        grouped,
+        key=lambda stage: (PIPELINE_STAGE_ORDER.get(stage.strip().lower(), 70), stage.strip().lower()),
+    )
+    stage_summaries = [
+        LeadPipelineStageSummary(
+            stage=stage,
+            lead_count=len(grouped[stage]),
+            overdue_count=sum(1 for item in grouped[stage] if item.next_follow_up_at < current_time),
+            due_this_week_count=sum(
+                1 for item in grouped[stage] if current_time <= item.next_follow_up_at <= current_time + timedelta(days=7)
+            ),
+            high_priority_count=sum(1 for item in grouped[stage] if item.priority == "high"),
+            dormant_count=sum(1 for item in grouped[stage] if item.dormant),
+        )
+        for stage in ordered_stages
+    ]
+    return LeadPipelineSummary(stage_summaries=stage_summaries)
 
 
 class CompleteLeadFollowUpUseCase:

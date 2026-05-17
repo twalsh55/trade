@@ -118,6 +118,7 @@ export type CRMFollowUpOverview = {
   high_priority: number;
   items: CRMLeadFollowUp[];
   relationship_summary: CRMRelationshipSummary | null;
+  pipeline_summary: CRMPipelineSummary | null;
 };
 
 export type CRMRelationshipReminder = {
@@ -143,6 +144,19 @@ export type CRMRelationshipSummary = {
   referral_reminder_count: number;
   milestone_reminder_count: number;
   warm_intro_connections: CRMWarmIntroConnection[];
+};
+
+export type CRMPipelineStageSummary = {
+  stage: string;
+  lead_count: number;
+  overdue_count: number;
+  due_this_week_count: number;
+  high_priority_count: number;
+  dormant_count: number;
+};
+
+export type CRMPipelineSummary = {
+  stage_summaries: CRMPipelineStageSummary[];
 };
 
 export type CRMEmailDraft = {

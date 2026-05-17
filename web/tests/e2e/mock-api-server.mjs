@@ -167,6 +167,12 @@ function buildDashboardSnapshot(benchmark, lookbackYears, universe) {
 
 function buildCrmOverview() {
   const items = [...state.crmFollowUps].sort((a, b) => new Date(a.next_follow_up_at).getTime() - new Date(b.next_follow_up_at).getTime());
+  const stageMap = new Map();
+  for (const item of items) {
+    const bucket = stageMap.get(item.stage) || [];
+    bucket.push(item);
+    stageMap.set(item.stage, bucket);
+  }
   return {
     generated_at: "2024-05-06T12:30:00+00:00",
     total_open: items.length,
@@ -174,6 +180,17 @@ function buildCrmOverview() {
     overdue: items.filter((item) => new Date(item.next_follow_up_at).getTime() < Date.parse("2024-05-06T12:30:00+00:00")).length,
     high_priority: items.filter((item) => item.priority === "high").length,
     items,
+    relationship_summary: null,
+    pipeline_summary: {
+      stage_summaries: [...stageMap.entries()].map(([stage, stageItems]) => ({
+        stage,
+        lead_count: stageItems.length,
+        overdue_count: stageItems.filter((item) => new Date(item.next_follow_up_at).getTime() < Date.parse("2024-05-06T12:30:00+00:00")).length,
+        due_this_week_count: stageItems.length,
+        high_priority_count: stageItems.filter((item) => item.priority === "high").length,
+        dormant_count: stageItems.filter((item) => item.dormant).length,
+      })),
+    },
   };
 }
 

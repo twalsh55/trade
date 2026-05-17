@@ -12,6 +12,8 @@ from src.domain.crm import (
     LeadFollowUp,
     LeadFollowUpEmailDraft,
     LeadFollowUpOverview,
+    LeadPipelineStageSummary,
+    LeadPipelineSummary,
     LeadRelationshipReminder,
     LeadRelationshipSummary,
     LeadWarmIntroConnection,
@@ -201,6 +203,21 @@ class LeadRelationshipSummaryDTO:
 
 
 @dataclass(frozen=True)
+class LeadPipelineStageSummaryDTO:
+    stage: str
+    lead_count: int
+    overdue_count: int
+    due_this_week_count: int
+    high_priority_count: int
+    dormant_count: int
+
+
+@dataclass(frozen=True)
+class LeadPipelineSummaryDTO:
+    stage_summaries: list[LeadPipelineStageSummaryDTO]
+
+
+@dataclass(frozen=True)
 class LeadFollowUpOverviewDTO:
     generated_at: str
     total_open: int
@@ -209,6 +226,7 @@ class LeadFollowUpOverviewDTO:
     high_priority: int
     items: list[LeadFollowUpDTO]
     relationship_summary: LeadRelationshipSummaryDTO | None
+    pipeline_summary: LeadPipelineSummaryDTO | None
 
 
 @dataclass(frozen=True)
@@ -437,6 +455,7 @@ def build_lead_follow_up_overview_dto(overview: LeadFollowUpOverview) -> LeadFol
         high_priority=overview.high_priority,
         items=[build_lead_follow_up_dto(item) for item in overview.items],
         relationship_summary=build_lead_relationship_summary_dto(overview.relationship_summary),
+        pipeline_summary=build_lead_pipeline_summary_dto(overview.pipeline_summary),
     )
 
 
@@ -520,6 +539,25 @@ def build_lead_warm_intro_connection_dto(connection: LeadWarmIntroConnection) ->
         target_lead_name=connection.target_lead_name,
         target_company_name=connection.target_company_name,
         owner_name=connection.owner_name,
+    )
+
+
+def build_lead_pipeline_summary_dto(summary: LeadPipelineSummary | None) -> LeadPipelineSummaryDTO | None:
+    if summary is None:
+        return None
+    return LeadPipelineSummaryDTO(
+        stage_summaries=[build_lead_pipeline_stage_summary_dto(item) for item in summary.stage_summaries],
+    )
+
+
+def build_lead_pipeline_stage_summary_dto(stage: LeadPipelineStageSummary) -> LeadPipelineStageSummaryDTO:
+    return LeadPipelineStageSummaryDTO(
+        stage=stage.stage,
+        lead_count=stage.lead_count,
+        overdue_count=stage.overdue_count,
+        due_this_week_count=stage.due_this_week_count,
+        high_priority_count=stage.high_priority_count,
+        dormant_count=stage.dormant_count,
     )
 
 

@@ -376,6 +376,8 @@ def test_crm_follow_up_overview_dto_and_use_case_sort_and_count_values() -> None
     assert payload["items"][0]["relationship_health_label"] == "healthy"
     assert payload["relationship_summary"]["healthy_count"] == 1
     assert payload["relationship_summary"]["watch_count"] == 1
+    assert payload["pipeline_summary"]["stage_summaries"][0]["stage"] == "Discovery"
+    assert payload["pipeline_summary"]["stage_summaries"][1]["stage"] == "Proposal"
 
 
 def test_extract_telegram_command_parses_supported_message_shapes() -> None:
@@ -735,6 +737,7 @@ def test_crm_intake_channel_returns_caption_for_authenticated_user(monkeypatch) 
     assert payload["telegram_available"] is True
     assert payload["intake_channel"] == "telegram"
     assert payload["intake_caption"].startswith("/intake ")
+    assert len(payload["intake_caption"]) < 60
 
 
 def test_crm_intake_channel_reports_missing_configuration() -> None:
@@ -924,6 +927,15 @@ def test_parse_crm_intake_token_and_download_telegram_file_validate_shapes(monke
     with pytest.raises(ValueError, match="invalid"):
         api_app_module._parse_crm_intake_token("not-base64", "secret")  # type: ignore[attr-defined]
 
+    compact_token = api_app_module._build_crm_intake_token(  # type: ignore[attr-defined]
+        UUID("11111111-1111-1111-1111-111111111111"),
+        "secret",
+    )
+    assert api_app_module._parse_crm_intake_token(compact_token, "secret") == UUID("11111111-1111-1111-1111-111111111111")  # type: ignore[attr-defined]
+
+    with pytest.raises(ValueError, match="invalid"):
+        api_app_module._parse_crm_intake_token("11111111111111111111111111111111.badbadbadbad", "secret")  # type: ignore[attr-defined]
+
     bad_payload = b64encode(b'["bad"]').decode("ascii").rstrip("=")
     with pytest.raises(ValueError, match="invalid"):
         api_app_module._parse_crm_intake_token(bad_payload, "secret")  # type: ignore[attr-defined]
@@ -935,6 +947,11 @@ def test_parse_crm_intake_token_and_download_telegram_file_validate_shapes(monke
     wrong_signature = b64encode(b'{"user_id":"11111111-1111-1111-1111-111111111111","signature":"wrong"}').decode("ascii").rstrip("=")
     with pytest.raises(ValueError, match="invalid"):
         api_app_module._parse_crm_intake_token(wrong_signature, "secret")  # type: ignore[attr-defined]
+
+    legacy_token = b64encode(
+        b'{"user_id":"11111111-1111-1111-1111-111111111111","signature":"d37f04408fab63d654f9a4bd"}'
+    ).decode("ascii").rstrip("=")
+    assert api_app_module._parse_crm_intake_token(legacy_token, "secret") == UUID("11111111-1111-1111-1111-111111111111")  # type: ignore[attr-defined]
 
     class FakeResponse:
         def __init__(self, body: bytes) -> None:
@@ -1504,6 +1521,7 @@ def test_crm_followups_endpoint_requires_auth_and_returns_queue() -> None:
     assert payload["items"][0]["timeline"]
     assert payload["items"][0]["last_meaningful_interaction_at"]
     assert payload["relationship_summary"]["warm_intro_connections"]
+    assert payload["pipeline_summary"]["stage_summaries"]
 
 
 def test_crm_followups_endpoint_supports_complete_snooze_and_notes() -> None:

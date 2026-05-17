@@ -8,6 +8,7 @@ type ClerkAuthBridgeProps = {
   publishableKey: string;
   host: string;
   redirectTo: string;
+  mode?: "sign-in" | "sign-up";
 };
 
 declare global {
@@ -19,15 +20,17 @@ declare global {
       };
       load(options?: object): Promise<void>;
       mountSignIn(target: Element): void;
+      mountSignUp(target: Element): void;
     };
     __internal_ClerkUICtor?: unknown;
     __brivolyClerkLoadPromise?: Promise<unknown>;
   }
 }
 
-export function ClerkAuthBridge({ publishableKey, host, redirectTo }: ClerkAuthBridgeProps) {
+export function ClerkAuthBridge({ publishableKey, host, redirectTo, mode = "sign-in" }: ClerkAuthBridgeProps) {
   const router = useRouter();
-  const [status, setStatus] = useState("Loading secure sign-in...");
+  const isSignUp = mode === "sign-up";
+  const [status, setStatus] = useState(isSignUp ? "Loading secure account creation..." : "Loading secure sign-in...");
   const [isCompleting, setIsCompleting] = useState(false);
 
   useEffect(() => {
@@ -105,17 +108,21 @@ export function ClerkAuthBridge({ publishableKey, host, redirectTo }: ClerkAuthB
 
     async function init() {
       try {
-        setStatus("Loading secure sign-in...");
+        setStatus(isSignUp ? "Loading secure account creation..." : "Loading secure sign-in...");
         const clerk = await ensureClerk();
         if (cancelled) {
           return;
         }
 
         if (clerk?.isSignedIn && clerk.session) {
-          setStatus("You're signed in. Finalizing your workspace...");
+          setStatus(isSignUp ? "Your account is ready. Finalizing your workspace..." : "You're signed in. Finalizing your workspace...");
           const token = await clerk.session.getToken({ skipCache: true });
           if (!token) {
-            setStatus("Sign-in was detected, but the secure session could not be completed. Please try again.");
+            setStatus(
+              isSignUp
+                ? "Account creation was detected, but the secure session could not be completed. Please try again."
+                : "Sign-in was detected, but the secure session could not be completed. Please try again.",
+            );
             return;
           }
           await bootstrapSession(token);
@@ -124,14 +131,19 @@ export function ClerkAuthBridge({ publishableKey, host, redirectTo }: ClerkAuthB
 
         const mountTarget = document.getElementById("clerk-auth-root");
         if (!mountTarget || !clerk) {
-          setStatus("We could not open the sign-in form. Refresh and try again.");
+          setStatus(isSignUp ? "We could not open account creation. Refresh and try again." : "We could not open the sign-in form. Refresh and try again.");
           return;
         }
         mountTarget.replaceChildren();
-        clerk.mountSignIn(mountTarget);
-        setStatus("Sign in below to open your Brivoly workspace.");
+        if (isSignUp) {
+          clerk.mountSignUp(mountTarget);
+          setStatus("Create your account below to open your Brivoly workspace.");
+        } else {
+          clerk.mountSignIn(mountTarget);
+          setStatus("Sign in below to open your Brivoly workspace.");
+        }
       } catch (error) {
-        setStatus(error instanceof Error ? error.message : "Unable to load sign-in.");
+        setStatus(error instanceof Error ? error.message : isSignUp ? "Unable to load account creation." : "Unable to load sign-in.");
       }
     }
 
@@ -140,7 +152,7 @@ export function ClerkAuthBridge({ publishableKey, host, redirectTo }: ClerkAuthB
     return () => {
       cancelled = true;
     };
-  }, [host, publishableKey, redirectTo, router]);
+  }, [host, isSignUp, mode, publishableKey, redirectTo, router]);
 
   const statusAppearance = getStatusAppearance(status);
 
@@ -148,26 +160,31 @@ export function ClerkAuthBridge({ publishableKey, host, redirectTo }: ClerkAuthB
     <div className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Secure Sign-In</p>
-          <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Open Brivoly and continue where you left off.</h2>
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">{isSignUp ? "Secure Sign-Up" : "Secure Sign-In"}</p>
+          <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
+            {isSignUp ? "Create your account and open Brivoly in one step." : "Open Brivoly and continue where you left off."}
+          </h2>
         </div>
         <div className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700">
-          Welcome back
+          {isSignUp ? "New workspace" : "Welcome back"}
         </div>
       </div>
       <p className="mt-3 max-w-xl text-sm leading-6 text-slate-600">
-        Use your account to open the CRM workspace. Once you sign in, Brivoly will take you straight back to where you
-        were headed.
+        {isSignUp
+          ? "Create your account here, and Brivoly will secure the session and take you straight into the CRM workspace."
+          : "Use your account to open the CRM workspace. Once you sign in, Brivoly will take you straight back to where you were headed."}
       </p>
       <div className="mt-5 grid gap-3 sm:grid-cols-3">
-        <AuthStep label="Step 1" value="Sign in" />
+        <AuthStep label="Step 1" value={isSignUp ? "Create account" : "Sign in"} />
         <AuthStep label="Step 2" value="Secure your session" />
         <AuthStep label="Step 3" value="Open your workspace" />
       </div>
       <div className="mt-5 rounded-[1.4rem] border bg-slate-50/80 px-4 py-4">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">What happens next</p>
         <p className="mt-2 text-sm leading-6 text-slate-700">
-          Brivoly will restore your queue, reminders, and saved account context as soon as the secure session is ready.
+          {isSignUp
+            ? "Brivoly will finish account creation, secure the session, and load your CRM workspace as soon as everything is ready."
+            : "Brivoly will restore your queue, reminders, and saved account context as soon as the secure session is ready."}
         </p>
       </div>
       <div className="relative mt-6 min-h-[360px] overflow-hidden rounded-[1.5rem] border bg-slate-50 p-4">

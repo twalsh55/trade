@@ -226,3 +226,6 @@ def test_follow_up_overview_enriches_relationship_intelligence() -> None:
     assert overview.relationship_summary.referral_reminder_count >= 1
     assert overview.relationship_summary.milestone_reminder_count >= 1
     assert overview.relationship_summary.warm_intro_connections
+    assert overview.pipeline_summary is not None
+    assert any(stage.stage == "Proposal" for stage in overview.pipeline_summary.stage_summaries)
+    assert any(stage.high_priority_count >= 1 for stage in overview.pipeline_summary.stage_summaries)
