@@ -1892,21 +1892,21 @@ function LeadMemoryPanel({
       ) : null}
 
       <section className="mt-6 rounded-[1.5rem] border bg-slate-50 p-5">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Latest context</p>
+        <p className="ui-eyebrow">Latest context</p>
         <p className="mt-3 text-sm leading-6 text-slate-700">{lead.notes}</p>
       </section>
 
       <section className="mt-6 rounded-[1.5rem] border bg-white p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Follow-Up Intelligence</p>
+            <p className="ui-eyebrow">Follow-Up Intelligence</p>
             <h3 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">Draft the next client message without starting from zero.</h3>
             <p className="mt-2 text-sm leading-6 text-slate-600">
               Brivoly uses the relationship stage, next step, and your saved business profile to suggest a follow-up you can edit before sending.
             </p>
           </div>
           <div className="rounded-[1.2rem] border bg-slate-50 px-4 py-3 text-sm text-slate-600 lg:max-w-xs">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Brand source</p>
+            <p className="ui-eyebrow">Brand source</p>
             <p className="mt-2">
               Sender: <span className="font-medium text-slate-900">{settings?.outbound_sender_name || settings?.business_name || "Fallback defaults"}</span>
             </p>
@@ -1915,7 +1915,7 @@ function LeadMemoryPanel({
 
         <div className="mt-5 grid gap-4 md:grid-cols-3">
           <label className="block">
-            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Objective</span>
+            <span className="ui-eyebrow">Objective</span>
             <select
               value={emailObjective}
               onChange={(event) => onEmailObjectiveChange(event.target.value as CRMEmailDraft["objective"])}
@@ -1928,7 +1928,7 @@ function LeadMemoryPanel({
             </select>
           </label>
           <label className="block">
-            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Tone</span>
+            <span className="ui-eyebrow">Tone</span>
             <select
               value={emailTone}
               onChange={(event) => onEmailToneChange(event.target.value as CRMEmailDraft["tone"])}
@@ -1940,7 +1940,7 @@ function LeadMemoryPanel({
             </select>
           </label>
           <label className="block">
-            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Length</span>
+            <span className="ui-eyebrow">Length</span>
             <select
               value={emailLength}
               onChange={(event) => onEmailLengthChange(event.target.value as CRMEmailDraft["length"])}
@@ -1970,7 +1970,7 @@ function LeadMemoryPanel({
         {emailDraft ? (
           <>
             <div className="mt-5 rounded-[1.4rem] border bg-slate-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Why this draft</p>
+              <p className="ui-eyebrow">Why this draft</p>
               <div className="mt-3 space-y-2">
                 {emailDraft.rationale.map((item) => (
                   <p key={item} className="text-sm leading-6 text-slate-700">
@@ -1980,7 +1980,7 @@ function LeadMemoryPanel({
               </div>
             </div>
             <label className="mt-5 block">
-              <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Subject</span>
+              <span className="ui-eyebrow">Subject</span>
               <input
                 value={emailSubjectDraft}
                 onChange={(event) => onEmailSubjectDraftChange(event.target.value)}
@@ -1988,12 +1988,12 @@ function LeadMemoryPanel({
               />
             </label>
             <label className="mt-4 block">
-              <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Body</span>
+              <span className="ui-eyebrow">Body</span>
               <textarea
                 value={emailBodyDraft}
                 onChange={(event) => onEmailBodyDraftChange(event.target.value)}
                 rows={12}
-                className="mt-2 min-h-56 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 font-mono text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:bg-white"
+                className="mt-2 min-h-56 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-7 text-slate-800 outline-none transition focus:border-slate-400 focus:bg-white"
               />
             </label>
           </>

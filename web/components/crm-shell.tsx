@@ -24,19 +24,25 @@ export function CRMShell({ data }: { data: CRMPageData }) {
   return (
     <>
       <section className="mt-6 rounded-[1.75rem] border border-amber-200 bg-amber-50 p-6 shadow-sm">
-        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-700">CRM Load Issue</p>
+        <p className="ui-eyebrow-strong text-amber-700">Client OS Load Issue</p>
         <h2 className="mt-3 text-3xl font-semibold tracking-tight text-amber-950">We could not load the workspace data.</h2>
         <p className="mt-3 max-w-2xl text-sm leading-7 text-amber-900">
-          Your session is active, but the CRM payload did not finish loading. Refresh and Brivoly should try again with the same account context.
+          {describeLoadFailure(data)}
         </p>
         {data.userLabel ? <p className="mt-4 text-sm font-medium text-amber-950">Current account: {data.userLabel}</p> : null}
+        {data.loadErrors.length ? (
+          <div className="mt-4 rounded-[1.25rem] border border-amber-200/80 bg-white/70 px-4 py-4 text-sm leading-6 text-amber-950">
+            <p className="ui-eyebrow-strong text-amber-700">Latest error</p>
+            <p className="mt-2">{data.loadErrors[0]}</p>
+          </div>
+        ) : null}
         <div className="mt-5">
           <button
             type="button"
             onClick={() => window.location.reload()}
             className="rounded-full bg-amber-950 px-5 py-3 text-sm font-medium text-white transition hover:bg-amber-900"
           >
-            Reload CRM
+            Reload Client OS
           </button>
         </div>
       </section>
@@ -48,6 +54,13 @@ export function CRMShell({ data }: { data: CRMPageData }) {
       </section>
     </>
   );
+}
+
+function describeLoadFailure(data: CRMPageData): string {
+  if (data.session?.authenticated) {
+    return "Your account session is active, but the relationship workspace did not finish loading. Refresh and Brivoly should retry with the same account context.";
+  }
+  return "Brivoly could not finish loading the client workspace data. Refresh and it should retry the guest workspace automatically.";
 }
 
 function resolveCRMView(pathname: string): CRMWorkspaceView {

@@ -31,8 +31,8 @@ export default async function SignUpPage({ searchParams }: SignUpPageProps) {
         <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:justify-between">
           <div className="max-w-3xl">
             <div>
-              <p className="bg-gradient-to-r from-[#034CFD] to-[#01113B] bg-clip-text text-xs font-semibold uppercase tracking-[0.28em] text-transparent">
-                CRM Portal
+              <p className="ui-eyebrow bg-gradient-to-r from-[#034CFD] to-[#01113B] bg-clip-text text-transparent">
+                Client OS
               </p>
               <h1 className="mt-2 text-4xl font-semibold tracking-tight text-slate-950 md:text-5xl">
                 Create your account and enter Client OS directly.
@@ -42,7 +42,7 @@ export default async function SignUpPage({ searchParams }: SignUpPageProps) {
               This keeps account creation inside Brivoly so the handoff into Client OS feels continuous instead of bouncing through a hosted auth redirect.
             </p>
             <div className="mt-6 rounded-[1.5rem] border border-cyan-200 bg-cyan-50 px-5 py-4 text-cyan-950">
-              <p className="text-xs font-semibold uppercase tracking-[0.22em]">New account setup</p>
+              <p className="ui-eyebrow-strong text-cyan-900">New account setup</p>
               <p className="mt-2 text-lg font-semibold">Create the account here, then Brivoly will open your client workspace.</p>
               <p className="mt-2 text-sm leading-6">
                 No localhost redirect detour, no manual re-entry. The goal is one clean handoff into the app.
@@ -56,7 +56,7 @@ export default async function SignUpPage({ searchParams }: SignUpPageProps) {
           </div>
 
           <div className="w-full max-w-md rounded-[1.75rem] border bg-slate-950 p-5 text-slate-50 shadow-[0_24px_80px_-50px_rgba(15,23,42,0.9)]">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300">Portal Status</p>
+            <p className="ui-eyebrow-inverse text-cyan-300">Portal Status</p>
             <div className="mt-4 space-y-3">
               <SignUpStatusRow label="Session" value="Creating a new account on this device" />
               <SignUpStatusRow label="Destination" value={redirectTo === "/clientos" ? "Client OS workspace" : "Brivoly workspace"} />
@@ -68,7 +68,7 @@ export default async function SignUpPage({ searchParams }: SignUpPageProps) {
 
       <section className="mt-6 grid gap-6 xl:grid-cols-[0.92fr_1.08fr]">
         <section className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Before You Continue</p>
+          <p className="ui-eyebrow">Before You Continue</p>
           <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Account creation should stay inside the app.</h2>
           <p className="mt-3 text-sm leading-7 text-slate-600">
             This flow mirrors the CRM entry surface so new users land in the same visual language and continue straight into their workspace.
@@ -98,7 +98,7 @@ export default async function SignUpPage({ searchParams }: SignUpPageProps) {
           />
         ) : (
           <section className="rounded-[1.75rem] border bg-white/85 p-6 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Configuration</p>
+            <p className="ui-eyebrow">Configuration</p>
             <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">Sign-up is not configured yet</h2>
             <p className="mt-3 text-sm leading-6 text-slate-600">
               Set <code>CLERK_PUBLISHABLE_KEY</code> so the frontend can render account creation for users.
@@ -121,7 +121,7 @@ export default async function SignUpPage({ searchParams }: SignUpPageProps) {
 function SignUpStatusRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-start justify-between gap-4 rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">{label}</p>
+      <p className="ui-eyebrow-inverse text-slate-400">{label}</p>
       <p className="text-right text-sm text-slate-100">{value}</p>
     </div>
   );
@@ -130,7 +130,7 @@ function SignUpStatusRow({ label, value }: { label: string; value: string }) {
 function InfoCard({ label, body }: { label: string; body: string }) {
   return (
     <div className="rounded-[1.4rem] border bg-slate-50/80 px-4 py-4">
-      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">{label}</p>
+      <p className="ui-eyebrow">{label}</p>
       <p className="mt-2 text-sm leading-6 text-slate-700">{body}</p>
     </div>
   );

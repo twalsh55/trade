@@ -41,5 +41,35 @@
       radial-gradient(circle at top, rgba(191, 219, 254, 0.45), transparent 30%),
       linear-gradient(180deg, rgba(255, 251, 235, 1), rgba(241, 245, 249, 1));
     font-family: var(--font-sans), sans-serif;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display), var(--font-sans), sans-serif;
+    letter-spacing: -0.03em;
+  }
+
+  input,
+  textarea,
+  select,
+  button {
+    font: inherit;
+  }
+}
+
+@layer components {
+  .ui-eyebrow {
+    @apply text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400;
+  }
+
+  .ui-eyebrow-strong {
+    @apply text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500;
+  }
+
+  .ui-eyebrow-inverse {
+    @apply text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-200;
   }
 }

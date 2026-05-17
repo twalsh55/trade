@@ -884,7 +884,12 @@ def _require_crm_user(
 ) -> User:
     session_token = _extract_session_token(authorization, session_cookie)
     if session_token:
-        return _require_authenticated_user(deps, authorization, session_cookie)
+        try:
+            return _require_authenticated_user(deps, authorization, session_cookie)
+        except HTTPException as exc:
+            if exc.status_code == status.HTTP_401_UNAUTHORIZED and _is_anonymous_crm_enabled():
+                return _build_anonymous_crm_user(deps)
+            raise
     if _is_anonymous_crm_enabled():
         return _build_anonymous_crm_user(deps)
     raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required.")

@@ -31,7 +31,7 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
         <div className="grid gap-8 lg:grid-cols-[0.82fr_1.18fr] lg:items-start">
           <section className="max-w-xl">
             <div>
-              <p className="bg-gradient-to-r from-[#034CFD] to-[#01113B] bg-clip-text text-xs font-semibold uppercase tracking-[0.28em] text-transparent">
+              <p className="ui-eyebrow bg-gradient-to-r from-[#034CFD] to-[#01113B] bg-clip-text text-transparent">
                 Sign In
               </p>
               <h1 className="mt-2 text-4xl font-semibold tracking-tight text-slate-950 md:text-5xl">
@@ -43,13 +43,13 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
             </p>
             <div className="mt-6 space-y-3">
               <SimpleAccessRow label="Opens" value="Follow-ups, pipeline, imports, and intake" />
-              <SimpleAccessRow label="After sign-in" value="Brivoly returns you to CRM automatically" />
+              <SimpleAccessRow label="After sign-in" value="Brivoly returns you to Client OS automatically" />
             </div>
             <div className="mt-8 flex flex-wrap gap-3">
               {bootstrap?.clerk_sign_up_url ? (
-              <Button asChild size="lg" variant="outline">
-                <Link href="/sign-up?redirectTo=%2Fclientos">Create account</Link>
-              </Button>
+                <Button asChild size="lg" variant="outline">
+                  <Link href="/sign-up?redirectTo=%2Fclientos">Create account</Link>
+                </Button>
               ) : null}
             </div>
           </section>
@@ -62,7 +62,7 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
             />
           ) : (
             <section className="rounded-[1.75rem] border bg-white/85 p-6 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Configuration</p>
+              <p className="ui-eyebrow">Configuration</p>
               <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">Sign-in is not configured yet</h2>
               <p className="mt-3 text-sm leading-6 text-slate-600">
                 Set <code>CLERK_PUBLISHABLE_KEY</code> so the frontend can render the sign-in form for users.
@@ -86,7 +86,7 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
 function SimpleAccessRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-[1.3rem] border bg-slate-50/80 px-4 py-4">
-      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">{label}</p>
+      <p className="ui-eyebrow">{label}</p>
       <p className="mt-2 text-sm leading-6 text-slate-700">{value}</p>
     </div>
   );

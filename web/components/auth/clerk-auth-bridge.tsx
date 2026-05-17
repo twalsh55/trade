@@ -158,12 +158,12 @@ export function ClerkAuthBridge({ publishableKey, host, redirectTo, mode = "sign
     <div className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">{isSignUp ? "Secure Sign-Up" : "Secure Sign-In"}</p>
+          <p className="ui-eyebrow">{isSignUp ? "Secure Sign-Up" : "Secure Sign-In"}</p>
           <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
             {isSignUp ? "Create account" : "Sign in"}
           </h2>
         </div>
-        <div className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700">
+        <div className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">
           {isSignUp ? "New account" : "Secure access"}
         </div>
       </div>
@@ -180,7 +180,7 @@ export function ClerkAuthBridge({ publishableKey, host, redirectTo, mode = "sign
         {isCompleting ? (
           <div className="absolute inset-0 flex items-center justify-center bg-[linear-gradient(180deg,rgba(248,250,252,0.96),rgba(255,255,255,0.98))] px-6">
             <div className="w-full max-w-md rounded-[1.6rem] border border-white bg-white/95 p-6 shadow-[0_24px_90px_-55px_rgba(15,23,42,0.35)]">
-              <div className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-800">
+              <div className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-800">
                 Signed in
               </div>
               <h3 className="mt-4 text-2xl font-semibold tracking-tight text-slate-950">Opening your client workspace.</h3>

@@ -33,7 +33,7 @@ export function CRMTaskbar({ authenticated = false }: { authenticated?: boolean 
           imageClassName="opacity-90"
         />
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300">Client OS</p>
+          <p className="ui-eyebrow-inverse text-cyan-300">Client OS</p>
           <p className="mt-1 text-xs text-slate-400">Brivoly</p>
         </div>
       </div>
@@ -50,7 +50,7 @@ export function CRMTaskbar({ authenticated = false }: { authenticated?: boolean 
                   : "border-white/10 bg-white/5 text-slate-200 hover:border-white/25 hover:bg-white/10"
               }`}
             >
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">{item.label}</p>
+              <p className="ui-eyebrow-inverse">{item.label}</p>
               <p className="mt-2 text-sm text-slate-200">{item.body}</p>
             </Link>
           );

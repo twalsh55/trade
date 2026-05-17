@@ -1727,6 +1727,19 @@ def test_crm_followups_endpoint_can_run_without_auth_in_anonymous_mode() -> None
         os.environ.pop("ALLOW_ANONYMOUS_CRM", None)
 
 
+def test_crm_followups_falls_back_to_anonymous_mode_when_session_token_is_invalid() -> None:
+    client = make_client(auth_error=AuthenticationError("Session token verification failed."))
+    os.environ["ALLOW_ANONYMOUS_CRM"] = "true"
+    try:
+        response = client.get("/api/crm/followups", headers={"Authorization": "Bearer stale-session-token"})
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["total_open"] == 4
+        assert payload["items"][0]["lead_name"] == "Amber Flores"
+    finally:
+        os.environ.pop("ALLOW_ANONYMOUS_CRM", None)
+
+
 def test_crm_followups_endpoint_supports_complete_snooze_and_notes() -> None:
     repository = InMemoryLeadFollowUpRepository(now=lambda: datetime(2024, 5, 6, 12, 30, tzinfo=UTC))
     client = make_client(user=make_user(), lead_follow_up_repository=repository)
