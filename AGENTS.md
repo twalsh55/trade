@@ -98,7 +98,7 @@ cd web && npm run e2e
   - left taskbar with dedicated Client OS pages
   - CRM relationship memory now persists in Postgres when `DATABASE_URL` is configured, including imported follow-ups, notes, timeline history, and inbox-ingested thread state
   - anonymous guest mode now bootstraps the sample relationship set once into durable CRM storage instead of rebuilding it from process memory on every restart
-  - Today priorities now collapse into one obvious `Start here` move, lighter `Needs care now` and `Freshest opening` summaries, direct draft/review actions, stronger upload-aware next-touch framing, and a clearer `Next move` cue on each priority so the daily home asks for less scanning
+  - Today priorities now collapse into one obvious `Start here` move, lighter `Needs care now` and `Freshest opening` summaries, direct draft/review actions, stronger upload-aware next-touch framing, a lightweight `Prepare now` path for upcoming meeting-like moments, and a clearer `Next move` cue on each priority so the daily home asks for less scanning
   - follow-up queue
   - inbox-native relationship page for auto-logging email threads and reconnect-aware next moves
   - mailbox beta now includes real Gmail / Outlook OAuth-ready connection start/complete routes, provider-backed sync for OAuth-linked accounts, provider-watch event callbacks, and provider-backed sending through Gmail API / Microsoft Graph when those accounts are connected
@@ -114,7 +114,8 @@ cd web && npm run e2e
   - attention view with reconnect-first guidance and direct draft actions
   - complete and snooze actions
   - relationship history + internal notes
-  - relationship memory summaries that blend email, notes, uploads, reconnect cues, and recent upload context, with lighter `Conversation memory` and `Latest saved context` reads instead of repetitive stacked boxes
+  - relationship memory summaries now blend email, notes, uploads, reconnect cues, recent upload context, and upcoming meeting prep signals, with lighter `Conversation memory` and `Latest saved context` reads instead of repetitive stacked boxes
+  - relationship pages now surface upcoming meeting-like moments with a direct `Prepare me` path into the meeting-prep memory view when Brivoly detects that a near-term next touch looks like a call, demo, review, or sync
   - recent client-shared context now has its own memory view, can be pulled straight into the next drafted note, generates a backend-driven follow-through hint, creates a more natural reconnect path, and now plays a bigger role in meeting prep, 30-day summaries, follow-through guidance, Today priorities, and inbox-side next moves
   - auto note designer for reconnects and follow-ups with in-app draft editing
   - last meaningful interaction tracking

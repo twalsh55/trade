@@ -28,6 +28,7 @@ from src.application.crm import (
     _build_last_30_days_summary,
     _build_meeting_prep_summary,
     _build_recent_upload_summary,
+    _resolve_upcoming_meeting,
     _build_upload_follow_through_hint,
     _build_reconnect_message_hint,
     _build_reconnect_next_move,
@@ -648,6 +649,7 @@ def test_crm_helper_branches_cover_relationship_summaries() -> None:
     assert _build_last_30_days_summary(build_follow_up(now=now, timeline=(), threads=()), now) == "There has not been much relationship activity in the last 30 days."
     assert _build_meeting_prep_summary(build_follow_up(now=now, timeline=(), threads=(), next_step="   ", notes="   "), now) == "Brivoly does not have enough context yet to prep this meeting."
     assert _build_upload_follow_through_hint(build_follow_up(now=now, timeline=(), threads=()), now) == ""
+    assert _resolve_upcoming_meeting(build_follow_up(now=now, next_step="review the onboarding meeting", threads=()), now)[0] == now
 
 
 def test_crm_helper_branches_cover_reconnect_guidance() -> None:

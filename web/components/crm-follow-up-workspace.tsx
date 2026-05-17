@@ -39,6 +39,7 @@ type TodayPriorityCardItem = {
   body: string;
   meta: string;
   nextMove?: string;
+  memoryView?: "meeting_prep";
   actionLabel?: string;
   onAction?: () => void;
 };
@@ -141,6 +142,8 @@ export function CRMFollowUpWorkspace({
   const showingImport = view === "import";
   const showingIntake = view === "intake";
   const intakeTask = resolveIntakeTask(pathname ?? "/clientos/intake");
+  const requestedLeadId = searchParams?.get("lead");
+  const requestedMemoryView = searchParams?.get("memory") === "meeting_prep" ? "meeting_prep" : null;
 
   useEffect(() => {
     if (view !== "followups" || !queuedTodayDraft || !selectedLead || selectedLead.id !== queuedTodayDraft.leadId) {
@@ -162,6 +165,15 @@ export function CRMFollowUpWorkspace({
       setSelectedLeadId(filteredFollowUps[0]?.id ?? null);
     }
   }, [filteredFollowUps, selectedLeadId]);
+
+  useEffect(() => {
+    if (!requestedLeadId) {
+      return;
+    }
+    if (overview.items.some((item) => item.id === requestedLeadId)) {
+      setSelectedLeadId(requestedLeadId);
+    }
+  }, [overview.items, requestedLeadId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -573,13 +585,16 @@ export function CRMFollowUpWorkspace({
     setDraftFocusToken((value) => value + 1);
   }
 
-  function runTodayPriorityAction(leadId: string, route: string, preset?: TodayDraftPreset) {
+  function runTodayPriorityAction(leadId: string, route: string, preset?: TodayDraftPreset, memoryView?: "meeting_prep") {
     focusLeadForFollowUp(leadId);
     if (preset) {
       requestDraftFocus();
       setQueuedTodayDraft({ leadId, preset });
     }
-    router.push(route);
+    const nextRoute = route === "/clientos/follow-ups" && memoryView
+      ? `${route}?lead=${encodeURIComponent(leadId)}&memory=${encodeURIComponent(memoryView)}`
+      : route;
+    router.push(nextRoute);
   }
 
   function syncInboxThread() {
@@ -1110,6 +1125,7 @@ export function CRMFollowUpWorkspace({
               onEmailBodyDraftChange={setEmailBodyDraft}
               onGenerateEmailDraft={generateEmailDraft}
               onSendDraftToMailbox={sendCurrentDraftToMailbox}
+              initialMemoryView={requestedMemoryView}
             />
           ) : null}
           <section className="rounded-[1.75rem] border bg-slate-950 p-6 text-slate-50 shadow-[0_24px_90px_-55px_rgba(15,23,42,0.9)]">
@@ -1455,7 +1471,7 @@ function TodayPrioritiesPanel({
 }: {
   items: CRMLeadFollowUp[];
   inboxSummary: CRMFollowUpOverview["inbox_summary"];
-  onRunAction: (leadId: string, route: string, preset?: TodayDraftPreset) => void;
+  onRunAction: (leadId: string, route: string, preset?: TodayDraftPreset, memoryView?: "meeting_prep") => void;
 }) {
   const replyLead = [...items]
     .filter((item) => item.recent_email_threads.some((thread) => thread.needs_reply))
@@ -1472,6 +1488,13 @@ function TodayPrioritiesPanel({
   const recentContextLead = [...items]
     .filter((item) => hasFreshContext(item) && !hasRecentUploadContext(item))
     .sort((left, right) => compareFreshContextPriority(left, right))[0] ?? null;
+  const meetingLead = [...items]
+    .filter((item) => item.relationship_upcoming_meeting_at)
+    .sort(
+      (left, right) =>
+        new Date(left.relationship_upcoming_meeting_at ?? left.next_follow_up_at).getTime() -
+        new Date(right.relationship_upcoming_meeting_at ?? right.next_follow_up_at).getTime(),
+    )[0] ?? null;
   const replyThread = replyLead ? getReplyThread(replyLead) : null;
 
   const uploadReentryLead = recentUploadLead && isReconnectMoment(recentUploadLead) ? recentUploadLead : null;
@@ -1513,6 +1536,20 @@ function TodayPrioritiesPanel({
               length: "short",
               status: "Drafting a reply from Today...",
             }),
+        }
+      : null,
+    meetingLead
+      ? {
+          id: `${meetingLead.id}-meeting`,
+          href: "/clientos/follow-ups",
+          eyebrow: "Meeting prep",
+          title: `Prepare for ${meetingLead.lead_name}`,
+          body: meetingLead.relationship_meeting_prep_summary || meetingLead.relationship_upcoming_meeting_label || meetingLead.next_step,
+          meta: `${meetingLead.company_name} · ${formatDateTime(meetingLead.relationship_upcoming_meeting_at ?? meetingLead.next_follow_up_at)}`,
+          nextMove: meetingLead.relationship_upcoming_meeting_label || "Open the relationship and walk in with the right context already in view.",
+          memoryView: "meeting_prep",
+          actionLabel: "Prepare now",
+          onAction: () => onRunAction(meetingLead.id, "/clientos/follow-ups", undefined, "meeting_prep"),
         }
       : null,
     reconnectLead && reconnectLead.id !== uploadReentryLead?.id
@@ -1606,6 +1643,7 @@ function TodayPrioritiesPanel({
   const secondaryPriorities = visiblePriorities.slice(1);
 
   const replyCount = inboxSummary?.needs_reply_count ?? 0;
+  const meetingCount = items.filter((item) => item.relationship_upcoming_meeting_at).length;
   const reconnectCount = items.filter((item) => item.relationship_state === "stale" || item.relationship_state === "at_risk" || item.relationship_state === "drifting").length;
   const proposalCount = items.filter((item) => isProposalFollowThrough(item)).length;
   const recentUploadCount = items.filter((item) => hasRecentUploadContext(item)).length;
@@ -1618,7 +1656,7 @@ function TodayPrioritiesPanel({
       <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Today’s priorities</p>
       <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">A short list of who needs your attention right now.</h2>
       <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-        Brivoly pulls together replies, reconnects, proposal follow-through, and new client context so you can pick the right next move without re-reading everything first.
+        Brivoly pulls together replies, reconnects, proposal follow-through, upcoming meeting prep, and new client context so you can pick the right next move without re-reading everything first.
       </p>
       <p className="mt-3 text-sm font-medium text-slate-700">Start with one relationship and one next move. Brivoly will hold the rest.</p>
       <div className="mt-4 flex flex-wrap gap-2">
@@ -1651,9 +1689,11 @@ function TodayPrioritiesPanel({
         />
         <TodaySignal
           label="Freshest opening"
-          value={contextCount ? String(contextCount) : "Quiet"}
+          value={meetingCount ? String(meetingCount) : contextCount ? String(contextCount) : "Quiet"}
           detail={
-            recentUploadCount
+            meetingCount
+              ? `${meetingCount} meeting prep moment${meetingCount === 1 ? "" : "s"} is coming up soon`
+              : recentUploadCount
               ? `${recentUploadCount} client upload${recentUploadCount === 1 ? "" : "s"} landed recently`
               : freshContextCount
                 ? `${freshContextCount} relationship${freshContextCount === 1 ? "" : "s"} picked up new context recently`
@@ -3078,6 +3118,7 @@ function LeadMemoryPanel({
   onEmailBodyDraftChange,
   onGenerateEmailDraft,
   onSendDraftToMailbox,
+  initialMemoryView,
 }: {
   lead: CRMLeadFollowUp;
   settings: AccountSettings | null;
@@ -3107,11 +3148,12 @@ function LeadMemoryPanel({
     status?: string;
   }) => void;
   onSendDraftToMailbox: () => void;
+  initialMemoryView?: "meeting_prep" | null;
 }) {
   const launchHref = buildMailtoHref(emailSubjectDraft, emailBodyDraft);
   const suggestedResponses = buildSuggestedResponsePresets(lead);
   const composerSectionRef = useRef<HTMLElement | null>(null);
-  const [memoryView, setMemoryView] = useState<"overview" | "last_30_days" | "meeting_prep" | "recent_changes" | "recent_upload">("overview");
+  const [memoryView, setMemoryView] = useState<"overview" | "last_30_days" | "meeting_prep" | "recent_changes" | "recent_upload">(initialMemoryView ?? "overview");
   const memoryPanels = [
     { value: "overview" as const, label: "What matters", body: lead.relationship_context_summary || lead.notes || "No summary yet." },
     { value: "last_30_days" as const, label: "Last 30 days", body: lead.relationship_last_30_days_summary || "No 30-day summary yet." },
@@ -3136,6 +3178,12 @@ function LeadMemoryPanel({
     composerSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [draftFocusToken, lead.id]);
 
+  useEffect(() => {
+    if (initialMemoryView) {
+      setMemoryView(initialMemoryView);
+    }
+  }, [initialMemoryView, lead.id]);
+
   return (
     <section className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm">
       <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Relationship memory</p>
@@ -3146,6 +3194,12 @@ function LeadMemoryPanel({
         <TimelineTile label="Where it stands" value={formatStageLabel(lead.stage)} />
         <TimelineTile label="Best channel" value={lead.contact_channel} />
         <TimelineTile label="Point person" value={lead.owner_name} />
+        {lead.relationship_upcoming_meeting_at ? (
+          <TimelineTile
+            label="Upcoming meeting"
+            value={`${formatDateTime(lead.relationship_upcoming_meeting_at)}${lead.relationship_upcoming_meeting_label ? ` · ${lead.relationship_upcoming_meeting_label}` : ""}`}
+          />
+        ) : null}
       </div>
 
       <div className="mt-4 grid gap-3 md:grid-cols-2">
@@ -3156,6 +3210,28 @@ function LeadMemoryPanel({
           value={lead.relationship_upload_follow_through_hint || lead.relationship_timing_nudge || "Brivoly is keeping the timing in view."}
         />
       </div>
+
+      {lead.relationship_upcoming_meeting_at ? (
+        <section className="mt-6 rounded-[1.5rem] border bg-emerald-50/70 p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="max-w-2xl">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">Upcoming meeting</p>
+              <h3 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+                Walk into this conversation with the right context already loaded.
+              </h3>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                {lead.relationship_upcoming_meeting_label || "Brivoly found a meeting-like next step for this relationship."}
+                {lead.relationship_upcoming_meeting_source ? ` Source: ${lead.relationship_upcoming_meeting_source}.` : ""}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <Button type="button" onClick={() => setMemoryView("meeting_prep")}>
+                Prepare me
+              </Button>
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       {isReconnectMoment(lead) ? (
         <section className="mt-6 rounded-[1.5rem] border bg-sky-50/70 p-5">

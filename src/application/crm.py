@@ -80,6 +80,7 @@ def _enrich_follow_up(item: LeadFollowUp, current_time: datetime) -> LeadFollowU
     recent_changes_summary = _build_recent_changes_summary(item_with_upload_context, current_time)
     last_30_days_summary = _build_last_30_days_summary(item_with_upload_context, current_time)
     meeting_prep_summary = _build_meeting_prep_summary(item_with_upload_context, current_time)
+    upcoming_meeting_at, upcoming_meeting_label, upcoming_meeting_source = _resolve_upcoming_meeting(item_with_upload_context, current_time)
     reconnect_why_now = _build_reconnect_why_now(item_with_upload_context, current_time)
     reconnect_next_move = _build_reconnect_next_move(item_with_upload_context, current_time)
     reconnect_message_hint = _build_reconnect_message_hint(item_with_upload_context, current_time)
@@ -96,6 +97,9 @@ def _enrich_follow_up(item: LeadFollowUp, current_time: datetime) -> LeadFollowU
         relationship_upload_follow_through_hint=upload_follow_through_hint,
         relationship_last_30_days_summary=last_30_days_summary,
         relationship_meeting_prep_summary=meeting_prep_summary,
+        relationship_upcoming_meeting_at=upcoming_meeting_at,
+        relationship_upcoming_meeting_label=upcoming_meeting_label,
+        relationship_upcoming_meeting_source=upcoming_meeting_source,
         relationship_reconnect_why_now=reconnect_why_now,
         relationship_reconnect_next_move=reconnect_next_move,
         relationship_reconnect_message_hint=reconnect_message_hint,
@@ -548,6 +552,62 @@ def _build_meeting_prep_summary(item: LeadFollowUp, current_time: datetime) -> s
     return " ".join(parts[:3])
 
 
+MEETING_KEYWORDS = (
+    "meeting",
+    "call",
+    "sync",
+    "demo",
+    "review",
+    "kickoff",
+    "walkthrough",
+    "check-in",
+    "check in",
+    "standup",
+)
+
+
+def _resolve_upcoming_meeting(item: LeadFollowUp, current_time: datetime) -> tuple[datetime | None, str, str]:
+    if item.next_follow_up_at < current_time:
+        return (None, "", "")
+    if item.next_follow_up_at > current_time + timedelta(days=14):
+        return (None, "", "")
+
+    next_step = item.next_step.strip()
+    latest_thread = sorted(item.recent_email_threads, key=lambda thread: thread.last_message_at, reverse=True)[:1]
+    latest_entry = sorted(item.timeline, key=lambda entry: entry.occurred_at, reverse=True)[:1]
+
+    thread_subject = latest_thread[0].subject.strip() if latest_thread else ""
+    thread_snippet = latest_thread[0].snippet.strip() if latest_thread else ""
+    latest_summary = latest_entry[0].summary.strip() if latest_entry else ""
+    latest_kind = latest_entry[0].kind.strip().lower() if latest_entry else ""
+
+    if _looks_like_meeting_context(next_step):
+        return (
+            item.next_follow_up_at,
+            _truncate_sentence(_sentence_case(next_step), 120),
+            "next step",
+        )
+    if _looks_like_meeting_context(thread_subject):
+        return (
+            item.next_follow_up_at,
+            _truncate_sentence(_sentence_case(thread_subject), 120),
+            "email thread",
+        )
+    if _looks_like_meeting_context(thread_snippet):
+        return (
+            item.next_follow_up_at,
+            _truncate_sentence(_sentence_case(thread_snippet), 120),
+            "email thread",
+        )
+    if latest_kind in {"meeting", "call"}:
+        return (
+            item.next_follow_up_at,
+            _truncate_sentence(_sentence_case(latest_summary or f"{latest_kind} with {item.lead_name}"), 120),
+            "relationship history",
+        )
+    return (None, "", "")
+
+
 def _build_reconnect_why_now(item: LeadFollowUp, current_time: datetime) -> str:
     upload_context = _build_upload_memory_snippet(item)
     latest_upload = _get_latest_upload_entry(item)
@@ -656,6 +716,13 @@ def _has_thin_reconnect_context(item: LeadFollowUp) -> bool:
         and not item.last_meaningful_interaction_at
         and not has_saved_summary
     )
+
+
+def _looks_like_meeting_context(text: str) -> bool:
+    normalized = text.strip().lower()
+    if not normalized:
+        return False
+    return any(keyword in normalized for keyword in MEETING_KEYWORDS)
 
 
 def summarize_timeline_kind(kind: str) -> str:

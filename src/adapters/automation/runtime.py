@@ -352,10 +352,13 @@ def _run_sentiment_job(runner) -> AutomationJobResult:  # type: ignore[no-untype
 
 def _run_mailbox_sync_job() -> AutomationJobResult:
     try:
-        synced_connections, synced_threads = run_scheduled_mailbox_sync_job()
+        synced_connections, synced_threads, watch_ready_connections = run_scheduled_mailbox_sync_job()
     except RuntimeError as exc:
         return AutomationJobResult(status="failed", detail=str(exc))
-    return AutomationJobResult(status="ok", detail=f"connections={synced_connections} threads={synced_threads}")
+    return AutomationJobResult(
+        status="ok",
+        detail=f"connections={synced_connections} threads={synced_threads} watch_ready={watch_ready_connections}",
+    )
 
 
 def _format_token_usage(usage) -> str:  # type: ignore[no-untyped-def]

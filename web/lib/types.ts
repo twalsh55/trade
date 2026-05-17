@@ -113,6 +113,9 @@ export type CRMLeadFollowUp = {
   relationship_upload_follow_through_hint: string;
   relationship_last_30_days_summary: string;
   relationship_meeting_prep_summary: string;
+  relationship_upcoming_meeting_at: string | null;
+  relationship_upcoming_meeting_label: string;
+  relationship_upcoming_meeting_source: string;
   relationship_reconnect_why_now: string;
   relationship_reconnect_next_move: string;
   relationship_reconnect_message_hint: string;

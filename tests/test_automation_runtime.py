@@ -460,10 +460,10 @@ def test_send_founder_code_progress_notification_tolerates_channel_errors(monkey
 
 
 def test_mailbox_sync_job_reports_counts_and_failure(monkeypatch) -> None:
-    monkeypatch.setattr("src.adapters.automation.runtime.run_scheduled_mailbox_sync_job", lambda: (2, 5))
+    monkeypatch.setattr("src.adapters.automation.runtime.run_scheduled_mailbox_sync_job", lambda: (2, 5, 2))
     result = _run_mailbox_sync_job()
     assert result.status == "ok"
-    assert result.detail == "connections=2 threads=5"
+    assert result.detail == "connections=2 threads=5 watch_ready=2"
 
     monkeypatch.setattr(
         "src.adapters.automation.runtime.run_scheduled_mailbox_sync_job",

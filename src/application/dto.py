@@ -181,6 +181,9 @@ class LeadFollowUpDTO:
     relationship_upload_follow_through_hint: str
     relationship_last_30_days_summary: str
     relationship_meeting_prep_summary: str
+    relationship_upcoming_meeting_at: str | None
+    relationship_upcoming_meeting_label: str
+    relationship_upcoming_meeting_source: str
     relationship_reconnect_why_now: str
     relationship_reconnect_next_move: str
     relationship_reconnect_message_hint: str
@@ -615,6 +618,9 @@ def build_lead_follow_up_dto(item: LeadFollowUp) -> LeadFollowUpDTO:
         relationship_upload_follow_through_hint=item.relationship_upload_follow_through_hint,
         relationship_last_30_days_summary=item.relationship_last_30_days_summary,
         relationship_meeting_prep_summary=item.relationship_meeting_prep_summary,
+        relationship_upcoming_meeting_at=item.relationship_upcoming_meeting_at.isoformat() if item.relationship_upcoming_meeting_at else None,
+        relationship_upcoming_meeting_label=item.relationship_upcoming_meeting_label,
+        relationship_upcoming_meeting_source=item.relationship_upcoming_meeting_source,
         relationship_reconnect_why_now=item.relationship_reconnect_why_now,
         relationship_reconnect_next_move=item.relationship_reconnect_next_move,
         relationship_reconnect_message_hint=item.relationship_reconnect_message_hint,
