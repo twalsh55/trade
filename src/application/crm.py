@@ -480,6 +480,9 @@ def _build_upload_follow_through_hint(item: LeadFollowUp, current_time: datetime
     if item.next_step.strip():
         return f"Best next touch from the new context: {_ensure_sentence(item.next_step)}"
 
+    if item.relationship_state in {"stale", "at_risk", "drifting"}:
+        return "Use the new client context as the easiest reason to reopen the relationship while it is still fresh."
+
     if latest_upload.occurred_at >= current_time - timedelta(days=2):
         return "Use the new client context while it is still fresh and turn it into a short follow-through note."
     return "Keep the new client context in view the next time you reach back out."
@@ -561,6 +564,10 @@ def _build_reconnect_why_now(item: LeadFollowUp, current_time: datetime) -> str:
     latest_entries = sorted(item.timeline, key=lambda entry: entry.occurred_at, reverse=True)[:1]
     if latest_entries:
         return f"Brivoly is still holding context around {_sentence_case(latest_entries[0].summary.rstrip('.'))}, so this does not need to feel like a cold restart."
+    if _has_thin_reconnect_context(item):
+        if item.company_name.strip():
+            return f"There is not much saved context here yet, which makes a brief check-in with {item.company_name} the cleanest way back in."
+        return "There is not much saved context here yet, so a simple low-pressure restart is the right move."
     return "Brivoly is keeping a low-pressure reconnect path ready."
 
 
@@ -593,6 +600,8 @@ def _build_reconnect_next_move(item: LeadFollowUp, current_time: datetime) -> st
     latest_entries = sorted(item.timeline, key=lambda entry: entry.occurred_at, reverse=True)[:1]
     if latest_entries:
         return f"Use the last bit of saved context around {_truncate_sentence(latest_entries[0].summary.strip(), 100)} and make the next step easy."
+    if _has_thin_reconnect_context(item):
+        return "Send a short check-in, acknowledge the gap lightly, and offer one easy way to pick this back up."
     return "Keep it simple: acknowledge the gap, offer context, and make the next move easy."
 
 
@@ -623,7 +632,22 @@ def _build_reconnect_message_hint(item: LeadFollowUp, current_time: datetime) ->
     latest_entries = sorted(item.timeline, key=lambda entry: entry.occurred_at, reverse=True)[:1]
     if latest_entries:
         return f'Quick angle: "Wanted to circle back on {_truncate_sentence(latest_entries[0].summary.strip(), 90)} and see if it makes sense to pick this up again."'
+    if _has_thin_reconnect_context(item):
+        return 'Quick angle: "Wanted to check in briefly and see if it makes sense to pick this back up."'
     return 'Quick angle: "Wanted to check back in and see if this is worth picking up again."'
+
+
+def _has_thin_reconnect_context(item: LeadFollowUp) -> bool:
+    has_saved_summary = item.relationship_context_summary.strip() and item.relationship_context_summary != "Brivoly has not captured enough relationship context yet."
+    return (
+        not item.next_step.strip()
+        and not item.notes.strip()
+        and not item.timeline
+        and not item.recent_email_threads
+        and not item.relationship_reminders
+        and not item.last_meaningful_interaction_at
+        and not has_saved_summary
+    )
 
 
 def summarize_timeline_kind(kind: str) -> str:
