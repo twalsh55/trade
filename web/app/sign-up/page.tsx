@@ -99,7 +99,7 @@ export default async function SignUpPage({ searchParams }: SignUpPageProps) {
         ) : (
           <section className="rounded-[1.75rem] border bg-white/85 p-6 shadow-sm">
             <p className="ui-eyebrow">Configuration</p>
-            <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">Sign-up is not configured yet</h2>
+            <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">Sign-up is not ready yet</h2>
             <p className="mt-3 text-sm leading-6 text-slate-600">
               Set <code>CLERK_PUBLISHABLE_KEY</code> so the frontend can render account creation for users.
             </p>

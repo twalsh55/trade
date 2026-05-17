@@ -610,7 +610,7 @@ export function CRMFollowUpWorkspace({
       <section className="mt-6 rounded-[1.75rem] border bg-white/85 p-6 shadow-sm">
         <div className="grid gap-6 xl:grid-cols-[0.92fr_1.08fr]">
           <section>
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Bring in context</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Bring context back in</p>
             <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Bring relationship context in without retyping it.</h2>
             <p className="mt-3 text-sm leading-6 text-slate-600">
               Upload a CSV, XLSX, XLS, or note image, or paste a Google Sheets link. Brivoly cleans up messy headers, spots what is missing, and keeps only what is ready to support the next touch.
@@ -651,7 +651,7 @@ export function CRMFollowUpWorkspace({
 
             {sourceType === "file_upload" ? (
               <section className="mt-5 rounded-[1.4rem] border bg-slate-50/80 p-5">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Bring in a file</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">File or note</p>
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -697,7 +697,7 @@ export function CRMFollowUpWorkspace({
                   placeholder="https://docs.google.com/spreadsheets/d/..."
                   className="mt-3 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400"
                 />
-                <p className="mt-3 text-xs text-slate-500">Use a shareable Google Sheets URL. Brivoly will pull the sheet in directly.</p>
+                <p className="mt-3 text-xs text-slate-500">Use a shareable Google Sheets URL. Brivoly will pull the context in directly.</p>
               </section>
             )}
 
@@ -759,7 +759,7 @@ export function CRMFollowUpWorkspace({
       {showingFollowups ? (
       <section className="mt-6 grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
         <section className="rounded-[1.75rem] border bg-white/80 p-6 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Relationship Memory</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Relationship memory</p>
           <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Keep context close to the next touch.</h2>
           <p className="mt-3 text-sm leading-6 text-slate-600">
             Search fast, spot quiet relationships, and move the next touch forward without losing the last meaningful interaction.
@@ -825,7 +825,7 @@ export function CRMFollowUpWorkspace({
                         <PriorityBadge priority={item.priority} />
                       </div>
                     </div>
-                    <p className="mt-4 text-sm font-medium text-slate-700">Suggested next touch</p>
+                    <p className="mt-4 text-sm font-medium text-slate-700">Next touch</p>
                     <p className="mt-1 text-sm leading-6 text-slate-600">{item.next_step}</p>
                     <div className="mt-5 grid gap-3 md:grid-cols-2">
                       <TimelineTile label="Last touch" value={formatDateTime(item.last_contacted_at)} />
@@ -888,7 +888,7 @@ export function CRMFollowUpWorkspace({
             />
           ) : null}
           <section className="rounded-[1.75rem] border bg-slate-950 p-6 text-slate-50 shadow-[0_24px_90px_-55px_rgba(15,23,42,0.9)]">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300">Why Brivoly</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300">Why it helps</p>
             <h2 className="mt-3 text-3xl font-semibold tracking-tight">Brivoly remembers relationships so freelancers do not have to.</h2>
             <ul className="mt-5 space-y-3 text-sm leading-6 text-slate-300">
               <li>Every note, reminder, and suggested message should lower mental overhead instead of adding admin.</li>
@@ -916,7 +916,7 @@ export function CRMFollowUpWorkspace({
             </div>
 
             <section className="mt-6 rounded-[1.4rem] border bg-slate-50/80 p-5">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Inbox sample sync</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Inbox sync preview</p>
               <p className="mt-2 text-sm leading-6 text-slate-600">
                 Use this to simulate inbox sync while real provider connections are being wired. The same API route is ready for Gmail- or Outlook-style thread events, so you can test how Brivoly remembers the thread before those links are live.
               </p>
@@ -1050,12 +1050,12 @@ function CRMViewHeader({ view }: { view: CRMWorkspaceView }) {
       body: "See who needs your attention, what is slipping, and where a warm follow-through will matter most.",
     },
     followups: {
-      eyebrow: "Relationship Memory",
+      eyebrow: "Relationship memory",
       title: "Never lose track of where a relationship stands.",
       body: "Keep notes, context, and the next touch together so client continuity does not depend on your memory alone.",
     },
     inbox: {
-      eyebrow: "Inbox Memory",
+      eyebrow: "Inbox memory",
       title: "Let email quietly keep relationship memory up to date.",
       body: "Brivoly turns inbox activity into context, summaries, and follow-through without asking you to log everything by hand.",
     },
@@ -1065,12 +1065,12 @@ function CRMViewHeader({ view }: { view: CRMWorkspaceView }) {
       body: "Use this page to spot quiet relationships, reopening moments, and where a gentle reconnect is due.",
     },
     import: {
-      eyebrow: "Bring in context",
+      eyebrow: "Bring context back in",
       title: "Bring older client context back into memory without extra cleanup.",
       body: "Upload spreadsheets and raw note images, let Brivoly make sense of them, and only keep what supports better follow-through.",
     },
     intake: {
-      eyebrow: "Client handoff",
+      eyebrow: "Client dropzone",
       title: "Make it easy for clients to send context when it matters.",
       body: "Use no-login upload links, simple default paths, and mobile-first capture so updates land in relationship memory without extra back-and-forth.",
     },
