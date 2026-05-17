@@ -113,7 +113,7 @@ export function ClerkAuthBridge({ publishableKey, host, redirectTo, mode = "sign
         }
 
         if (clerk?.isSignedIn && clerk.session) {
-          setStatus(isSignUp ? "Your account is ready. Finalizing your workspace..." : "You're signed in. Finalizing your workspace...");
+          setStatus(isSignUp ? "Your account is ready. Finalizing Client OS..." : "You're signed in. Finalizing Client OS...");
           const token = await clerk.session.getToken({ skipCache: true });
           if (!token) {
             setStatus(
@@ -135,10 +135,10 @@ export function ClerkAuthBridge({ publishableKey, host, redirectTo, mode = "sign
         mountTarget.replaceChildren();
         if (isSignUp) {
           clerk.mountSignUp(mountTarget);
-          setStatus("Create your account below to open your Brivoly workspace.");
+          setStatus("Create your account below to open Client OS.");
         } else {
           clerk.mountSignIn(mountTarget);
-          setStatus("Sign in below to open your Brivoly workspace.");
+          setStatus("Sign in below to open Client OS.");
         }
       } catch (error) {
         setStatus(error instanceof Error ? error.message : isSignUp ? "Unable to load account creation." : "Unable to load sign-in.");
@@ -183,7 +183,7 @@ export function ClerkAuthBridge({ publishableKey, host, redirectTo, mode = "sign
               <div className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-800">
                 Signed in
               </div>
-              <h3 className="mt-4 text-2xl font-semibold tracking-tight text-slate-950">Opening your client workspace.</h3>
+              <h3 className="mt-4 text-2xl font-semibold tracking-tight text-slate-950">Opening Client OS.</h3>
               <p className="mt-3 text-sm leading-6 text-slate-600">
                 We’re securing your session and loading the app so the handoff feels cleaner.
               </p>

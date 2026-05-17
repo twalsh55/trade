@@ -42,8 +42,8 @@ export default async function SignUpPage({ searchParams }: SignUpPageProps) {
               This keeps account creation inside Brivoly so the handoff into Client OS feels continuous instead of bouncing through a hosted auth redirect.
             </p>
             <div className="mt-6 rounded-[1.5rem] border border-cyan-200 bg-cyan-50 px-5 py-4 text-cyan-950">
-              <p className="ui-eyebrow-strong text-cyan-900">New account setup</p>
-              <p className="mt-2 text-lg font-semibold">Create the account here, then Brivoly will open your relationship memory.</p>
+              <p className="ui-eyebrow-strong text-cyan-900">New account access</p>
+              <p className="mt-2 text-lg font-semibold">Create the account here, then Brivoly will open Client OS.</p>
               <p className="mt-2 text-sm leading-6">
                 No localhost redirect detour, no manual re-entry. The goal is one clean handoff into the app.
               </p>
@@ -69,7 +69,7 @@ export default async function SignUpPage({ searchParams }: SignUpPageProps) {
       <section className="mt-6 grid gap-6 xl:grid-cols-[0.92fr_1.08fr]">
         <section className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm">
           <p className="ui-eyebrow">Before You Continue</p>
-          <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Account creation should stay inside the app.</h2>
+          <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Account creation should stay inside Brivoly.</h2>
           <p className="mt-3 text-sm leading-7 text-slate-600">
             This flow mirrors the Client OS entry surface so new users land in the same visual language and continue straight into their relationship flow.
           </p>
@@ -80,11 +80,11 @@ export default async function SignUpPage({ searchParams }: SignUpPageProps) {
             />
             <InfoCard
               label="What happens"
-              body="Create the account below, Brivoly secures your session, then returns you to the relationship flow."
+              body="Create the account below, Brivoly secures your session, then returns you to Client OS."
             />
             <InfoCard
               label="Why this path"
-              body="Keeping account creation in-app avoids broken external redirects and makes the first-run experience feel much cleaner."
+              body="Keeping account creation in-app avoids broken external redirects and makes the first-run experience feel much calmer."
             />
           </div>
         </section>

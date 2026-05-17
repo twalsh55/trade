@@ -127,6 +127,7 @@ cd web && npm run e2e
   - relationship history now visually calls out client-shared upload context instead of burying it in generic activity
   - intake setup now has one-tap channel and source-format defaults to reduce typing
   - text-heavy card layouts now prefer wider 2-column patterns so copy does not collapse into cramped narrow cards
+  - auth and handoff copy now consistently points to Client OS instead of older workspace/portal language
 
 ### Relationship OS Todo
 

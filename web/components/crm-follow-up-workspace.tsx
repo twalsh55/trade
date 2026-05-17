@@ -892,7 +892,7 @@ export function CRMFollowUpWorkspace({
             <ul className="mt-5 space-y-3 text-sm leading-6 text-slate-300">
               <li>Every note, reminder, and suggested message should lower mental overhead instead of adding admin.</li>
               <li>Brivoly should help you stay warm, responsive, and top-of-mind without more software work.</li>
-              <li>The goal is continuity and follow-through, not pipeline management.</li>
+              <li>The goal is continuity and follow-through, not stage management.</li>
             </ul>
           </section>
         </section>
@@ -915,9 +915,9 @@ export function CRMFollowUpWorkspace({
             </div>
 
             <section className="mt-6 rounded-[1.4rem] border bg-slate-50/80 p-5">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Inbox sync preview</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Inbox sample sync</p>
               <p className="mt-2 text-sm leading-6 text-slate-600">
-                Use this to simulate inbox sync while real provider connections are being wired. The same API route is ready for Gmail- or Outlook-style thread events.
+                Use this to simulate inbox sync while real provider connections are being wired. The same API route is ready for Gmail- or Outlook-style thread events, so you can test how Brivoly remembers the thread before those links are live.
               </p>
               <div className="mt-4 grid gap-3 md:grid-cols-2">
                 <input value={inboxThreadId} onChange={(event) => setInboxThreadId(event.target.value)} placeholder="Thread ID (optional)" className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400" />
@@ -1069,7 +1069,7 @@ function CRMViewHeader({ view }: { view: CRMWorkspaceView }) {
       body: "Upload spreadsheets and raw note images, let Brivoly make sense of them, and only keep what supports better follow-through.",
     },
     intake: {
-      eyebrow: "Client Dropzones",
+      eyebrow: "Client handoff",
       title: "Make it easy for clients to send context when it matters.",
       body: "Use no-login upload links, light routing rules, and mobile-first capture so updates land where the relationship already lives.",
     },
@@ -1864,7 +1864,7 @@ function RemoteImageCapturePanel({
       <div className="mt-5 rounded-[1.3rem] border bg-slate-50 px-4 py-4">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Share-ready page</p>
         <p className="mt-2 text-sm font-medium text-slate-900">
-          {intakeChannel?.magic_link_url ? "No-login client dropzone is live." : "Client dropzone is not configured yet."}
+          {intakeChannel?.magic_link_url ? "No-login update page is live." : "The client update page is not ready yet."}
         </p>
         <p className="mt-2 text-sm leading-6 text-slate-600">
           {intakeChannel?.instructions ?? "Finish setup to turn on the phone-friendly page clients can use when they have an update."}
