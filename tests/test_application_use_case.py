@@ -313,7 +313,7 @@ def test_follow_up_overview_enriches_relationship_intelligence() -> None:
     assert amber.relationship_timing_nudge
     assert amber.relationship_context_summary
     assert amber.relationship_recent_changes_summary
-    assert amber.relationship_recent_upload_summary == ""
+    assert "shared upload link" in amber.relationship_recent_upload_summary
     assert amber.relationship_last_30_days_summary
     assert amber.relationship_meeting_prep_summary
     assert amber.relationship_reconnect_why_now

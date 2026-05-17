@@ -70,6 +70,13 @@ class InMemoryLeadFollowUpRepository:
                 company_milestone_date=date(2016, 6, 2),
                 timeline=(
                     LeadTimelineEntry(
+                        id="amber-upload",
+                        occurred_at=current_time - timedelta(hours=3),
+                        kind="import",
+                        channel="magic_link",
+                        summary="Client uploaded three onboarding screenshots and a scope note through the shared link.",
+                    ),
+                    LeadTimelineEntry(
                         id="amber-call",
                         occurred_at=current_time - timedelta(days=5),
                         kind="call",

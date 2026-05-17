@@ -1069,8 +1069,11 @@ function TodayPrioritiesPanel({
   const proposalLead = [...items]
     .filter((item) => isProposalFollowThrough(item))
     .sort((left, right) => compareProposalPriority(left, right))[0] ?? null;
+  const recentUploadLead = [...items]
+    .filter((item) => hasRecentUploadContext(item))
+    .sort((left, right) => compareRecentUploadPriority(left, right))[0] ?? null;
   const recentContextLead = [...items]
-    .filter((item) => hasFreshContext(item))
+    .filter((item) => hasFreshContext(item) && !hasRecentUploadContext(item))
     .sort((left, right) => compareFreshContextPriority(left, right))[0] ?? null;
   const replyThread = replyLead ? getReplyThread(replyLead) : null;
 
@@ -1105,6 +1108,16 @@ function TodayPrioritiesPanel({
           meta: `${proposalLead.company_name} · follow up by ${formatDateTime(proposalLead.next_follow_up_at)}`,
         }
       : null,
+    recentUploadLead
+      ? {
+          id: `${recentUploadLead.id}-upload`,
+          href: "/clientos/intake",
+          eyebrow: "Client upload",
+          title: `Review new files from ${recentUploadLead.lead_name}`,
+          body: recentUploadLead.relationship_recent_upload_summary,
+          meta: `${recentUploadLead.company_name} · ${formatDateTime(getLatestUploadContextEntry(recentUploadLead)?.occurred_at ?? null)}`,
+        }
+      : null,
     recentContextLead
       ? {
           id: `${recentContextLead.id}-context`,
@@ -1130,6 +1143,7 @@ function TodayPrioritiesPanel({
   const replyCount = inboxSummary?.needs_reply_count ?? 0;
   const reconnectCount = items.filter((item) => item.relationship_state === "stale" || item.relationship_state === "at_risk" || item.relationship_state === "drifting").length;
   const proposalCount = items.filter((item) => isProposalFollowThrough(item)).length;
+  const recentUploadCount = items.filter((item) => hasRecentUploadContext(item)).length;
   const freshContextCount = items.filter((item) => hasFreshContext(item)).length;
 
   return (
@@ -1154,7 +1168,13 @@ function TodayPrioritiesPanel({
         />
         <TodaySignal
           label="Fresh context"
-          value={freshContextCount ? `${freshContextCount} relationship${freshContextCount === 1 ? "" : "s"} picked up new context recently` : "No new context landed overnight"}
+          value={
+            recentUploadCount
+              ? `${recentUploadCount} client upload${recentUploadCount === 1 ? "" : "s"} landed recently`
+              : freshContextCount
+                ? `${freshContextCount} relationship${freshContextCount === 1 ? "" : "s"} picked up new context recently`
+                : "No new context landed overnight"
+          }
         />
       </div>
       <div className="mt-5 space-y-3">
@@ -2698,6 +2718,13 @@ function getLatestContextEntry(item: CRMLeadFollowUp) {
   return timeline[0] ?? null;
 }
 
+function getLatestUploadContextEntry(item: CRMLeadFollowUp) {
+  const timeline = [...item.timeline]
+    .filter((entry) => entry.kind === "import" || entry.channel === "magic_link" || entry.channel === "image" || entry.channel === "telegram")
+    .sort((left, right) => new Date(right.occurred_at).getTime() - new Date(left.occurred_at).getTime());
+  return timeline[0] ?? null;
+}
+
 function getReplySummary(item: CRMLeadFollowUp) {
   const replyThread = item.recent_email_threads.find((thread) => thread.needs_reply);
   if (!replyThread) {
@@ -2736,6 +2763,10 @@ function compareFreshContextPriority(left: CRMLeadFollowUp, right: CRMLeadFollow
   return getLatestContextTimestamp(right) - getLatestContextTimestamp(left);
 }
 
+function compareRecentUploadPriority(left: CRMLeadFollowUp, right: CRMLeadFollowUp) {
+  return getLatestUploadContextTimestamp(right) - getLatestUploadContextTimestamp(left);
+}
+
 function compareSoonestFollowUp(left: CRMLeadFollowUp, right: CRMLeadFollowUp) {
   return new Date(left.next_follow_up_at).getTime() - new Date(right.next_follow_up_at).getTime();
 }
@@ -2753,8 +2784,24 @@ function getLatestContextTimestamp(item: CRMLeadFollowUp) {
   return latest ? new Date(latest.occurred_at).getTime() : 0;
 }
 
+function getLatestUploadContextTimestamp(item: CRMLeadFollowUp) {
+  const latest = getLatestUploadContextEntry(item);
+  return latest ? new Date(latest.occurred_at).getTime() : 0;
+}
+
 function hasFreshContext(item: CRMLeadFollowUp) {
   const latest = getLatestContextTimestamp(item);
+  if (!latest) {
+    return false;
+  }
+  return Date.now() - latest <= 1000 * 60 * 60 * 24 * 3;
+}
+
+function hasRecentUploadContext(item: CRMLeadFollowUp) {
+  if (!item.relationship_recent_upload_summary) {
+    return false;
+  }
+  const latest = getLatestUploadContextTimestamp(item);
   if (!latest) {
     return false;
   }
