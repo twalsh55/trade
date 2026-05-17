@@ -670,10 +670,53 @@ def test_launch_next_pending_founder_code_request_requires_codex_binary(tmp_path
     monkeypatch.setenv("AUTONOMOUS_CODE_EXECUTION_CURSOR_FILE", str(tmp_path / "exec-cursor.txt"))
     monkeypatch.setenv("AUTONOMOUS_CODE_EXECUTOR_PID_FILE", str(tmp_path / "executor.pid"))
     monkeypatch.setattr(runtime_module, "_is_executor_running", lambda path: False)
-    monkeypatch.setattr(runtime_module.shutil, "which", lambda name: None)
+    monkeypatch.setattr(runtime_module, "_resolve_codex_bin", lambda: None)
 
     with pytest.raises(RuntimeError, match="Codex CLI is not installed"):
         launch_next_pending_founder_code_request()
+
+
+def test_resolve_codex_bin_prefers_explicit_env_path(tmp_path, monkeypatch) -> None:
+    codex_path = tmp_path / "codex"
+    codex_path.write_text("", encoding="utf-8")
+    monkeypatch.setenv("AUTONOMOUS_CODEX_BIN", str(codex_path))
+    monkeypatch.setattr(runtime_module.shutil, "which", lambda name: None)
+
+    assert runtime_module._resolve_codex_bin() == str(codex_path)
+
+
+def test_resolve_codex_bin_falls_back_to_known_vscode_locations(monkeypatch) -> None:
+    monkeypatch.delenv("AUTONOMOUS_CODEX_BIN", raising=False)
+    monkeypatch.setattr(runtime_module.shutil, "which", lambda name: None)
+    monkeypatch.setattr(runtime_module, "glob", lambda pattern: ["/tmp/vscode-codex"])
+
+    real_path = Path
+    
+    class FakePath:
+        def __init__(self, raw: str) -> None:
+            self.raw = raw
+
+        @classmethod
+        def home(cls) -> Path:
+            return real_path("/home/tester")
+
+        def is_file(self) -> bool:
+            return self.raw == "/tmp/vscode-codex"
+
+        def __str__(self) -> str:
+            return self.raw
+
+    monkeypatch.setattr(runtime_module, "Path", lambda value="": FakePath(value) if str(value) == "/tmp/vscode-codex" else real_path(value))
+
+    assert runtime_module._resolve_codex_bin() == "/tmp/vscode-codex"
+
+
+def test_resolve_codex_bin_returns_none_when_no_candidates_exist(monkeypatch) -> None:
+    monkeypatch.delenv("AUTONOMOUS_CODEX_BIN", raising=False)
+    monkeypatch.setattr(runtime_module.shutil, "which", lambda name: None)
+    monkeypatch.setattr(runtime_module, "glob", lambda pattern: [])
+
+    assert runtime_module._resolve_codex_bin() is None
 
 
 def test_is_executor_running_handles_missing_invalid_and_dead_pid(tmp_path, monkeypatch) -> None:

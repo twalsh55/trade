@@ -4,6 +4,7 @@ import json
 import os
 import shutil
 import subprocess
+from glob import glob
 from datetime import datetime
 from pathlib import Path
 
@@ -155,7 +156,7 @@ def launch_next_pending_founder_code_request() -> str:
 
     next_request = _pick_next_pending_request(pending_requests)
     request_id = str(next_request["id"])
-    codex_bin = shutil.which("codex")
+    codex_bin = _resolve_codex_bin()
     if not codex_bin:
         raise RuntimeError("Codex CLI is not installed or not on PATH.")
 
@@ -221,6 +222,31 @@ def launch_next_pending_founder_code_request() -> str:
     cursor_path.parent.mkdir(parents=True, exist_ok=True)
     cursor_path.write_text(request_id, encoding="utf-8")
     return f"launched={request_id} pid={process.pid}"
+
+
+def _resolve_codex_bin() -> str | None:
+    configured = os.getenv("AUTONOMOUS_CODEX_BIN", "").strip()
+    if configured:
+        configured_path = Path(configured).expanduser()
+        if configured_path.is_file():
+            return str(configured_path)
+
+    path_lookup = shutil.which("codex")
+    if path_lookup:
+        return path_lookup
+
+    home_dir = Path(os.path.expanduser("~"))
+    candidate_patterns = (
+        "~/.vscode-server/extensions/openai.chatgpt-*/bin/*/codex",
+        "~/.vscode/extensions/openai.chatgpt-*/bin/*/codex",
+    )
+    for pattern in candidate_patterns:
+        matches = sorted(glob(str(home_dir / pattern[2:])), reverse=True)
+        for match in matches:
+            candidate_path = Path(match)
+            if candidate_path.is_file():
+                return str(candidate_path)
+    return None
 
 
 def read_active_founder_code_request() -> dict[str, object] | None:
