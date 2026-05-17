@@ -56,7 +56,7 @@ export function IntakeMagicLinkUpload({ token }: { token: string }) {
     <form onSubmit={handleSubmit} className="mt-6 space-y-4 rounded-[1.75rem] border bg-white/92 p-6 shadow-sm">
       <div className="rounded-[1.3rem] border bg-slate-50 px-4 py-4 text-sm leading-6 text-slate-700">
         <p className="font-medium text-slate-900">No login is needed.</p>
-        <p className="mt-1">This is meant for quick screenshots, whiteboard photos, handwritten notes, and other small updates you want to send from your phone in a few taps.</p>
+        <p className="mt-1">Send a screenshot, whiteboard photo, handwritten note, or other small update from your phone in a few taps.</p>
       </div>
 
       <div>
@@ -88,7 +88,7 @@ export function IntakeMagicLinkUpload({ token }: { token: string }) {
         disabled={state.kind === "submitting"}
         className="inline-flex w-full items-center justify-center rounded-full bg-slate-950 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
       >
-        {state.kind === "submitting" ? "Sending..." : "Send update"}
+        {state.kind === "submitting" ? "Sending..." : "Send it in"}
       </button>
 
       {state.message ? (
