@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import type {
   AccountSettings,
   BillingOverview,
+  CRMCalendarConnection,
   CRMEmailDraft,
   CRMFollowUpOverview,
   CRMImportHeaderMapping,
@@ -64,6 +65,7 @@ export function CRMFollowUpWorkspace({
   const [overview, setOverview] = useState(initialOverview);
   const [settings, setSettings] = useState<AccountSettings | null>(initialSettings);
   const [selectedLeadId, setSelectedLeadId] = useState(initialOverview.items[0]?.id ?? null);
+  const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [noteDraft, setNoteDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -101,10 +103,19 @@ export function CRMFollowUpWorkspace({
   const [inboxMessageBody, setInboxMessageBody] = useState("");
   const [inboxStatus, setInboxStatus] = useState<string | null>(null);
   const [mailboxConnections, setMailboxConnections] = useState<CRMMailboxConnection[]>([]);
+  const [calendarConnections, setCalendarConnections] = useState<CRMCalendarConnection[]>([]);
   const [mailboxProvider, setMailboxProvider] = useState<"gmail" | "outlook">("gmail");
   const [mailboxEmail, setMailboxEmail] = useState("");
   const [mailboxDisplayName, setMailboxDisplayName] = useState("");
   const [mailboxStatus, setMailboxStatus] = useState<string | null>(null);
+  const [calendarProvider, setCalendarProvider] = useState<"google_calendar" | "outlook_calendar">("google_calendar");
+  const [calendarAddress, setCalendarAddress] = useState("");
+  const [calendarDisplayName, setCalendarDisplayName] = useState("");
+  const [calendarStatus, setCalendarStatus] = useState<string | null>(null);
+  const [calendarEventTitle, setCalendarEventTitle] = useState("");
+  const [calendarEventStartsAt, setCalendarEventStartsAt] = useState("");
+  const [calendarAttendeeEmails, setCalendarAttendeeEmails] = useState("");
+  const [calendarEventNotes, setCalendarEventNotes] = useState("");
   const [inboxQuery, setInboxQuery] = useState("");
   const [inboxFilter, setInboxFilter] = useState<InboxFilter>("all");
   const [isPending, startTransition] = useTransition();
@@ -113,6 +124,7 @@ export function CRMFollowUpWorkspace({
   const [isEmailPending, startEmailTransition] = useTransition();
   const [isInboxPending, startInboxTransition] = useTransition();
   const [isMailboxPending, startMailboxTransition] = useTransition();
+  const [isCalendarPending, startCalendarTransition] = useTransition();
   const [queuedTodayDraft, setQueuedTodayDraft] = useState<{ leadId: string; preset: TodayDraftPreset } | null>(null);
   const [draftFocusToken, setDraftFocusToken] = useState(0);
 
@@ -167,6 +179,17 @@ export function CRMFollowUpWorkspace({
   }, [filteredFollowUps, selectedLeadId]);
 
   useEffect(() => {
+    if (!selectedLead) {
+      setSelectedThreadId(null);
+      return;
+    }
+    if (selectedThreadId && selectedLead.recent_email_threads.some((thread) => thread.thread_id === selectedThreadId)) {
+      return;
+    }
+    setSelectedThreadId(selectedLead.recent_email_threads[0]?.thread_id ?? null);
+  }, [selectedLead, selectedThreadId]);
+
+  useEffect(() => {
     if (!requestedLeadId) {
       return;
     }
@@ -196,6 +219,32 @@ export function CRMFollowUpWorkspace({
     }
 
     void loadMailboxConnections();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadCalendarConnections() {
+      try {
+        const response = await fetch("/api/crm/calendars", { cache: "no-store" });
+        const body = (await response.json().catch(() => null)) as { items?: CRMCalendarConnection[]; error?: string } | null;
+        if (!response.ok || !body?.items) {
+          throw new Error(body?.error || "Unable to load calendar connections.");
+        }
+        if (!cancelled) {
+          setCalendarConnections(body.items);
+        }
+      } catch (calendarError) {
+        if (!cancelled) {
+          setCalendarStatus(calendarError instanceof Error ? calendarError.message : "Unable to load calendar connections.");
+        }
+      }
+    }
+
+    void loadCalendarConnections();
     return () => {
       cancelled = true;
     };
@@ -575,18 +624,19 @@ export function CRMFollowUpWorkspace({
     generateEmailDraftForLead(lead, overrides);
   }
 
-  function focusLeadForFollowUp(leadId: string) {
+  function focusLeadForFollowUp(leadId: string, threadId?: string | null) {
     setRelationshipQuery("");
     setRelationshipFilter("all");
     setSelectedLeadId(leadId);
+    setSelectedThreadId(threadId ?? null);
   }
 
   function requestDraftFocus() {
     setDraftFocusToken((value) => value + 1);
   }
 
-  function runTodayPriorityAction(leadId: string, route: string, preset?: TodayDraftPreset, memoryView?: "meeting_prep") {
-    focusLeadForFollowUp(leadId);
+  function runTodayPriorityAction(leadId: string, route: string, preset?: TodayDraftPreset, memoryView?: "meeting_prep", threadId?: string | null) {
+    focusLeadForFollowUp(leadId, threadId);
     if (preset) {
       requestDraftFocus();
       setQueuedTodayDraft({ leadId, preset });
@@ -794,6 +844,102 @@ export function CRMFollowUpWorkspace({
     });
   }
 
+  function upsertCalendarConnection(connection: CRMCalendarConnection) {
+    setCalendarConnections((current) => {
+      const remaining = current.filter((item) => item.id !== connection.id);
+      return [connection, ...remaining];
+    });
+  }
+
+  function connectCalendar() {
+    setCalendarStatus("Connecting the calendar to Brivoly...");
+    startCalendarTransition(async () => {
+      try {
+        const response = await fetch("/api/crm/calendars", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            provider: calendarProvider,
+            calendar_address: calendarAddress.trim(),
+            display_name: calendarDisplayName.trim(),
+          }),
+        });
+        const body = (await response.json().catch(() => null)) as CRMCalendarConnection | { error?: string } | null;
+        if (!response.ok || !body || !("id" in body)) {
+          throw new Error((body && "error" in body && body.error) || "Unable to connect the calendar right now.");
+        }
+        upsertCalendarConnection(body);
+        setCalendarStatus(`${body.provider === "google_calendar" ? "Google Calendar" : "Outlook Calendar"} is now connected as ${body.calendar_address}.`);
+        setCalendarAddress("");
+        setCalendarDisplayName("");
+      } catch (calendarError) {
+        setCalendarStatus(calendarError instanceof Error ? calendarError.message : "Unable to connect the calendar right now.");
+      }
+    });
+  }
+
+  function disconnectCalendar(connection: CRMCalendarConnection) {
+    setCalendarStatus(`Disconnecting ${connection.calendar_address}...`);
+    startCalendarTransition(async () => {
+      try {
+        const response = await fetch(`/api/crm/calendars/${connection.id}`, { method: "DELETE" });
+        const body = (await response.json().catch(() => null)) as { deleted?: boolean; error?: string } | null;
+        if (!response.ok || !body?.deleted) {
+          throw new Error((body && "error" in body && body.error) || "Unable to disconnect the calendar right now.");
+        }
+        setCalendarConnections((current) => current.filter((item) => item.id !== connection.id));
+        setCalendarStatus(`${connection.calendar_address} was disconnected from Brivoly.`);
+      } catch (calendarError) {
+        setCalendarStatus(calendarError instanceof Error ? calendarError.message : "Unable to disconnect the calendar right now.");
+      }
+    });
+  }
+
+  function ingestCalendarEvent() {
+    setCalendarStatus("Bringing this meeting into relationship memory...");
+    startCalendarTransition(async () => {
+      try {
+        const attendeeEmails = calendarAttendeeEmails
+          .split(",")
+          .map((item) => item.trim().toLowerCase())
+          .filter(Boolean);
+        const response = await fetch("/api/crm/calendars/events", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            connection_id: calendarConnections[0]?.id ?? null,
+            provider: calendarProvider,
+            event_id: `calendar-event-${Date.now()}`,
+            title: calendarEventTitle.trim(),
+            starts_at: calendarEventStartsAt,
+            attendee_emails: attendeeEmails,
+            notes: calendarEventNotes.trim(),
+          }),
+        });
+        const body = (await response.json().catch(() => null)) as CRMFollowUpOverview | { error?: string } | null;
+        if (!response.ok || !body || !("items" in body)) {
+          throw new Error((body && "error" in body && body.error) || "Unable to bring this meeting into Brivoly right now.");
+        }
+        setOverview(body);
+        const matchedLead = attendeeEmails.length
+          ? body.items.find((item) => attendeeEmails.includes(item.email_address.trim().toLowerCase()))
+          : body.items[0];
+        if (matchedLead) {
+          setSelectedLeadId(matchedLead.id);
+          setSelectedThreadId(matchedLead.recent_email_threads[0]?.thread_id ?? null);
+        }
+        setCalendarStatus("Meeting context saved. Brivoly can now use it in Today and meeting prep.");
+        setCalendarEventTitle("");
+        setCalendarEventStartsAt("");
+        setCalendarAttendeeEmails("");
+        setCalendarEventNotes("");
+        router.refresh();
+      } catch (calendarError) {
+        setCalendarStatus(calendarError instanceof Error ? calendarError.message : "Unable to bring this meeting into Brivoly right now.");
+      }
+    });
+  }
+
   function sendCurrentDraftToMailbox() {
     if (!selectedLead || !emailSubjectDraft.trim() || !emailBodyDraft.trim()) {
       return;
@@ -806,6 +952,7 @@ export function CRMFollowUpWorkspace({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             connection_id: mailboxConnections[0]?.id ?? null,
+            thread_id: selectedThreadId,
             subject: emailSubjectDraft,
             body: emailBodyDraft,
           }),
@@ -1283,6 +1430,119 @@ export function CRMFollowUpWorkspace({
             </section>
 
             <section className="mt-6 rounded-[1.4rem] border bg-slate-50/80 p-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Connected calendars</p>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Calendar beta: connect the address you usually schedule from, then bring meetings into relationship memory so Brivoly can prep the next conversation before it starts.
+              </p>
+              <div className="mt-4 rounded-[1.2rem] border border-dashed bg-white px-4 py-4">
+                <p className="ui-eyebrow">Calendar connection</p>
+                <div className="mt-4 grid gap-3 xl:grid-cols-[0.8fr_1.2fr_1fr_auto]">
+                  <label className="block">
+                    <span className="ui-eyebrow">Provider</span>
+                    <select
+                      value={calendarProvider}
+                      onChange={(event) => setCalendarProvider(event.target.value as "google_calendar" | "outlook_calendar")}
+                      className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400"
+                    >
+                      <option value="google_calendar">Google Calendar</option>
+                      <option value="outlook_calendar">Outlook Calendar</option>
+                    </select>
+                  </label>
+                  <label className="block">
+                    <span className="ui-eyebrow">Calendar address</span>
+                    <input
+                      value={calendarAddress}
+                      onChange={(event) => setCalendarAddress(event.target.value)}
+                      placeholder="you@yourstudio.com"
+                      className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="ui-eyebrow">Name on the calendar</span>
+                    <input
+                      value={calendarDisplayName}
+                      onChange={(event) => setCalendarDisplayName(event.target.value)}
+                      placeholder="Northstar schedule"
+                      className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400"
+                    />
+                  </label>
+                  <div className="flex items-end">
+                    <Button disabled={isCalendarPending} onClick={connectCalendar}>
+                      {isCalendarPending ? "Connecting..." : "Add calendar"}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-4 space-y-3">
+                {calendarConnections.length ? (
+                  calendarConnections.map((connection) => (
+                    <div key={connection.id} className="rounded-[1.2rem] border bg-white px-4 py-4">
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-950">
+                            {connection.provider === "google_calendar" ? "Google Calendar" : "Outlook Calendar"} · {connection.calendar_address}
+                          </p>
+                          <p className="mt-1 text-sm text-slate-600">
+                            {connection.display_name || "Calendar account"} · {connection.last_sync_at ? `last event saved ${formatDateTime(connection.last_sync_at)}` : "no meeting context saved yet"}
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <MiniFlag label={connection.background_sync_enabled ? "beta ready" : "manual"} tone="neutral" />
+                          <Button type="button" variant="outline" disabled={isCalendarPending} onClick={() => disconnectCalendar(connection)}>
+                            Disconnect
+                          </Button>
+                        </div>
+                      </div>
+                      {connection.last_sync_error ? <p className="mt-2 text-xs text-amber-700">{connection.last_sync_error}</p> : null}
+                    </div>
+                  ))
+                ) : (
+                  <div className="rounded-[1.2rem] border border-dashed bg-white px-4 py-4 text-sm leading-6 text-slate-600">
+                    No calendar is connected yet. Add one above, then bring the next meeting in so Brivoly can prep the conversation from saved context.
+                  </div>
+                )}
+              </div>
+              <div className="mt-5 rounded-[1.2rem] border bg-white px-4 py-4">
+                <p className="ui-eyebrow">Bring one meeting in</p>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  Use this beta path to attach an upcoming meeting to the right relationship now. Brivoly will fold it into Today, meeting prep, and the relationship timeline.
+                </p>
+                <div className="mt-4 grid gap-3 xl:grid-cols-2">
+                  <input
+                    value={calendarEventTitle}
+                    onChange={(event) => setCalendarEventTitle(event.target.value)}
+                    placeholder="Weekly rollout review"
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400"
+                  />
+                  <input
+                    value={calendarEventStartsAt}
+                    onChange={(event) => setCalendarEventStartsAt(event.target.value)}
+                    type="datetime-local"
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400"
+                  />
+                  <input
+                    value={calendarAttendeeEmails}
+                    onChange={(event) => setCalendarAttendeeEmails(event.target.value)}
+                    placeholder="amber@northstarstudio.com, ops@client.com"
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400 xl:col-span-2"
+                  />
+                  <textarea
+                    value={calendarEventNotes}
+                    onChange={(event) => setCalendarEventNotes(event.target.value)}
+                    placeholder="Optional notes or agenda from the invite"
+                    className="min-h-[120px] w-full rounded-[1.4rem] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-800 outline-none transition focus:border-slate-400 xl:col-span-2"
+                  />
+                </div>
+                <div className="mt-4 flex flex-wrap gap-3">
+                  <Button disabled={isCalendarPending} onClick={ingestCalendarEvent}>
+                    {isCalendarPending ? "Saving..." : "Save meeting context"}
+                  </Button>
+                </div>
+              </div>
+              {calendarStatus ? <p className="mt-4 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">{calendarStatus}</p> : null}
+            </section>
+
+            <section className="mt-6 rounded-[1.4rem] border bg-slate-50/80 p-5">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Manual thread sync</p>
             <p className="mt-2 text-sm leading-6 text-slate-600">
                 Use this when you want to bring one thread in by hand or test relationship memory against a specific message.
@@ -1322,7 +1582,10 @@ export function CRMFollowUpWorkspace({
             {selectedLead ? (
               <InboxNextMovePanel
                 lead={selectedLead}
-                onDraftAction={(draft) => generateEmailDraft(draft)}
+                onDraftAction={(draft, threadId) => {
+                  setSelectedThreadId(threadId ?? selectedLead.recent_email_threads[0]?.thread_id ?? null);
+                  generateEmailDraft(draft);
+                }}
                 isDrafting={isEmailPending}
                 draftStatus={emailStatus}
               />
@@ -1332,9 +1595,11 @@ export function CRMFollowUpWorkspace({
           <InboxActivityPanel
             items={overview.items}
             selectedLeadId={selectedLead?.id ?? null}
-            onSelectLead={setSelectedLeadId}
-            onDraftAction={(leadId, draft) => {
-              focusLeadForFollowUp(leadId);
+            onSelectLead={(leadId, threadId) => {
+              focusLeadForFollowUp(leadId, threadId);
+            }}
+            onDraftAction={(leadId, draft, threadId) => {
+              focusLeadForFollowUp(leadId, threadId);
               requestDraftFocus();
               setQueuedTodayDraft({ leadId, preset: draft });
               void router.push("/clientos/follow-ups");
@@ -1471,7 +1736,7 @@ function TodayPrioritiesPanel({
 }: {
   items: CRMLeadFollowUp[];
   inboxSummary: CRMFollowUpOverview["inbox_summary"];
-  onRunAction: (leadId: string, route: string, preset?: TodayDraftPreset, memoryView?: "meeting_prep") => void;
+  onRunAction: (leadId: string, route: string, preset?: TodayDraftPreset, memoryView?: "meeting_prep", threadId?: string | null) => void;
 }) {
   const replyLead = [...items]
     .filter((item) => item.recent_email_threads.some((thread) => thread.needs_reply))
@@ -1535,7 +1800,7 @@ function TodayPrioritiesPanel({
               tone: "warm",
               length: "short",
               status: "Drafting a reply from Today...",
-            }),
+            }, undefined, replyThread?.thread_id ?? null),
         }
       : null,
     meetingLead
@@ -2064,7 +2329,7 @@ function InboxActivityPanel({
 }: {
   items: CRMLeadFollowUp[];
   selectedLeadId: string | null;
-  onSelectLead: (leadId: string) => void;
+  onSelectLead: (leadId: string, threadId?: string | null) => void;
   onDraftAction: (
     leadId: string,
     draft: {
@@ -2073,6 +2338,7 @@ function InboxActivityPanel({
       length: CRMEmailDraft["length"];
       status: string;
     },
+    threadId?: string | null,
   ) => void;
   inboxQuery: string;
   inboxFilter: InboxFilter;
@@ -2186,7 +2452,7 @@ function InboxThreadCard({
     thread: CRMLeadFollowUp["recent_email_threads"][number];
   };
   selected: boolean;
-  onSelectLead: (leadId: string) => void;
+  onSelectLead: (leadId: string, threadId?: string | null) => void;
   onDraftAction: (
     leadId: string,
     draft: {
@@ -2195,6 +2461,7 @@ function InboxThreadCard({
       length: CRMEmailDraft["length"];
       status: string;
     },
+    threadId?: string | null,
   ) => void;
 }) {
   const { leadId, leadName, companyName, stage, thread } = item;
@@ -2205,7 +2472,7 @@ function InboxThreadCard({
         selected ? "border-slate-900 bg-white shadow-sm" : "bg-slate-50/80 hover:border-slate-400 hover:bg-white"
       }`}
     >
-      <button type="button" onClick={() => onSelectLead(leadId)} className="block w-full text-left">
+      <button type="button" onClick={() => onSelectLead(leadId, thread.thread_id)} className="block w-full text-left">
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
@@ -2256,8 +2523,9 @@ function InboxThreadCard({
                     objective: "revive",
                     tone: "warm",
                     length: "short",
-                    status: "Drafting a reconnect from Inbox...",
+                  status: "Drafting a reconnect from Inbox...",
                   },
+              thread.thread_id,
             );
           }}
         >
@@ -2267,7 +2535,7 @@ function InboxThreadCard({
           type="button"
           variant="outline"
           onClick={() => {
-            onSelectLead(leadId);
+            onSelectLead(leadId, thread.thread_id);
           }}
         >
           Open relationship
@@ -2289,7 +2557,7 @@ function InboxNextMovePanel({
     tone: CRMEmailDraft["tone"];
     length: CRMEmailDraft["length"];
     status: string;
-  }) => void;
+  }, threadId?: string | null) => void;
   isDrafting: boolean;
   draftStatus: string | null;
 }) {
@@ -2380,12 +2648,12 @@ function InboxNextMovePanel({
               variant="outline"
               disabled={isDrafting}
               onClick={() =>
-                onDraftAction({
+              onDraftAction({
                   objective: shouldReconnect ? "revive" : "follow_up",
                   tone: "warm",
                   length: "short",
                   status: shouldReconnect ? "Drafting a reconnect from fresh client context..." : "Drafting a reply from fresh client context...",
-                })
+                }, latestThread?.thread_id ?? null)
               }
             >
               {shouldReconnect ? "Turn this into a reconnect" : "Turn this into a note"}
@@ -2407,7 +2675,7 @@ function InboxNextMovePanel({
         </div>
       ) : null}
       <div className="mt-4 flex flex-wrap gap-3">
-        <Button disabled={isDrafting} onClick={() => onDraftAction(primaryAction.draft)}>
+        <Button disabled={isDrafting} onClick={() => onDraftAction(primaryAction.draft, latestThread?.thread_id ?? null)}>
           {isDrafting ? "Drafting..." : primaryAction.label}
         </Button>
         <Button asChild variant="outline">

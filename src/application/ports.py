@@ -8,6 +8,7 @@ import pandas as pd
 
 from src.domain.auth import ExternalIdentity, User
 from src.domain.crm import (
+    CalendarConnection,
     LeadFollowUp,
     LeadImportClarification,
     MailboxConnection,
@@ -95,6 +96,15 @@ class LeadFollowUpRepositoryPort(Protocol):
 
     def delete_mailbox_connection(self, user: User, connection_id: str) -> None:
         """Remove one inbox connection for the authenticated user."""
+
+    def list_calendar_connections(self, user: User) -> list[CalendarConnection]:
+        """Return connected calendar accounts for the authenticated user."""
+
+    def save_calendar_connection(self, user: User, connection: CalendarConnection) -> CalendarConnection:
+        """Persist one calendar connection and return the stored value."""
+
+    def delete_calendar_connection(self, user: User, connection_id: str) -> None:
+        """Remove one calendar connection for the authenticated user."""
 
 
 class MailboxProviderPort(Protocol):

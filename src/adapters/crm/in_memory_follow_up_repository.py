@@ -5,7 +5,7 @@ from datetime import UTC, date, datetime, timedelta
 from uuid import UUID
 
 from src.domain.auth import User
-from src.domain.crm import LeadEmailThreadSummary, LeadFollowUp, LeadTimelineEntry, MailboxConnection
+from src.domain.crm import CalendarConnection, LeadEmailThreadSummary, LeadFollowUp, LeadTimelineEntry, MailboxConnection
 
 
 def build_seed_follow_ups(current_time: datetime) -> tuple[LeadFollowUp, ...]:
@@ -218,6 +218,7 @@ class InMemoryLeadFollowUpRepository:
         self.now = now or (lambda: datetime.now(tz=UTC))
         self._items = self._build_seed_data()
         self._mailbox_connections: dict[str, MailboxConnection] = {}
+        self._calendar_connections: dict[str, CalendarConnection] = {}
 
     def list_lead_follow_ups(self, user: User) -> list[LeadFollowUp]:
         return [replace(item) for item in self._items.values()]
@@ -271,6 +272,21 @@ class InMemoryLeadFollowUpRepository:
         if connection_id not in self._mailbox_connections:
             raise KeyError(connection_id)
         self._mailbox_connections.pop(connection_id, None)
+
+    def list_calendar_connections(self, user: User) -> list[CalendarConnection]:
+        del user
+        return [replace(item) for item in self._calendar_connections.values()]
+
+    def save_calendar_connection(self, user: User, connection: CalendarConnection) -> CalendarConnection:
+        del user
+        self._calendar_connections[connection.id] = replace(connection)
+        return replace(connection)
+
+    def delete_calendar_connection(self, user: User, connection_id: str) -> None:
+        del user
+        if connection_id not in self._calendar_connections:
+            raise KeyError(connection_id)
+        self._calendar_connections.pop(connection_id, None)
 
     def list_mailbox_connection_user_ids(self) -> list[UUID]:
         return []

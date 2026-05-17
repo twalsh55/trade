@@ -123,6 +123,22 @@ class MailboxConnection:
 
 
 @dataclass(frozen=True)
+class CalendarConnection:
+    id: str
+    provider: str
+    calendar_address: str
+    display_name: str
+    status: str
+    connected_at: datetime
+    connection_mode: str = "manual"
+    external_account_id: str = ""
+    last_sync_at: datetime | None = None
+    last_sync_status: str = ""
+    last_sync_error: str = ""
+    background_sync_enabled: bool = True
+
+
+@dataclass(frozen=True)
 class MailboxThreadMessage:
     message_id: str
     sent_at: datetime

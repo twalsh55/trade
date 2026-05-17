@@ -4,6 +4,8 @@ import type {
   AlertHistoryResponse,
   BillingOverview,
   CRMEmailDraft,
+  CRMCalendarConnection,
+  CRMCalendarConnectionsResponse,
   CRMFollowUpOverview,
   CRMImportPreview,
   CRMImportResult,
@@ -262,6 +264,61 @@ export async function ingestCrmInboxThread(
 export async function listCrmMailboxConnections(options: ApiRequestOptions = {}): Promise<CRMMailboxConnection[]> {
   const response = await apiRequest<CRMMailboxConnectionsResponse>("/api/crm/inbox/mailboxes", {}, options);
   return response.items;
+}
+
+export async function listCrmCalendarConnections(options: ApiRequestOptions = {}): Promise<CRMCalendarConnection[]> {
+  const response = await apiRequest<CRMCalendarConnectionsResponse>("/api/crm/calendars", {}, options);
+  return response.items;
+}
+
+export async function connectCrmCalendar(
+  payload: {
+    provider: "google_calendar" | "outlook_calendar";
+    calendar_address: string;
+    display_name?: string;
+  },
+  options: ApiRequestOptions = {},
+): Promise<CRMCalendarConnection> {
+  return apiRequest<CRMCalendarConnection>(
+    "/api/crm/calendars/connect",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+    options,
+  );
+}
+
+export async function deleteCrmCalendarConnection(connectionId: string, options: ApiRequestOptions = {}): Promise<{ deleted: boolean; connection_id: string }> {
+  return apiRequest<{ deleted: boolean; connection_id: string }>(
+    `/api/crm/calendars/${connectionId}`,
+    {
+      method: "DELETE",
+    },
+    options,
+  );
+}
+
+export async function ingestCrmCalendarEvent(
+  payload: {
+    connection_id?: string | null;
+    provider: "google_calendar" | "outlook_calendar";
+    event_id: string;
+    title: string;
+    starts_at: string;
+    attendee_emails: string[];
+    notes?: string;
+  },
+  options: ApiRequestOptions = {},
+): Promise<CRMFollowUpOverview> {
+  return apiRequest<CRMFollowUpOverview>(
+    "/api/crm/calendars/events",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+    options,
+  );
 }
 
 export async function connectCrmMailbox(

@@ -1081,6 +1081,53 @@ def test_crm_mailbox_update_and_delete_endpoints_manage_connection_state() -> No
     assert repository.list_mailbox_connections(make_user()) == []
 
 
+def test_crm_calendar_connect_event_ingest_and_delete_endpoints_manage_meeting_memory() -> None:
+    repository = InMemoryLeadFollowUpRepository(now=lambda: datetime(2024, 5, 17, 12, 30, tzinfo=UTC))
+    client = make_client(user=make_user(), lead_follow_up_repository=repository)
+
+    connect_response = client.post(
+        "/api/crm/calendars/connect",
+        headers={"Authorization": "Bearer session-token"},
+        json={"provider": "google_calendar", "calendar_address": "ada@northstar.example", "display_name": "Ada calendar"},
+    )
+
+    assert connect_response.status_code == 200
+    connection = connect_response.json()
+    assert connection["provider"] == "google_calendar"
+
+    ingest_response = client.post(
+        "/api/crm/calendars/events",
+        headers={"Authorization": "Bearer session-token"},
+        json={
+            "connection_id": connection["id"],
+            "provider": "google_calendar",
+            "event_id": "meeting-1",
+            "title": "Northstar weekly review",
+            "starts_at": "2024-05-18T09:00:00+00:00",
+            "attendee_emails": ["amber@northstarstudio.com"],
+            "notes": "Review onboarding screenshots before the meeting.",
+        },
+    )
+
+    assert ingest_response.status_code == 200
+    amber = next(item for item in ingest_response.json()["items"] if item["id"] == "lead-amber-studio")
+    assert amber["relationship_upcoming_meeting_at"] == "2024-05-18T09:00:00+00:00"
+    assert amber["relationship_upcoming_meeting_label"]
+
+    list_response = client.get("/api/crm/calendars", headers={"Authorization": "Bearer session-token"})
+    assert list_response.status_code == 200
+    assert list_response.json()["items"][0]["calendar_address"] == "ada@northstar.example"
+
+    delete_response = client.delete(
+        f"/api/crm/calendars/{connection['id']}",
+        headers={"Authorization": "Bearer session-token"},
+    )
+
+    assert delete_response.status_code == 200
+    assert delete_response.json()["deleted"] is True
+    assert repository.list_calendar_connections(make_user()) == []
+
+
 def test_crm_mailbox_oauth_start_and_complete_endpoints_return_provider_connection() -> None:
     client = make_client(user=make_user())
 

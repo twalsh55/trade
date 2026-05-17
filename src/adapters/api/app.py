@@ -68,15 +68,20 @@ from src.application.crm import GetLeadFollowUpOverviewUseCase
 from src.application.crm import (
     AddLeadFollowUpNoteUseCase,
     BeginMailboxOAuthUseCase,
+    CalendarEventInput,
     CompleteLeadFollowUpUseCase,
     CompleteMailboxOAuthUseCase,
+    ConnectCalendarUseCase,
     ConnectMailboxUseCase,
+    DisconnectCalendarConnectionUseCase,
     DisconnectMailboxConnectionUseCase,
     DesignLeadFollowUpEmailUseCase,
     EmailThreadMessageInput,
     EnsureMailboxWatchUseCase,
     EraseRelationshipMemoryUseCase,
+    IngestCalendarEventUseCase,
     IngestLeadEmailThreadUseCase,
+    ListCalendarConnectionsUseCase,
     ListMailboxConnectionsUseCase,
     ProcessMailboxWatchEventUseCase,
     SendLeadFollowUpEmailUseCase,
@@ -110,6 +115,7 @@ from src.application.dto import (
     build_lead_import_preview_dto,
     build_lead_follow_up_email_draft_dto,
     build_lead_follow_up_overview_dto,
+    build_calendar_connection_dto,
     build_mailbox_connection_dto,
     build_mailbox_send_result_dto,
     build_mailbox_sync_result_dto,
@@ -230,6 +236,22 @@ class MailboxOAuthCompletePayload(BaseModel):
 
 class MailboxConnectionUpdatePayload(BaseModel):
     background_sync_enabled: bool
+
+
+class CalendarConnectionPayload(BaseModel):
+    provider: str = Field(pattern="^(google_calendar|outlook_calendar)$")
+    calendar_address: str = Field(min_length=3, max_length=255)
+    display_name: str = Field(default="", max_length=160)
+
+
+class CalendarEventPayload(BaseModel):
+    connection_id: str | None = Field(default=None, min_length=1, max_length=255)
+    provider: str = Field(pattern="^(google_calendar|outlook_calendar)$")
+    event_id: str = Field(min_length=1, max_length=255)
+    title: str = Field(min_length=1, max_length=255)
+    starts_at: datetime
+    attendee_emails: list[str] = Field(min_length=1, max_length=30)
+    notes: str = Field(default="", max_length=2000)
 
 
 class AccountPrivacyErasePayload(BaseModel):
@@ -471,11 +493,13 @@ def create_app(dependencies: ApiDependencies | None = None) -> FastAPI:
         ).execute(user)
         overview = GetLeadFollowUpOverviewUseCase(repository=crm_repository, now=deps.now).execute(user)
         connections = ListMailboxConnectionsUseCase(repository=crm_repository).execute(user)
+        calendar_connections = ListCalendarConnectionsUseCase(repository=crm_repository).execute(user)
         return {
             "generated_at": deps.now().isoformat(),
             "user": dto_to_dict(build_authenticated_user_dto(user)),
             "settings": dto_to_dict(build_user_dashboard_settings_dto(settings)),
             "mailboxes": [dto_to_dict(build_mailbox_connection_dto(item)) for item in connections],
+            "calendars": [dto_to_dict(build_calendar_connection_dto(item)) for item in calendar_connections],
             "relationship_memory": dto_to_dict(build_lead_follow_up_overview_dto(overview)),
         }
 
@@ -660,6 +684,71 @@ def create_app(dependencies: ApiDependencies | None = None) -> FastAPI:
             raise HTTPException(status_code=404, detail="No matching mailbox connection was found for this watch event.")
 
         return dto_to_dict(build_mailbox_sync_result_dto(matched_result))
+
+    @app.get("/api/crm/calendars")
+    def crm_calendar_connections(
+        authorization: str | None = Header(default=None),
+        session_cookie: str | None = Cookie(default=None, alias=CLERK_SESSION_COOKIE),
+    ) -> dict[str, object]:
+        user = _require_crm_user(deps, authorization, session_cookie)
+        connections = ListCalendarConnectionsUseCase(repository=deps.lead_follow_up_repository_factory()).execute(user)
+        return {"items": [dto_to_dict(build_calendar_connection_dto(item)) for item in connections]}
+
+    @app.post("/api/crm/calendars/connect")
+    def crm_connect_calendar(
+        payload: CalendarConnectionPayload,
+        authorization: str | None = Header(default=None),
+        session_cookie: str | None = Cookie(default=None, alias=CLERK_SESSION_COOKIE),
+    ) -> dict[str, object]:
+        user = _require_crm_user(deps, authorization, session_cookie)
+        try:
+            connection = ConnectCalendarUseCase(repository=deps.lead_follow_up_repository_factory(), now=deps.now).execute(
+                user,
+                provider=payload.provider,
+                calendar_address=payload.calendar_address,
+                display_name=payload.display_name,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return dto_to_dict(build_calendar_connection_dto(connection))
+
+    @app.delete("/api/crm/calendars/{connection_id}")
+    def crm_delete_calendar(
+        connection_id: str,
+        authorization: str | None = Header(default=None),
+        session_cookie: str | None = Cookie(default=None, alias=CLERK_SESSION_COOKIE),
+    ) -> dict[str, object]:
+        user = _require_crm_user(deps, authorization, session_cookie)
+        try:
+            DisconnectCalendarConnectionUseCase(repository=deps.lead_follow_up_repository_factory()).execute(user, connection_id)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="Calendar connection not found.") from exc
+        return {"deleted": True, "connection_id": connection_id}
+
+    @app.post("/api/crm/calendars/events")
+    def crm_calendar_event_ingest(
+        payload: CalendarEventPayload,
+        authorization: str | None = Header(default=None),
+        session_cookie: str | None = Cookie(default=None, alias=CLERK_SESSION_COOKIE),
+    ) -> dict[str, object]:
+        user = _require_crm_user(deps, authorization, session_cookie)
+        repository = deps.lead_follow_up_repository_factory()
+        try:
+            overview = IngestCalendarEventUseCase(repository=repository, now=deps.now).execute(
+                user,
+                source=payload.provider,
+                connection_id=payload.connection_id,
+                event=CalendarEventInput(
+                    event_id=payload.event_id,
+                    title=payload.title,
+                    starts_at=payload.starts_at,
+                    attendee_emails=tuple(payload.attendee_emails),
+                    notes=payload.notes,
+                ),
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return dto_to_dict(build_lead_follow_up_overview_dto(overview))
 
     @app.get("/api/crm/inbox/mailboxes")
     def crm_mailbox_connections(

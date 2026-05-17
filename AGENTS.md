@@ -50,6 +50,9 @@ cd web && npm run e2e
 - CRM routes are live, including:
   - `GET /api/crm/followups`
   - `PATCH /api/crm/followups/{id}`
+  - `GET /api/crm/calendars`
+  - `POST /api/crm/calendars/connect`
+  - `POST /api/crm/calendars/events`
   - `POST /api/crm/inbox/mailboxes/oauth/start`
   - `POST /api/crm/inbox/mailboxes/oauth/complete`
   - `POST /api/crm/inbox/watch-events/{provider}`
@@ -102,12 +105,14 @@ cd web && npm run e2e
   - follow-up queue
   - inbox-native relationship page for auto-logging email threads and reconnect-aware next moves
   - mailbox beta now includes real Gmail / Outlook OAuth-ready connection start/complete routes, provider-backed sync for OAuth-linked accounts, provider-watch event callbacks, and provider-backed sending through Gmail API / Microsoft Graph when those accounts are connected
+  - calendar beta now includes durable Google Calendar / Outlook Calendar connection records plus meeting-event ingest into relationship memory so upcoming conversations can feed Today and meeting prep
   - connected mailbox cards now support disconnecting accounts, pausing or resuming scheduled background sync per mailbox, refreshing provider watch coverage, and clearer reauth / health-state visibility without losing the saved relationship memory
+  - connected calendar cards now support connect/disconnect and a lightweight meeting-ingest path for bringing scheduled conversations straight into relationship memory
   - manual mailbox connection still exists as a fallback beta path when provider credentials are not configured yet
   - inbox cards now surface backend-driven relationship pulse, open-loop memory, thread continuity cues, `what changed` hints, unresolved-thread cues, a clearer long-thread `through-line`, and a carry-forward cue for longer threads, grouped into `Needs you now` and `Still warm`
   - email-thread ingestion that can auto-create/update contacts from inbox activity
   - mailbox sync now feeds the same inbox-ingest path Brivoly already uses, so provider-synced email activity and provider watch callbacks land in relationship memory instead of a separate mailbox subsystem
-  - sending a drafted note now writes the outbound message back into the same relationship timeline and thread history, including notes sent through the provider-backed mailbox path, and now carries forward stored external message ids for better reply continuity with a smarter Outlook reply path when Brivoly can match the prior provider message
+  - sending a drafted note now writes the outbound message back into the same relationship timeline and thread history, including notes sent through the provider-backed mailbox path, now carries forward stored external message ids for better reply continuity, and now keeps the selected inbox thread attached all the way from Inbox / Today into the composer send path
   - account settings now include locale defaults, retention-window defaults, an AI-processing toggle, and privacy-consent metadata as the first localization/GDPR groundwork layer
   - `/api/account/privacy/export` and the settings export action can now download a JSON snapshot of account settings, connected mailboxes, and stored relationship memory for GDPR-oriented export groundwork
   - `/api/account/privacy/erase` and the settings erase actions can now clear stored relationship memory or wipe memory plus connected mailbox links as an early GDPR delete/control path
@@ -116,6 +121,7 @@ cd web && npm run e2e
   - relationship history + internal notes
   - relationship memory summaries now blend email, notes, uploads, reconnect cues, recent upload context, and upcoming meeting prep signals, with lighter `Conversation memory` and `Latest saved context` reads instead of repetitive stacked boxes
   - relationship pages now surface upcoming meeting-like moments with a direct `Prepare me` path into the meeting-prep memory view when Brivoly detects that a near-term next touch looks like a call, demo, review, or sync
+  - explicit calendar events now land as `meeting` timeline context, can temporarily become the next prep moment, and feed the existing meeting-prep summary layer instead of living in a separate calendar silo
   - recent client-shared context now has its own memory view, can be pulled straight into the next drafted note, generates a backend-driven follow-through hint, creates a more natural reconnect path, and now plays a bigger role in meeting prep, 30-day summaries, follow-through guidance, Today priorities, and inbox-side next moves
   - auto note designer for reconnects and follow-ups with in-app draft editing
   - last meaningful interaction tracking
@@ -150,6 +156,7 @@ cd web && npm run e2e
   - intake defaults now read more like set-it-and-forget-it guidance, with quieter `Client dropzone` language, lighter `Usual path` / `What to notice` wording, `First / Next / Then` task framing, recommended helper actions, and simple `Save` actions instead of configuration-heavy language
   - auth, shell fallback, API fallback, loading, draft-composer, and client-upload surfaces now use calmer language and lighter guidance with less system-heavy phrasing
   - Today navigation and other dense summary areas are progressively flattening into lighter pills and calmer summaries instead of equal-weight cards
+  - scheduled mailbox automation now reports both watch-ready and event-ready inbox coverage so the always-on sync layer is easier to reason about than a raw thread count alone
 
 ### Relationship OS Todo
 

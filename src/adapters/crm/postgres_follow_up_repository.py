@@ -11,7 +11,7 @@ from psycopg.rows import dict_row
 
 from src.adapters.crm.in_memory_follow_up_repository import build_seed_follow_ups
 from src.domain.auth import User
-from src.domain.crm import LeadEmailThreadSummary, LeadFollowUp, LeadRelationshipReminder, LeadTimelineEntry, MailboxConnection
+from src.domain.crm import CalendarConnection, LeadEmailThreadSummary, LeadFollowUp, LeadRelationshipReminder, LeadTimelineEntry, MailboxConnection
 
 
 class PostgresLeadFollowUpRepository:
@@ -56,6 +56,24 @@ class PostgresLeadFollowUpRepository:
                     """
                     CREATE INDEX IF NOT EXISTS crm_mailbox_connection_user_updated_idx
                     ON crm_mailbox_connection (user_id, updated_at DESC)
+                    """
+                )
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS crm_calendar_connection (
+                        user_id UUID NOT NULL,
+                        connection_id TEXT NOT NULL,
+                        payload JSONB NOT NULL,
+                        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                        PRIMARY KEY (user_id, connection_id)
+                    )
+                    """
+                )
+                cursor.execute(
+                    """
+                    CREATE INDEX IF NOT EXISTS crm_calendar_connection_user_updated_idx
+                    ON crm_calendar_connection (user_id, updated_at DESC)
                     """
                 )
             connection.commit()
@@ -177,6 +195,70 @@ class PostgresLeadFollowUpRepository:
                 cursor.execute(
                     """
                     DELETE FROM crm_mailbox_connection
+                    WHERE user_id = %(user_id)s AND connection_id = %(connection_id)s
+                    """,
+                    {"user_id": user.id, "connection_id": connection_id},
+                )
+                deleted_count = max(0, int(getattr(cursor, "rowcount", 0) or 0))
+            connection.commit()
+        if deleted_count == 0:
+            raise KeyError(connection_id)
+
+    def list_calendar_connections(self, user: User) -> list[CalendarConnection]:
+        with connect(self.database_url, row_factory=dict_row) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT payload
+                    FROM crm_calendar_connection
+                    WHERE user_id = %(user_id)s
+                    ORDER BY updated_at DESC, connection_id ASC
+                    """,
+                    {"user_id": user.id},
+                )
+                rows = cursor.fetchall()
+        return [_payload_to_calendar_connection(_coerce_payload(row["payload"])) for row in rows]
+
+    def save_calendar_connection(self, user: User, connection: CalendarConnection) -> CalendarConnection:
+        payload = json.dumps(asdict(connection), default=_json_default)
+        with connect(self.database_url) as database_connection:
+            with database_connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO crm_calendar_connection (
+                        user_id,
+                        connection_id,
+                        payload,
+                        created_at,
+                        updated_at
+                    )
+                    VALUES (
+                        %(user_id)s,
+                        %(connection_id)s,
+                        %(payload)s::jsonb,
+                        NOW(),
+                        NOW()
+                    )
+                    ON CONFLICT (user_id, connection_id) DO UPDATE
+                    SET
+                        payload = EXCLUDED.payload,
+                        updated_at = NOW()
+                    """,
+                    {
+                        "user_id": user.id,
+                        "connection_id": connection.id,
+                        "payload": payload,
+                    },
+                )
+            database_connection.commit()
+        return connection
+
+    def delete_calendar_connection(self, user: User, connection_id: str) -> None:
+        with connect(self.database_url) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    DELETE FROM crm_calendar_connection
                     WHERE user_id = %(user_id)s AND connection_id = %(connection_id)s
                     """,
                     {"user_id": user.id, "connection_id": connection_id},
@@ -390,6 +472,23 @@ def _payload_to_mailbox_connection(payload: dict[str, Any]) -> MailboxConnection
         reauth_required=bool(payload.get("reauth_required", False)),
         health_note=str(payload.get("health_note", "")),
         last_sent_at=_parse_datetime(payload.get("last_sent_at")),
+    )
+
+
+def _payload_to_calendar_connection(payload: dict[str, Any]) -> CalendarConnection:
+    return CalendarConnection(
+        id=str(payload["id"]),
+        provider=str(payload["provider"]),
+        calendar_address=str(payload["calendar_address"]),
+        display_name=str(payload.get("display_name", "")),
+        status=str(payload.get("status", "connected")),
+        connected_at=_require_datetime(payload["connected_at"]),
+        connection_mode=str(payload.get("connection_mode", "manual")),
+        external_account_id=str(payload.get("external_account_id", "")),
+        last_sync_at=_parse_datetime(payload.get("last_sync_at")),
+        last_sync_status=str(payload.get("last_sync_status", "")),
+        last_sync_error=str(payload.get("last_sync_error", "")),
+        background_sync_enabled=bool(payload.get("background_sync_enabled", True)),
     )
 
 

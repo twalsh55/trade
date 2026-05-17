@@ -88,11 +88,13 @@ def test_postgres_lead_follow_up_repository_ensure_schema(monkeypatch) -> None:
     repository = PostgresLeadFollowUpRepository("postgres://example")
     repository.ensure_schema()
 
-    assert len(cursor.executed) == 4
+    assert len(cursor.executed) == 6
     assert "crm_lead_follow_up" in cursor.executed[0][0]
     assert "crm_lead_follow_up_user_updated_idx" in cursor.executed[1][0]
     assert "crm_mailbox_connection" in cursor.executed[2][0]
     assert "crm_mailbox_connection_user_updated_idx" in cursor.executed[3][0]
+    assert "crm_calendar_connection" in cursor.executed[4][0]
+    assert "crm_calendar_connection_user_updated_idx" in cursor.executed[5][0]
     assert connection.committed is True
 
 

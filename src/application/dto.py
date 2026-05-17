@@ -9,6 +9,7 @@ from src.application.account import AlertHistoryEntry, UserDashboardSettings
 from src.application.billing import BillingOverview
 from src.domain.auth import User
 from src.domain.crm import (
+    CalendarConnection,
     LeadEmailThreadSummary,
     LeadFollowUp,
     LeadFollowUpEmailDraft,
@@ -306,6 +307,22 @@ class MailboxConnectionDTO:
     reauth_required: bool
     health_note: str
     last_sent_at: str | None
+
+
+@dataclass(frozen=True)
+class CalendarConnectionDTO:
+    id: str
+    provider: str
+    calendar_address: str
+    display_name: str
+    status: str
+    connected_at: str
+    connection_mode: str
+    external_account_id: str
+    last_sync_at: str | None
+    last_sync_status: str
+    last_sync_error: str
+    background_sync_enabled: bool
 
 
 @dataclass(frozen=True)
@@ -760,6 +777,23 @@ def build_mailbox_connection_dto(connection: MailboxConnection) -> MailboxConnec
         reauth_required=connection.reauth_required,
         health_note=connection.health_note,
         last_sent_at=connection.last_sent_at.isoformat() if connection.last_sent_at else None,
+    )
+
+
+def build_calendar_connection_dto(connection: CalendarConnection) -> CalendarConnectionDTO:
+    return CalendarConnectionDTO(
+        id=connection.id,
+        provider=connection.provider,
+        calendar_address=connection.calendar_address,
+        display_name=connection.display_name,
+        status=connection.status,
+        connected_at=connection.connected_at.isoformat(),
+        connection_mode=connection.connection_mode,
+        external_account_id=connection.external_account_id,
+        last_sync_at=connection.last_sync_at.isoformat() if connection.last_sync_at else None,
+        last_sync_status=connection.last_sync_status,
+        last_sync_error=connection.last_sync_error,
+        background_sync_enabled=connection.background_sync_enabled,
     )
 
 

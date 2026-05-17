@@ -10,6 +10,7 @@ from src.application.account import UserDashboardSettings
 from src.application.ports import LeadFollowUpRepositoryPort, MailboxProviderPort
 from src.domain.auth import User
 from src.domain.crm import (
+    CalendarConnection,
     LeadEmailThreadSummary,
     LeadFollowUp,
     LeadFollowUpActionResult,
@@ -27,6 +28,15 @@ from src.domain.crm import (
     LeadWarmIntroConnection,
     MailboxThreadSnapshot,
 )
+
+
+@dataclass(frozen=True)
+class CalendarEventInput:
+    event_id: str
+    title: str
+    starts_at: datetime
+    attendee_emails: tuple[str, ...]
+    notes: str = ""
 
 
 class GetLeadFollowUpOverviewUseCase:
@@ -1044,6 +1054,80 @@ class IngestLeadEmailThreadUseCase:
         return GetLeadFollowUpOverviewUseCase(repository=self.repository, now=self.now).execute(user)
 
 
+class IngestCalendarEventUseCase:
+    def __init__(
+        self,
+        repository: LeadFollowUpRepositoryPort,
+        now: Callable[[], datetime],
+    ) -> None:
+        self.repository = repository
+        self.now = now
+
+    def execute(
+        self,
+        user: User,
+        *,
+        source: str,
+        event: CalendarEventInput,
+        connection_id: str | None = None,
+    ) -> LeadFollowUpOverview:
+        normalized_source = source.strip().lower()
+        if normalized_source not in {"google_calendar", "outlook_calendar"}:
+            raise ValueError("Unsupported calendar provider.")
+        normalized_event_id = event.event_id.strip()
+        normalized_title = event.title.strip()
+        if not normalized_event_id:
+            raise ValueError("event_id is required.")
+        if not normalized_title:
+            raise ValueError("title is required.")
+        attendee_emails = tuple(
+            email.strip().lower()
+            for email in event.attendee_emails
+            if email and email.strip() and "@" in email
+        )
+        if not attendee_emails:
+            raise ValueError("At least one attendee email is required.")
+        if connection_id:
+            _require_calendar_connection(self.repository.list_calendar_connections(user), connection_id)
+
+        items = self.repository.list_lead_follow_ups(user)
+        matched_lead = next((item for item in items if item.email_address.strip().lower() in attendee_emails), None)
+        counterpart_email = next(
+            (email for email in attendee_emails if not _email_matches_user(user, email)),
+            attendee_emails[0],
+        )
+        lead = matched_lead or _build_auto_created_follow_up(
+            counterpart_email=counterpart_email,
+            counterpart_name="",
+            owner_name=_resolve_owner_name(user),
+            current_time=self.now(),
+        )
+        updated_lead = _merge_calendar_event_into_follow_up(
+            lead,
+            source=normalized_source,
+            event_id=normalized_event_id,
+            title=normalized_title,
+            starts_at=event.starts_at,
+            notes=event.notes,
+            current_time=self.now(),
+        )
+        self.repository.import_lead_follow_ups(user, [updated_lead])
+
+        if connection_id:
+            connection = _require_calendar_connection(self.repository.list_calendar_connections(user), connection_id)
+            self.repository.save_calendar_connection(
+                user,
+                replace(
+                    connection,
+                    last_sync_at=self.now(),
+                    last_sync_status="ok",
+                    last_sync_error="",
+                ),
+            )
+
+        return GetLeadFollowUpOverviewUseCase(repository=self.repository, now=self.now).execute(user)
+
+
 class DesignLeadFollowUpEmailUseCase:
     def __init__(
         self,
@@ -1085,6 +1169,14 @@ class ListMailboxConnectionsUseCase:
         return list(self.repository.list_mailbox_connections(user))
 
 
+class ListCalendarConnectionsUseCase:
+    def __init__(self, repository: LeadFollowUpRepositoryPort) -> None:
+        self.repository = repository
+
+    def execute(self, user: User) -> list[CalendarConnection]:
+        return list(self.repository.list_calendar_connections(user))
+
+
 class UpdateMailboxConnectionSyncUseCase:
     def __init__(self, repository: LeadFollowUpRepositoryPort) -> None:
         self.repository = repository
@@ -1106,6 +1198,55 @@ class DisconnectMailboxConnectionUseCase:
         self.repository.delete_mailbox_connection(user, connection_id)
 
 
+class ConnectCalendarUseCase:
+    def __init__(
+        self,
+        repository: LeadFollowUpRepositoryPort,
+        now: Callable[[], datetime],
+    ) -> None:
+        self.repository = repository
+        self.now = now
+
+    def execute(self, user: User, *, provider: str, calendar_address: str, display_name: str) -> CalendarConnection:
+        normalized_provider = provider.strip().lower()
+        if normalized_provider not in {"google_calendar", "outlook_calendar"}:
+            raise ValueError("Unsupported calendar provider.")
+        normalized_address = calendar_address.strip().lower()
+        if "@" not in normalized_address:
+            raise ValueError("A valid calendar address is required.")
+        normalized_name = display_name.strip() or _derive_name_from_email(normalized_address)
+        existing = next(
+            (
+                item
+                for item in self.repository.list_calendar_connections(user)
+                if item.provider == normalized_provider and item.calendar_address.lower() == normalized_address
+            ),
+            None,
+        )
+        connection = CalendarConnection(
+            id=existing.id if existing else f"calendar-{normalized_provider}-{hashlib.sha1(normalized_address.encode('utf-8')).hexdigest()[:10]}",
+            provider=normalized_provider,
+            calendar_address=normalized_address,
+            display_name=normalized_name,
+            status="connected",
+            connected_at=existing.connected_at if existing else self.now(),
+            last_sync_at=existing.last_sync_at if existing else None,
+            last_sync_status=existing.last_sync_status if existing else "",
+            last_sync_error=existing.last_sync_error if existing else "",
+            background_sync_enabled=existing.background_sync_enabled if existing else True,
+        )
+        return self.repository.save_calendar_connection(user, connection)
+
+
+class DisconnectCalendarConnectionUseCase:
+    def __init__(self, repository: LeadFollowUpRepositoryPort) -> None:
+        self.repository = repository
+
+    def execute(self, user: User, connection_id: str) -> None:
+        _require_calendar_connection(self.repository.list_calendar_connections(user), connection_id)
+        self.repository.delete_calendar_connection(user, connection_id)
+
+
 class EraseRelationshipMemoryUseCase:
     def __init__(self, repository: LeadFollowUpRepositoryPort) -> None:
         self.repository = repository
@@ -1118,6 +1259,8 @@ class EraseRelationshipMemoryUseCase:
         if normalized_scope == "all_memory":
             for connection in list(self.repository.list_mailbox_connections(user)):
                 self.repository.delete_mailbox_connection(user, connection.id)
+            for connection in list(self.repository.list_calendar_connections(user)):
+                self.repository.delete_calendar_connection(user, connection.id)
 
 
 class ProcessMailboxWatchEventUseCase:
@@ -1599,6 +1742,16 @@ def _require_mailbox_connection(items: list[MailboxConnection], connection_id: s
     raise KeyError(normalized_connection_id)
 
 
+def _require_calendar_connection(items: list[CalendarConnection], connection_id: str | None) -> CalendarConnection:
+    normalized_connection_id = (connection_id or "").strip()
+    if not normalized_connection_id:
+        raise ValueError("calendar connection id is required.")
+    for item in items:
+        if item.id == normalized_connection_id:
+            return item
+    raise KeyError(normalized_connection_id)
+
+
 def _mailbox_watch_renewal_due(connection: MailboxConnection) -> bool:
     if connection.connection_mode != "oauth":
         return False
@@ -1721,6 +1874,10 @@ def _resolve_thread_counterpart(user: User, messages: list[EmailThreadMessageInp
     return "", ""
 
 
+def _email_matches_user(user: User, email_address: str) -> bool:
+    return bool(user.email and user.email.strip().lower() == email_address.strip().lower())
+
+
 def _find_follow_up_by_email(items: list[LeadFollowUp], email_address: str) -> LeadFollowUp | None:
     for item in items:
         if item.email_address.strip().lower() == email_address:
@@ -1819,6 +1976,48 @@ def _merge_email_thread_into_follow_up(
         priority=priority,
         timeline=all_entries,
         recent_email_threads=thread_history,
+    )
+
+
+def _merge_calendar_event_into_follow_up(
+    lead: LeadFollowUp,
+    *,
+    source: str,
+    event_id: str,
+    title: str,
+    starts_at: datetime,
+    notes: str,
+    current_time: datetime,
+) -> LeadFollowUp:
+    entry_id = f"calendar-{event_id}"
+    existing_timeline_ids = {entry.id for entry in lead.timeline}
+    summary_parts = [f"Upcoming meeting: {title.strip().rstrip('.')}"]
+    cleaned_notes = notes.strip().rstrip(".")
+    if cleaned_notes:
+        summary_parts.append(cleaned_notes)
+    event_entry = LeadTimelineEntry(
+        id=entry_id,
+        occurred_at=starts_at,
+        kind="meeting",
+        channel=source,
+        summary=". ".join(summary_parts) + ".",
+    )
+    all_entries = lead.timeline if entry_id in existing_timeline_ids else tuple(sorted((*lead.timeline, event_entry), key=lambda entry: entry.occurred_at, reverse=True))
+    should_promote_meeting = starts_at >= current_time
+    next_follow_up_at = starts_at if should_promote_meeting else lead.next_follow_up_at
+    next_step = f"Prepare for {title.strip().rstrip('.')}." if should_promote_meeting else lead.next_step
+    priority = "high" if should_promote_meeting and starts_at <= current_time + timedelta(days=2) else lead.priority
+    last_contacted_at = max(lead.last_contacted_at or starts_at, starts_at) if starts_at <= current_time else lead.last_contacted_at
+    return replace(
+        lead,
+        stage=lead.stage if lead.stage.strip() and lead.stage.strip().lower() != "lead" else "Meeting",
+        contact_channel="calendar",
+        last_contacted_at=last_contacted_at,
+        next_follow_up_at=next_follow_up_at,
+        next_step=next_step,
+        notes=cleaned_notes[:240] if cleaned_notes else lead.notes,
+        priority=priority,
+        timeline=all_entries,
     )
 
 

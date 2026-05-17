@@ -243,11 +243,27 @@ export type CRMMailboxConnection = {
   last_sent_at: string | null;
 };
 
+export type CRMCalendarConnection = {
+  id: string;
+  provider: "google_calendar" | "outlook_calendar" | string;
+  calendar_address: string;
+  display_name: string;
+  status: string;
+  connected_at: string;
+  connection_mode: "manual" | string;
+  external_account_id: string;
+  last_sync_at: string | null;
+  last_sync_status: string;
+  last_sync_error: string;
+  background_sync_enabled: boolean;
+};
+
 export type AccountPrivacyExport = {
   generated_at: string;
   user: AuthenticatedUser;
   settings: AccountSettings;
   mailboxes: CRMMailboxConnection[];
+  calendars: CRMCalendarConnection[];
   relationship_memory: CRMFollowUpOverview;
 };
 
@@ -258,6 +274,10 @@ export type CRMMailboxOAuthStart = {
 
 export type CRMMailboxConnectionsResponse = {
   items: CRMMailboxConnection[];
+};
+
+export type CRMCalendarConnectionsResponse = {
+  items: CRMCalendarConnection[];
 };
 
 export type CRMMailboxSyncResult = {

@@ -10,10 +10,12 @@ import pytest
 from src.application.account import UserDashboardSettings
 from src.application.crm import (
     AddLeadFollowUpNoteUseCase,
+    CalendarEventInput,
     CompleteLeadFollowUpUseCase,
     DesignLeadFollowUpEmailUseCase,
     EmailThreadMessageInput,
     GetLeadFollowUpOverviewUseCase,
+    IngestCalendarEventUseCase,
     IngestLeadEmailThreadUseCase,
     SnoozeLeadFollowUpUseCase,
     _build_email_ask_line,
@@ -962,3 +964,27 @@ def test_crm_helper_branches_cover_remaining_health_context_and_merge_paths() ->
     )
     assert merged_without_email.email_address == ""
     assert _build_email_subject(build_follow_up(now=now, stage="Discovery"), objective="follow_up") == "Quick follow-up for Example Co"
+
+
+def test_ingest_calendar_event_use_case_promotes_upcoming_meeting() -> None:
+    now = datetime(2024, 5, 17, 12, 30, tzinfo=UTC)
+    repository = InMemoryLeadFollowUpRepository(now=lambda: now)
+    user = make_user()
+    connect_use_case = IngestCalendarEventUseCase(repository=repository, now=lambda: now)
+
+    overview = connect_use_case.execute(
+        user,
+        source="google_calendar",
+        event=CalendarEventInput(
+            event_id="meeting-1",
+            title="Weekly rollout review",
+            starts_at=now + timedelta(days=1),
+            attendee_emails=("amber@northstarstudio.com",),
+            notes="Review the onboarding screenshots before meeting.",
+        ),
+    )
+
+    amber = next(item for item in overview.items if item.id == "lead-amber-studio")
+    assert amber.relationship_upcoming_meeting_at == (now + timedelta(days=1))
+    assert "Weekly rollout review" in amber.relationship_upcoming_meeting_label
+    assert amber.next_step == "Prepare for Weekly rollout review."
