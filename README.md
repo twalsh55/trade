@@ -194,6 +194,7 @@ Telegram-triggered prospecting:
 
 - expose `POST /api/telegram/webhook`
 - set `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, and optionally `TELEGRAM_WEBHOOK_SECRET`
+- set `PROSPECT_AGENT_ENABLED=true` only when you want the prospect agent live
 - point your Telegram bot webhook at your API, for example `https://api.brivoly.com/api/telegram/webhook`
 - supported bot commands from the allowed chat:
   - `/prospect`
@@ -229,6 +230,11 @@ What it does:
 - never posts to Reddit, Hacker News, or any other social network
 - does not draft public replies or posting suggestions; it returns SaaS ideas only
 - records OpenAI token usage in the digest and can append usage entries to a local JSONL log
+
+Important toggle:
+
+- `PROSPECT_AGENT_ENABLED=false` disables `/prospect`, scheduled prospect automation, and cooperative prospect recommendations for `/code`
+- founder-code requests still queue normally while the prospect agent is disabled
 
 Required email settings:
 
@@ -283,6 +289,7 @@ Useful prospecting settings:
 
 ```bash
 PROSPECT_EMAIL_RECIPIENT=tom.mg.walsh@gmail.com
+PROSPECT_AGENT_ENABLED=false
 PROSPECT_PROFILE=crm_direction
 PROSPECT_REDDIT_SEARCH_TERMS=lead follow up manually,sales pipeline spreadsheet,client handoff spreadsheet,crm for agencies spreadsheet,relationship notes follow up
 PROSPECT_REDDIT_LIMIT_PER_TERM=8
@@ -386,6 +393,7 @@ Automation behavior:
 - a file lock prevents duplicate workers
 - a heartbeat file makes health checks and watchdog recovery straightforward
 - state persists last successful run timestamps so the worker can resume cleanly after restarts
+- when `PROSPECT_AGENT_ENABLED=false`, the worker skips scheduling the hourly prospect job entirely
 - when `AUTOMATION_ENABLE_FOUNDER_CODE_SYNC=true`, the worker polls the production API for stored `/code` requests and appends them to `AUTONOMOUS_CODE_INBOX_FILE`
 - the worker also stages newly synced items into `AUTONOMOUS_CODE_PENDING_FILE` and keeps the newest staged instruction in `AUTONOMOUS_CODE_LATEST_FILE`
 - when `AUTOMATION_ENABLE_FOUNDER_CODE_EXECUTOR=true`, the worker can also launch one headless `codex exec` run at a time from the pending queue, tracking the active run in `AUTONOMOUS_CODE_ACTIVE_FILE`

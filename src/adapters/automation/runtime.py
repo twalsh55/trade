@@ -25,7 +25,13 @@ from src.adapters.founder_code.runtime import (
 )
 from src.adapters.llm.openai_prospect_drafter import OpenAIProspectDrafterError
 from src.adapters.operator_briefing.runtime import run_daily_operator_briefing_job
-from src.adapters.prospecting.runtime import get_app_openai_api_key, is_placeholder_openai_key, parse_positive_int, run_prospecting_job
+from src.adapters.prospecting.runtime import (
+    get_app_openai_api_key,
+    is_placeholder_openai_key,
+    is_prospect_agent_enabled,
+    parse_positive_int,
+    run_prospecting_job,
+)
 from src.adapters.social.reddit_lead_source import RedditLeadSourceError
 from src.application.automation import (
     AutomationHeartbeat,
@@ -104,13 +110,15 @@ class LocalAutomationWorker:
 
 def build_jobs_from_env() -> tuple[AutomationJob, ...]:
     timeout_seconds = parse_positive_int("AUTOMATION_JOB_TIMEOUT_SECONDS", default=45)
-    jobs = [
-        AutomationJob(
-            name="prospect_hourly",
-            interval=timedelta(minutes=parse_positive_int("AUTOMATION_PROSPECT_INTERVAL_MINUTES", default=720)),
-            runner=lambda: _run_job_with_timeout("prospect_hourly", _run_prospect_job, timeout_seconds),
-        ),
-    ]
+    jobs = []
+    if is_prospect_agent_enabled():
+        jobs.append(
+            AutomationJob(
+                name="prospect_hourly",
+                interval=timedelta(minutes=parse_positive_int("AUTOMATION_PROSPECT_INTERVAL_MINUTES", default=720)),
+                runner=lambda: _run_job_with_timeout("prospect_hourly", _run_prospect_job, timeout_seconds),
+            )
+        )
     if os.getenv("AUTOMATION_ENABLE_FOUNDER_CODE_SYNC", "false").strip().lower() == "true":
         founder_code_interval = timedelta(seconds=parse_positive_int("AUTOMATION_FOUNDER_CODE_SYNC_INTERVAL_SECONDS", default=60))
         jobs.append(
@@ -230,6 +238,8 @@ def run_worker_from_env(max_iterations: int | None = None) -> int:
 
 
 def _run_prospect_job() -> AutomationJobResult:
+    if not is_prospect_agent_enabled():
+        return AutomationJobResult(status="skipped", detail="prospect_agent=disabled")
     fallback_suffix = ""
     placeholder_suffix = ""
     try:

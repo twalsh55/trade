@@ -178,6 +178,7 @@ def test_local_automation_status_script_reports_health(monkeypatch, capsys) -> N
 
 
 def test_build_jobs_worker_and_run_worker_from_env(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("PROSPECT_AGENT_ENABLED", "true")
     monkeypatch.setenv("AUTOMATION_PROSPECT_INTERVAL_MINUTES", "720")
     monkeypatch.setenv("AUTOMATION_OPERATOR_BRIEFING_INTERVAL_HOURS", "12")
     monkeypatch.setenv("AUTOMATION_POLL_SECONDS", "9")
@@ -235,7 +236,23 @@ def test_build_jobs_worker_and_run_worker_from_env(monkeypatch, tmp_path) -> Non
         run_worker_from_env()
 
 
+def test_build_jobs_omits_prospect_job_when_agent_disabled(monkeypatch) -> None:
+    monkeypatch.setenv("PROSPECT_AGENT_ENABLED", "false")
+    monkeypatch.setenv("AUTOMATION_ENABLE_FOUNDER_CODE_SYNC", "false")
+    monkeypatch.setenv("AUTOMATION_ENABLE_FOUNDER_CODE_EXECUTOR", "false")
+    monkeypatch.setenv("AUTOMATION_ENABLE_SCHEDULED_OPERATOR_BRIEFING", "false")
+    monkeypatch.setenv("AUTOMATION_ENABLE_SENTIMENT_JOB", "false")
+
+    assert build_jobs_from_env() == ()
+
+
 def test_automation_job_runners_report_success_and_failure(monkeypatch) -> None:
+    monkeypatch.setenv("PROSPECT_AGENT_ENABLED", "false")
+    result = _run_prospect_job()
+    assert result.status == "skipped"
+    assert result.detail == "prospect_agent=disabled"
+
+    monkeypatch.setenv("PROSPECT_AGENT_ENABLED", "true")
     digest = type(
         "Digest",
         (),

@@ -19,6 +19,7 @@ from src.adapters.prospecting.runtime import (
     parse_positive_int,
     required_env,
     run_prospecting_job,
+    is_prospect_agent_enabled,
 )
 
 
@@ -221,6 +222,14 @@ def test_collect_prospecting_config_errors_allows_telegram_fallback(monkeypatch)
     assert collect_prospecting_config_errors() == []
 
 
+def test_is_prospect_agent_enabled_defaults_off_and_can_enable(monkeypatch) -> None:
+    monkeypatch.delenv("PROSPECT_AGENT_ENABLED", raising=False)
+    assert is_prospect_agent_enabled() is False
+
+    monkeypatch.setenv("PROSPECT_AGENT_ENABLED", "true")
+    assert is_prospect_agent_enabled() is True
+
+
 def test_required_env_and_parse_positive_int(monkeypatch) -> None:
     monkeypatch.setenv("SMTP_HOST", "smtp.example.com")
     monkeypatch.setenv("PROSPECT_MAX_MATCHES", "4")
@@ -266,6 +275,7 @@ def test_parse_positive_int_raises_for_invalid_values(monkeypatch) -> None:
 
 
 def test_run_prospecting_job_builds_and_executes_use_case(monkeypatch) -> None:
+    monkeypatch.setenv("PROSPECT_AGENT_ENABLED", "true")
     config = object()
     lead_source = object()
     drafter = object()
@@ -316,6 +326,7 @@ def test_run_prospecting_job_builds_and_executes_use_case(monkeypatch) -> None:
 
 
 def test_run_prospecting_job_appends_usage_log_when_configured(monkeypatch) -> None:
+    monkeypatch.setenv("PROSPECT_AGENT_ENABLED", "true")
     config = object()
     digest = type(
         "Digest",
@@ -358,6 +369,7 @@ def test_run_prospecting_job_appends_usage_log_when_configured(monkeypatch) -> N
 
 
 def test_run_prospecting_job_can_disable_operator_briefing(monkeypatch) -> None:
+    monkeypatch.setenv("PROSPECT_AGENT_ENABLED", "true")
     config = object()
     digest = type(
         "Digest",
@@ -396,6 +408,7 @@ def test_run_prospecting_job_can_disable_operator_briefing(monkeypatch) -> None:
 
 
 def test_run_prospecting_job_tolerates_operator_briefing_email_failure(monkeypatch) -> None:
+    monkeypatch.setenv("PROSPECT_AGENT_ENABLED", "true")
     config = object()
     digest = type(
         "Digest",
@@ -431,6 +444,17 @@ def test_run_prospecting_job_tolerates_operator_briefing_email_failure(monkeypat
     monkeypatch.setattr("src.adapters.prospecting.runtime.RunDailyProspectingUseCase", FakeUseCase)
 
     assert run_prospecting_job() is digest
+
+
+def test_run_prospecting_job_raises_when_agent_disabled(monkeypatch) -> None:
+    monkeypatch.setenv("PROSPECT_AGENT_ENABLED", "false")
+
+    try:
+        run_prospecting_job()
+    except RuntimeError as exc:
+        assert str(exc) == "Prospect agent is disabled."
+    else:
+        raise AssertionError("Expected RuntimeError")
 
 
 def test_queue_agent_build_recommendation_enqueues_strong_recommendation(monkeypatch) -> None:

@@ -436,6 +436,10 @@ def test_extract_telegram_image_intake_supports_photos_and_image_documents() -> 
 
 
 def test_build_prospecting_status_message_reports_errors_and_modes(monkeypatch) -> None:
+    monkeypatch.setenv("PROSPECT_AGENT_ENABLED", "false")
+    assert _build_prospecting_status_message() == "Prospect agent is disabled."
+
+    monkeypatch.setenv("PROSPECT_AGENT_ENABLED", "true")
     monkeypatch.setattr("src.adapters.api.app.collect_prospecting_config_errors", lambda: ["Missing SMTP_HOST"])
     assert _build_prospecting_status_message() == "Prospecting agent is not ready:\n- Missing SMTP_HOST"
 
@@ -470,6 +474,11 @@ def test_run_prospecting_from_telegram_sends_success_and_failure_updates(monkeyp
         def send_message(self, text: str) -> None:
             sent.append(text)
 
+    monkeypatch.setenv("PROSPECT_AGENT_ENABLED", "false")
+    _run_prospecting_from_telegram(FakeNotifier())  # type: ignore[arg-type]
+    assert sent[-1] == "Prospect agent is disabled for now."
+
+    monkeypatch.setenv("PROSPECT_AGENT_ENABLED", "true")
     monkeypatch.setattr(
         "src.adapters.api.app.run_prospecting_job",
         lambda: type("Digest", (), {"scanned_post_count": 7, "shortlisted_count": 2})(),
@@ -529,6 +538,11 @@ def test_run_code_from_telegram_sends_decision_and_failure_updates(monkeypatch, 
         def send_message(self, text: str) -> None:
             sent.append(text)
 
+    monkeypatch.setenv("PROSPECT_AGENT_ENABLED", "false")
+    _run_code_from_telegram(FakeNotifier())  # type: ignore[arg-type]
+    assert sent[-1] == "Queued your code request. The prospect agent is disabled for now."
+
+    monkeypatch.setenv("PROSPECT_AGENT_ENABLED", "true")
     digest = object()
     brief = object()
     seen_guidance: list[str | None] = []
@@ -575,6 +589,7 @@ def test_telegram_webhook_handles_commands_and_guards(monkeypatch) -> None:
     monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "bot")
     monkeypatch.setenv("TELEGRAM_CHAT_ID", "123")
     monkeypatch.setenv("TELEGRAM_WEBHOOK_SECRET", "secret")
+    monkeypatch.setenv("PROSPECT_AGENT_ENABLED", "true")
     monkeypatch.setattr("src.adapters.api.app.TelegramNotifier", FakeNotifier)
     monkeypatch.setattr("src.adapters.api.app._run_prospecting_from_telegram", lambda notifier: tasks.append("ran"))
     monkeypatch.setattr("src.adapters.api.app._run_etf_sentiment_from_telegram", lambda notifier: tasks.append("sentiment"))
@@ -658,7 +673,60 @@ def test_telegram_webhook_handles_commands_and_guards(monkeypatch) -> None:
         " Founder guidance received: fix a bug with login."
     )
     assert tasks == ["ran", "sentiment", "code", "code"]
-    assert queued_commands[-1] == "/code fix a bug with login"
+
+
+def test_telegram_webhook_respects_disabled_prospect_agent(monkeypatch) -> None:
+    client = make_client(user=make_user())
+    sent: list[str] = []
+    tasks: list[str] = []
+    queued_commands: list[str] = []
+
+    class FakeNotifier:
+        def __init__(self, bot_token: str, chat_id: str) -> None:
+            self.bot_token = bot_token
+            self.chat_id = chat_id
+
+        def send_message(self, text: str) -> None:
+            sent.append(text)
+
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "bot")
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "123")
+    monkeypatch.setenv("TELEGRAM_WEBHOOK_SECRET", "secret")
+    monkeypatch.setenv("PROSPECT_AGENT_ENABLED", "false")
+    monkeypatch.setattr("src.adapters.api.app.TelegramNotifier", FakeNotifier)
+    monkeypatch.setattr("src.adapters.api.app._run_prospecting_from_telegram", lambda notifier: tasks.append("prospect"))
+    monkeypatch.setattr("src.adapters.api.app._run_code_from_telegram", lambda notifier, founder_guidance=None: tasks.append("code"))
+    monkeypatch.setattr("src.adapters.api.app._queue_founder_code_request", lambda command: queued_commands.append(command.text))
+
+    response = client.post(
+        "/api/telegram/webhook",
+        headers={"X-Telegram-Bot-Api-Secret-Token": "secret"},
+        json={"message": {"text": "/prospect", "chat": {"id": 123}}},
+    )
+    assert response.json() == {"ok": True, "handled": True, "command": "/prospect"}
+    assert sent[-1] == "Prospect agent is disabled for now."
+    assert tasks == []
+
+    response = client.post(
+        "/api/telegram/webhook",
+        headers={"X-Telegram-Bot-Api-Secret-Token": "secret"},
+        json={"message": {"text": "/prospect status", "chat": {"id": 123}}},
+    )
+    assert response.json() == {"ok": True, "handled": True, "command": "/prospect status"}
+    assert sent[-1] == "Prospect agent is disabled."
+
+    response = client.post(
+        "/api/telegram/webhook",
+        headers={"X-Telegram-Bot-Api-Secret-Token": "secret"},
+        json={"message": {"text": "/code fix login", "chat": {"id": 123}}},
+    )
+    assert response.json() == {"ok": True, "handled": True, "command": "/code"}
+    assert sent[-1] == (
+        "Queued your code request. The prospect agent is disabled for now, so no build recommendation will run."
+        " Founder guidance received: fix login."
+    )
+    assert queued_commands == ["/code fix login"]
+    assert tasks == []
 
     response = client.post(
         "/api/telegram/webhook",
@@ -667,7 +735,7 @@ def test_telegram_webhook_handles_commands_and_guards(monkeypatch) -> None:
     )
     assert response.json() == {"ok": True, "handled": True, "command": "/help"}
     assert "Supported commands:" in sent[-1]
-    assert "/code - run the prospect agent and queue a build recommendation" in sent[-1]
+    assert "/code - queue a founder code request and, when enabled, run the prospect agent for a build recommendation" in sent[-1]
     assert "/code <guidance> - treat the text as founder direction unless it would harm the product goal" in sent[-1]
 
     response = client.post(
@@ -1046,6 +1114,7 @@ def test_telegram_webhook_status_can_report_errors(monkeypatch) -> None:
 
     monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "bot")
     monkeypatch.setenv("TELEGRAM_CHAT_ID", "123")
+    monkeypatch.setenv("PROSPECT_AGENT_ENABLED", "true")
     monkeypatch.setattr("src.adapters.api.app.TelegramNotifier", FakeNotifier)
     monkeypatch.setattr("src.adapters.api.app.collect_prospecting_config_errors", lambda: ["Missing SMTP_HOST"])
 

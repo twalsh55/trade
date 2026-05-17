@@ -43,7 +43,7 @@ from src.adapters.crm.runtime import build_crm_image_intake_agent_from_env, buil
 from src.adapters.crm.spreadsheet_files import convert_excel_bytes_to_csv, decode_base64_file_content
 from src.adapters.crm.runtime import build_lead_follow_up_repository
 from src.adapters.persistence.runtime import build_personalization_repository, build_user_repository
-from src.adapters.prospecting.runtime import collect_prospecting_config_errors, run_prospecting_job
+from src.adapters.prospecting.runtime import collect_prospecting_config_errors, is_prospect_agent_enabled, run_prospecting_job
 from src.adapters.sentiment.runtime import collect_etf_sentiment_config_errors, deliver_etf_sentiment_job, run_etf_sentiment_job
 from src.adapters.social.reddit_lead_source import RedditLeadSourceError
 from src.application.account import (
@@ -652,6 +652,9 @@ def create_app(dependencies: ApiDependencies | None = None) -> FastAPI:
 
         notifier = _build_telegram_notifier()
         if command.name == "/prospect" and command.argument is None:
+            if not is_prospect_agent_enabled():
+                notifier.send_message("Prospect agent is disabled for now.")
+                return {"ok": True, "handled": True, "command": command.name}
             notifier.send_message("Starting the daily prospecting run now. I will send a follow-up when it finishes.")
             background_tasks.add_task(_run_prospecting_from_telegram, notifier)
             return {"ok": True, "handled": True, "command": command.name}
@@ -668,6 +671,12 @@ def create_app(dependencies: ApiDependencies | None = None) -> FastAPI:
         if command.name == "/code":
             _queue_founder_code_request(command)
             guidance_notice = f" Founder guidance received: {command.argument}." if command.argument else ""
+            if not is_prospect_agent_enabled():
+                notifier.send_message(
+                    "Queued your code request. The prospect agent is disabled for now, so no build recommendation will run."
+                    f"{guidance_notice}"
+                )
+                return {"ok": True, "handled": True, "command": command.name}
             notifier.send_message(
                 "Starting a cooperative code run now. I will send a build recommendation when it finishes."
                 f"{guidance_notice}"
@@ -677,11 +686,11 @@ def create_app(dependencies: ApiDependencies | None = None) -> FastAPI:
         if command.name == "/help" and command.argument is None:
             notifier.send_message(
                 "Supported commands:\n"
-                "/prospect - run the prospecting agent\n"
-                "/prospect status - show whether the prospecting agent is configured\n"
+                "/prospect - run the prospecting agent when enabled\n"
+                "/prospect status - show whether the prospecting agent is enabled and configured\n"
                 "/sentiment - run the ETF sentiment agent\n"
                 "/sentiment status - show whether the ETF sentiment agent is configured\n"
-                "/code - run the prospect agent and queue a build recommendation\n"
+                "/code - queue a founder code request and, when enabled, run the prospect agent for a build recommendation\n"
                 "/code <guidance> - treat the text as founder direction unless it would harm the product goal"
             )
             return {"ok": True, "handled": True, "command": command.name}
@@ -900,6 +909,8 @@ def _queue_founder_code_request(command: _TelegramCommand) -> None:
 
 
 def _build_prospecting_status_message() -> str:
+    if not is_prospect_agent_enabled():
+        return "Prospect agent is disabled."
     errors = collect_prospecting_config_errors()
     openai_enabled = bool(get_first_configured_env("APP_OPENAI_API_KEY", "OPENAI_API_KEY"))
     if errors:
@@ -913,6 +924,12 @@ def _build_prospecting_status_message() -> str:
 
 
 def _run_prospecting_from_telegram(notifier: TelegramNotifier) -> None:
+    if not is_prospect_agent_enabled():
+        try:
+            notifier.send_message("Prospect agent is disabled for now.")
+        except TelegramNotificationError:
+            return
+        return
     try:
         digest = run_prospecting_job()
         notifier.send_message(
@@ -952,6 +969,12 @@ def _run_etf_sentiment_from_telegram(notifier: TelegramNotifier) -> None:
 
 
 def _run_code_from_telegram(notifier: TelegramNotifier, founder_guidance: str | None = None) -> None:
+    if not is_prospect_agent_enabled():
+        try:
+            notifier.send_message("Queued your code request. The prospect agent is disabled for now.")
+        except TelegramNotificationError:
+            return
+        return
     try:
         digest = run_prospecting_job(founder_guidance)
         brief = decide_autonomous_build_brief(digest, founder_guidance=founder_guidance)

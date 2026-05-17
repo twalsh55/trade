@@ -40,6 +40,10 @@ APP_OPENAI_ENV_NAMES = ("APP_OPENAI_API_KEY", "OPENAI_API_KEY")
 prospecting_logger = logging.getLogger("brivoly.prospecting")
 
 
+def is_prospect_agent_enabled() -> bool:
+    return os.getenv("PROSPECT_AGENT_ENABLED", "false").strip().lower() == "true"
+
+
 def is_placeholder_openai_key(api_key: str) -> bool:
     normalized = api_key.strip()
     return normalized in {"sk-...", "sk-placeholder", "your-openai-api-key"} or len(normalized) < 20
@@ -139,6 +143,8 @@ def build_telegram_digest_notifier_from_env() -> TelegramDigestNotifier:
 
 
 def run_prospecting_job(founder_guidance: str | None = None) -> ProspectingDigest:
+    if not is_prospect_agent_enabled():
+        raise RuntimeError("Prospect agent is disabled.")
     config = build_config_from_env(founder_guidance)
     use_case = RunDailyProspectingUseCase(
         lead_source=build_lead_source_from_env(),

@@ -120,7 +120,7 @@ cd web && npm run e2e
 
 ### Agent / Automation State
 
-- Prospect agent is a research partner for CRM direction.
+- Prospect agent is currently disabled by default via `PROSPECT_AGENT_ENABLED=false`.
 - Prospecting is tuned to `crm_direction`.
 - Repeated validated signals:
   - follow-up discipline
@@ -130,8 +130,8 @@ cd web && npm run e2e
 - Strong secondary idea, still not core: message / DM capture.
 - `/code` in Telegram can:
   - take founder guidance
-  - run cooperative prospecting
   - queue durable work items
+- when the prospect agent is re-enabled, `/code` can also run cooperative prospecting for a build recommendation
 - Prospect-agent recommendations can also enter that same durable queue.
 - Local always-on automation is the main 24/7 path.
 - Local worker can sync/stage remote requests and launch headless `codex exec` runs.
