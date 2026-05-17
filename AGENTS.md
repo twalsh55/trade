@@ -122,7 +122,7 @@ cd web && npm run e2e
   - first-login business onboarding with skip-for-now path
   - paid image-note intake
   - magic-link remote note capture for phone image uploads
-  - client-facing upload flow with lighter no-login handoff copy
+  - client-facing upload flow with lighter no-login handoff copy and simpler share-link language
 
 ### Relationship OS Todo
 
@@ -141,7 +141,7 @@ cd web && npm run e2e
 - Client Dropzones:
   - [ ] keep no-login upload links extremely mobile-friendly and low-friction
   - [ ] attach uploaded files, screenshots, and notes more clearly to relationship history
-  - [ ] continue removing any operator-heavy intake language from the capture flow
+  - [ ] continue removing any operator-heavy intake language from the remaining setup surfaces
 - UX constraints:
   - [ ] reduce equal-weight panels, counters, and dashboard-style density
   - [ ] keep the interface calm, lightweight, and fast on both desktop and mobile
@@ -197,7 +197,7 @@ cd web && npm run e2e
   - replace numeric-feeling health signals with simple status language like `active`, `warm`, `drifting`, `stale`, and `at risk`
   - add fast timeline summaries for `last 30 days`, `meeting prep`, and `what changed recently`, especially for mobile context recovery
   - make AI feel invisible by surfacing memory and suggestions exactly where users hesitate, instead of adding dedicated AI surfaces
-  - make dropzones feel more like lightweight client handoff pages and less like intake tooling
+  - keep simplifying dropzones until they feel like lightweight client handoff pages instead of setup tooling
   - deeper AI-assisted messy file / image intake
   - richer stage memory / handoff history
   - spreadsheet cleanup and field-mapping controls after preview

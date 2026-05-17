@@ -1765,7 +1765,7 @@ function RemoteImageCapturePanel({
 
   return (
     <section className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm">
-      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Client Dropzones</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Client handoff</p>
       <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Give clients an easy place to send updates.</h2>
       <p className="mt-3 text-sm leading-6 text-slate-600">
         Brivoly gives you a simple no-login handoff page for screenshots, whiteboard photos, and note images. Clients can send context from their phone, and it lands back in the relationship history without extra back-and-forth.
@@ -1773,7 +1773,7 @@ function RemoteImageCapturePanel({
 
       {!advancedAiUnlocked ? (
         <div className="mt-5 rounded-[1.3rem] border border-amber-200 bg-amber-50 px-4 py-4 text-sm leading-6 text-amber-900">
-          Remote image intake uses the same paid AI gate as advanced spreadsheet and file interpretation.
+          Shared image capture uses the same paid AI layer as advanced spreadsheet and file interpretation.
         </div>
       ) : null}
 
@@ -1793,16 +1793,16 @@ function RemoteImageCapturePanel({
       </div>
 
       <div className="mt-5 rounded-[1.3rem] border bg-slate-50 px-4 py-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Share-ready link</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Share-ready page</p>
         <p className="mt-2 text-sm font-medium text-slate-900">
           {intakeChannel?.magic_link_url ? "No-login client dropzone is live." : "Client dropzone is not configured yet."}
         </p>
         <p className="mt-2 text-sm leading-6 text-slate-600">
-          {intakeChannel?.instructions ?? "Set the CRM intake secret to enable phone-first note capture."}
+          {intakeChannel?.instructions ?? "Finish setup to turn on the phone-friendly page clients can use when they have an update."}
         </p>
         {normalizedChannels.length ? (
           <p className="mt-3 text-sm text-slate-700">
-            Preferred channels for this account: <span className="font-medium">{normalizedChannels.join(", ")}</span>
+            Best handoff paths for this account: <span className="font-medium">{normalizedChannels.join(", ")}</span>
           </p>
         ) : null}
         {routingNotes ? <p className="mt-2 text-sm leading-6 text-slate-600">{routingNotes}</p> : null}
@@ -1836,15 +1836,15 @@ function RemoteImageCapturePanel({
 
 function IntakeTaskNav({ activeTask }: { activeTask: CRMIntakeTask }) {
   const items: Array<{ href: string; title: string; body: string; task: CRMIntakeTask }> = [
-    { href: "/clientos/intake", title: "Dropzone Hub", body: "See the overall intake setup.", task: "hub" },
-    { href: "/clientos/intake/profile", title: "AI Profile", body: "Teach Brivoly your messy sources.", task: "profile" },
-    { href: "/clientos/intake/routing", title: "Routing", body: "Define preferred channels and notes.", task: "routing" },
-    { href: "/clientos/intake/capture", title: "Client Link", body: "Share the no-login upload path.", task: "capture" },
+    { href: "/clientos/intake", title: "Overview", body: "See the full client handoff flow.", task: "hub" },
+    { href: "/clientos/intake/profile", title: "Teach Brivoly", body: "Show it the messy formats you usually get.", task: "profile" },
+    { href: "/clientos/intake/routing", title: "Where updates land", body: "Choose the paths and notes that fit this account.", task: "routing" },
+    { href: "/clientos/intake/capture", title: "Share link", body: "Send the no-login page clients can use on their phone.", task: "capture" },
   ];
 
   return (
     <section className="rounded-[1.75rem] border bg-white/90 p-5 shadow-sm">
-      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Dropzone Setup</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Client handoff</p>
       <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         {items.map((item) => {
           const active = item.task === activeTask;
@@ -1882,20 +1882,20 @@ function IntakeTaskHub({
       <TaskSummaryCard
         href="/clientos/intake/profile"
         eyebrow="Step 1"
-        title="Teach Brivoly your source material"
-        body={advancedAiUnlocked ? "Your paid AI intake tools are available. Keep the prompt and common formats current." : "Unlock the paid AI intake layer before relying on note-image and messy-file interpretation."}
+        title="Teach Brivoly what usually arrives"
+        body={advancedAiUnlocked ? "Your paid AI memory tools are available. Keep the prompt and common formats current." : "Unlock the paid AI layer before relying on note images and messy files to carry context back in."}
       />
       <TaskSummaryCard
         href="/clientos/intake/routing"
         eyebrow="Step 2"
-        title="Decide how context should arrive"
-        body={normalizedChannels.length ? `Preferred channels are set: ${normalizedChannels.join(", ")}.` : "Add preferred intake channels and operator notes so the team knows where raw material should come from."}
+        title="Decide how updates should come in"
+        body={normalizedChannels.length ? `Best handoff paths are set: ${normalizedChannels.join(", ")}.` : "Set the paths and short notes that make it obvious how this account usually sends context back."}
       />
       <TaskSummaryCard
         href="/clientos/intake/capture"
         eyebrow="Step 3"
-        title="Share the client dropzone"
-        body={hasMagicLink ? "A signed no-login upload link is live and ready to share with clients." : "Finish setup so the client upload path can be used from a phone."}
+        title="Share the update link"
+        body={hasMagicLink ? "A signed no-login page is live and ready to send to clients." : "Finish setup so clients can send updates from their phone without friction."}
       />
     </section>
   );
@@ -1942,10 +1942,10 @@ function IntakeRoutingPanel({
 }) {
   return (
     <section className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm">
-      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Intake Routing</p>
-      <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Decide how relationship context should arrive.</h2>
+      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Where updates land</p>
+      <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Choose the paths that make sending context feel easy.</h2>
       <p className="mt-3 text-sm leading-6 text-slate-600">
-        Use this task to define the preferred intake paths and the notes that explain when each one should be used.
+        Keep this simple: choose the best handoff channels for this account and leave a short note so the next update arrives in the right place.
       </p>
 
       <div className="mt-5 space-y-4">
@@ -1959,7 +1959,7 @@ function IntakeRoutingPanel({
           />
         </label>
         <label className="block">
-          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Routing notes</span>
+          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Handoff notes</span>
           <textarea
             value={routingNotesDraft}
             onChange={(event) => onRoutingNotesDraftChange(event.target.value)}
@@ -1971,11 +1971,11 @@ function IntakeRoutingPanel({
 
       <div className="mt-5 flex items-center gap-3">
         <Button onClick={onSave} disabled={isSaving || !canPersistSettings}>
-          {isSaving ? "Saving..." : "Save intake routing"}
+          {isSaving ? "Saving..." : "Save handoff paths"}
         </Button>
         {saveStatus ? <p className="text-sm text-slate-500">{saveStatus}</p> : null}
       </div>
-      {!canPersistSettings ? <p className="mt-3 text-sm text-slate-500">Routing settings are unavailable until account settings finish loading.</p> : null}
+      {!canPersistSettings ? <p className="mt-3 text-sm text-slate-500">These settings will open once account details finish loading.</p> : null}
     </section>
   );
 }
@@ -2011,10 +2011,10 @@ function AIIntakePanel({
     <section className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">AI Intake Profile</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Teach Brivoly</p>
           <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Teach Brivoly the context you usually receive.</h2>
           <p className="mt-3 text-sm leading-6 text-slate-600">
-            Store a custom prompt and common source formats per user so future AI-assisted spreadsheet, file, and image interpretation stays close to how you actually work.
+            Store a custom prompt and common source formats so future AI-assisted spreadsheet, file, and image interpretation stays close to how you actually work.
           </p>
         </div>
         <div className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${advancedAiUnlocked ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-amber-50 text-amber-800"}`}>
@@ -2024,13 +2024,13 @@ function AIIntakePanel({
 
       {!advancedAiUnlocked ? (
         <div className="mt-5 rounded-[1.3rem] border border-amber-200 bg-amber-50 px-4 py-4 text-sm leading-6 text-amber-900">
-          AI-assisted file, spreadsheet, and image interpretation should stay behind a paid plan. Current billing status: {formatBillingStatusLabel(billingStatus)}.
+          AI-assisted file, spreadsheet, and image interpretation stays behind a paid plan. Current billing status: {formatBillingStatusLabel(billingStatus)}.
         </div>
       ) : null}
 
       <div className="mt-5 space-y-4">
         <label className="block">
-          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Common import formats</span>
+          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Common source formats</span>
           <input
             value={aiFormatsDraft}
             onChange={(event) => onAiFormatsDraftChange(event.target.value)}
@@ -2039,7 +2039,7 @@ function AIIntakePanel({
           />
         </label>
         <label className="block">
-          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Custom AI intake prompt</span>
+          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Custom AI memory prompt</span>
           <textarea
             value={aiPromptDraft}
             onChange={(event) => onAiPromptDraftChange(event.target.value)}
@@ -2051,7 +2051,7 @@ function AIIntakePanel({
 
       <div className="mt-5 flex items-center gap-3">
         <Button onClick={onSave} disabled={isSaving || !canPersistSettings}>
-          {isSaving ? "Saving..." : "Save AI intake profile"}
+          {isSaving ? "Saving..." : "Save AI memory profile"}
         </Button>
         {saveStatus ? <p className="text-sm text-slate-500">{saveStatus}</p> : null}
       </div>
@@ -2504,7 +2504,7 @@ function LeadMemoryPanel({
       <section className="mt-6 rounded-[1.5rem] border bg-white p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <p className="ui-eyebrow">Follow-Up Intelligence</p>
+            <p className="ui-eyebrow">Suggested next note</p>
             <h3 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">Draft the next reconnect without starting from zero.</h3>
             <p className="mt-2 text-sm leading-6 text-slate-600">
               Brivoly uses the latest context, suggested next touch, and your saved business profile to suggest a message you can edit before sending.

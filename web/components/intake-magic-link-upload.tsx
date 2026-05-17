@@ -56,12 +56,12 @@ export function IntakeMagicLinkUpload({ token }: { token: string }) {
     <form onSubmit={handleSubmit} className="mt-6 space-y-4 rounded-[1.75rem] border bg-white/92 p-6 shadow-sm">
       <div className="rounded-[1.3rem] border bg-slate-50 px-4 py-4 text-sm leading-6 text-slate-700">
         <p className="font-medium text-slate-900">No login is needed.</p>
-        <p className="mt-1">This works well for quick screenshots, whiteboard photos, handwritten notes, and other visual updates from your phone.</p>
+        <p className="mt-1">This is meant for quick screenshots, whiteboard photos, handwritten notes, and other small updates you want to send from your phone.</p>
       </div>
 
       <div>
         <label htmlFor="intake-file" className="text-sm font-medium text-slate-900">
-          Screenshot or note image
+          File or screenshot
         </label>
         <input
           id="intake-file"
