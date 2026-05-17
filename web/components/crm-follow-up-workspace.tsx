@@ -24,6 +24,22 @@ export type CRMWorkspaceView = "overview" | "followups" | "inbox" | "pipeline" |
 type CRMIntakeTask = "hub" | "profile" | "routing" | "capture";
 type RelationshipFilter = "all" | "due" | "stale" | "at_risk";
 type InboxFilter = "all" | "reply" | "waiting" | "quiet";
+type TodayDraftPreset = {
+  objective: CRMEmailDraft["objective"];
+  tone: CRMEmailDraft["tone"];
+  length: CRMEmailDraft["length"];
+  status: string;
+};
+type TodayPriorityCardItem = {
+  id: string;
+  href: string;
+  eyebrow: string;
+  title: string;
+  body: string;
+  meta: string;
+  actionLabel?: string;
+  onAction?: () => void;
+};
 
 export function CRMFollowUpWorkspace({
   initialOverview,
@@ -87,6 +103,7 @@ export function CRMFollowUpWorkspace({
   const [isAiSettingsPending, startAiSettingsTransition] = useTransition();
   const [isEmailPending, startEmailTransition] = useTransition();
   const [isInboxPending, startInboxTransition] = useTransition();
+  const [queuedTodayDraft, setQueuedTodayDraft] = useState<{ leadId: string; preset: TodayDraftPreset } | null>(null);
 
   useEffect(() => {
     if (!selectedLeadId && initialOverview.items[0]) {
@@ -114,6 +131,14 @@ export function CRMFollowUpWorkspace({
   const showingImport = view === "import";
   const showingIntake = view === "intake";
   const intakeTask = resolveIntakeTask(pathname ?? "/clientos/intake");
+
+  useEffect(() => {
+    if (!queuedTodayDraft || !selectedLead || selectedLead.id !== queuedTodayDraft.leadId) {
+      return;
+    }
+    generateEmailDraftForLead(selectedLead, queuedTodayDraft.preset);
+    setQueuedTodayDraft(null);
+  }, [queuedTodayDraft, selectedLead]);
 
   useEffect(() => {
     setAiPromptDraft(initialSettings?.crm_ai_prompt ?? "");
@@ -441,16 +466,15 @@ export function CRMFollowUpWorkspace({
     });
   }
 
-  function generateEmailDraft(overrides?: {
-    objective?: CRMEmailDraft["objective"];
-    tone?: CRMEmailDraft["tone"];
-    length?: CRMEmailDraft["length"];
-    status?: string;
-  }) {
-    const lead = selectedLead;
-    if (!lead) {
-      return;
-    }
+  function generateEmailDraftForLead(
+    lead: CRMLeadFollowUp,
+    overrides?: {
+      objective?: CRMEmailDraft["objective"];
+      tone?: CRMEmailDraft["tone"];
+      length?: CRMEmailDraft["length"];
+      status?: string;
+    },
+  ) {
     const objective = overrides?.objective ?? emailObjective;
     const tone = overrides?.tone ?? emailTone;
     const length = overrides?.length ?? emailLength;
@@ -481,6 +505,27 @@ export function CRMFollowUpWorkspace({
         setEmailStatus(draftError instanceof Error ? draftError.message : "Unable to generate an email draft.");
       }
     });
+  }
+
+  function generateEmailDraft(overrides?: {
+    objective?: CRMEmailDraft["objective"];
+    tone?: CRMEmailDraft["tone"];
+    length?: CRMEmailDraft["length"];
+    status?: string;
+  }) {
+    const lead = selectedLead;
+    if (!lead) {
+      return;
+    }
+    generateEmailDraftForLead(lead, overrides);
+  }
+
+  function runTodayPriorityAction(leadId: string, route: string, preset?: TodayDraftPreset) {
+    setSelectedLeadId(leadId);
+    router.push(route);
+    if (preset) {
+      setQueuedTodayDraft({ leadId, preset });
+    }
   }
 
   function syncInboxThread() {
@@ -985,8 +1030,8 @@ export function CRMFollowUpWorkspace({
         <section className="mt-6 grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
           <TodayPrioritiesPanel
             items={overview.items}
-            selectedLead={selectedLead}
             inboxSummary={overview.inbox_summary}
+            onRunAction={runTodayPriorityAction}
           />
           {overview.relationship_summary ? <RelationshipContinuityPanel summary={overview.relationship_summary} /> : null}
         </section>
@@ -1053,12 +1098,12 @@ function resolveIntakeTask(pathname: string): CRMIntakeTask {
 
 function TodayPrioritiesPanel({
   items,
-  selectedLead,
   inboxSummary,
+  onRunAction,
 }: {
   items: CRMLeadFollowUp[];
-  selectedLead: CRMLeadFollowUp | null;
   inboxSummary: CRMFollowUpOverview["inbox_summary"];
+  onRunAction: (leadId: string, route: string, preset?: TodayDraftPreset) => void;
 }) {
   const replyLead = [...items]
     .filter((item) => item.recent_email_threads.some((thread) => thread.needs_reply))
@@ -1077,7 +1122,7 @@ function TodayPrioritiesPanel({
     .sort((left, right) => compareFreshContextPriority(left, right))[0] ?? null;
   const replyThread = replyLead ? getReplyThread(replyLead) : null;
 
-  const priorities = compactPriorityCards([
+  const priorities = compactPriorityCards<TodayPriorityCardItem>([
     replyLead
       ? {
           id: `${replyLead.id}-reply`,
@@ -1086,6 +1131,14 @@ function TodayPrioritiesPanel({
           title: `Reply to ${replyLead.lead_name}`,
           body: replyThread?.next_touch_hint || replyThread?.memory_summary || getReplySummary(replyLead),
           meta: `${replyLead.company_name} · ${formatDateTime(getNewestThreadTime(replyLead) ?? replyLead.next_follow_up_at)}`,
+          actionLabel: "Draft reply",
+          onAction: () =>
+            onRunAction(replyLead.id, "/clientos/follow-ups", {
+              objective: "follow_up",
+              tone: "warm",
+              length: "short",
+              status: "Drafting a reply from Today...",
+            }),
         }
       : null,
     reconnectLead
@@ -1096,6 +1149,14 @@ function TodayPrioritiesPanel({
           title: `Reconnect with ${reconnectLead.lead_name}`,
           body: reconnectLead.relationship_timing_nudge || reconnectLead.relationship_reminders[0]?.message || reconnectLead.next_step,
           meta: `${reconnectLead.company_name} · last meaningful touch ${formatDateTime(reconnectLead.last_meaningful_interaction_at)}`,
+          actionLabel: "Draft reconnect",
+          onAction: () =>
+            onRunAction(reconnectLead.id, "/clientos/follow-ups", {
+              objective: "revive",
+              tone: "warm",
+              length: "short",
+              status: "Drafting a reconnect from Today...",
+            }),
         }
       : null,
     proposalLead
@@ -1106,6 +1167,14 @@ function TodayPrioritiesPanel({
           title: `Keep momentum with ${proposalLead.lead_name}`,
           body: proposalLead.relationship_timing_nudge || proposalLead.next_step,
           meta: `${proposalLead.company_name} · follow up by ${formatDateTime(proposalLead.next_follow_up_at)}`,
+          actionLabel: "Draft nudge",
+          onAction: () =>
+            onRunAction(proposalLead.id, "/clientos/follow-ups", {
+              objective: "follow_up",
+              tone: "confident",
+              length: "short",
+              status: "Drafting a proposal nudge from Today...",
+            }),
         }
       : null,
     recentUploadLead
@@ -1116,6 +1185,8 @@ function TodayPrioritiesPanel({
           title: `Review new files from ${recentUploadLead.lead_name}`,
           body: recentUploadLead.relationship_recent_upload_summary,
           meta: `${recentUploadLead.company_name} · ${formatDateTime(getLatestUploadContextEntry(recentUploadLead)?.occurred_at ?? null)}`,
+          actionLabel: "Review context",
+          onAction: () => onRunAction(recentUploadLead.id, "/clientos/follow-ups"),
         }
       : null,
     recentContextLead
@@ -1126,11 +1197,13 @@ function TodayPrioritiesPanel({
           title: `New context from ${recentContextLead.lead_name}`,
           body: getLatestContextEntry(recentContextLead)?.summary ?? recentContextLead.notes,
           meta: `${recentContextLead.company_name} · ${formatDateTime(getLatestContextEntry(recentContextLead)?.occurred_at ?? null)}`,
+          actionLabel: "Open relationship",
+          onAction: () => onRunAction(recentContextLead.id, "/clientos/follow-ups"),
         }
       : null,
   ]);
 
-  const fallbackPriorities = items.slice(0, 4).map((item) => ({
+  const fallbackPriorities: TodayPriorityCardItem[] = items.slice(0, 4).map((item) => ({
     id: item.id,
     href: "/clientos/follow-ups",
     eyebrow: "Next touch",
@@ -1179,7 +1252,16 @@ function TodayPrioritiesPanel({
       </div>
       <div className="mt-5 space-y-3">
         {visiblePriorities.map((item) => (
-          <PriorityCard key={item.id} href={item.href} eyebrow={item.eyebrow} title={item.title} body={item.body} meta={item.meta} />
+          <PriorityCard
+            key={item.id}
+            href={item.href}
+            eyebrow={item.eyebrow}
+            title={item.title}
+            body={item.body}
+            meta={item.meta}
+            actionLabel={item.actionLabel}
+            onAction={item.onAction}
+          />
         ))}
       </div>
       <div className="mt-5 grid gap-4 md:grid-cols-3">
@@ -1233,20 +1315,37 @@ function PriorityCard({
   title,
   body,
   meta,
+  actionLabel,
+  onAction,
 }: {
   href: string;
   eyebrow: string;
   title: string;
   body: string;
   meta: string;
+  actionLabel?: string;
+  onAction?: () => void;
 }) {
   return (
-    <Link href={href} className="block rounded-[1.35rem] border bg-slate-50/80 px-5 py-5 transition hover:border-slate-400 hover:bg-white">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{eyebrow}</p>
-      <p className="text-lg font-semibold tracking-tight text-slate-950">{title}</p>
-      <p className="mt-2 text-sm leading-6 text-slate-600">{body}</p>
-      <p className="mt-3 text-xs text-slate-500">{meta}</p>
-    </Link>
+    <div className="rounded-[1.35rem] border bg-slate-50/80 px-5 py-5 transition hover:border-slate-400 hover:bg-white">
+      <Link href={href} className="block">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{eyebrow}</p>
+        <p className="text-lg font-semibold tracking-tight text-slate-950">{title}</p>
+        <p className="mt-2 text-sm leading-6 text-slate-600">{body}</p>
+        <p className="mt-3 text-xs text-slate-500">{meta}</p>
+      </Link>
+      {actionLabel && onAction ? (
+        <div className="mt-4 flex justify-start">
+          <button
+            type="button"
+            onClick={onAction}
+            className="rounded-full border border-slate-300 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-700 transition hover:border-slate-500 hover:text-slate-950"
+          >
+            {actionLabel}
+          </button>
+        </div>
+      ) : null}
+    </div>
   );
 }
 

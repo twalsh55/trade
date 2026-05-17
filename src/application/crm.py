@@ -68,21 +68,22 @@ def _enrich_follow_up(item: LeadFollowUp, current_time: datetime) -> LeadFollowU
     dormant = _is_dormant(item, last_meaningful, current_time)
     reminders = _build_relationship_reminders(item_with_threads, last_meaningful, current_time)
     item_with_reminders = replace(item_with_threads, relationship_reminders=tuple(reminders))
-    context_summary = _build_relationship_context_summary(item_with_reminders)
-    timing_nudge = _build_relationship_timing_nudge(item_with_reminders, current_time)
-    recent_changes_summary = _build_recent_changes_summary(item_with_reminders, current_time)
     recent_upload_summary = _build_recent_upload_summary(item_with_reminders, current_time)
-    last_30_days_summary = _build_last_30_days_summary(item_with_reminders, current_time)
-    meeting_prep_summary = _build_meeting_prep_summary(item_with_reminders, current_time)
-    reconnect_why_now = _build_reconnect_why_now(item_with_reminders, current_time)
-    reconnect_next_move = _build_reconnect_next_move(item_with_reminders, current_time)
-    reconnect_message_hint = _build_reconnect_message_hint(item_with_reminders, current_time)
+    item_with_upload_context = replace(item_with_reminders, relationship_recent_upload_summary=recent_upload_summary)
+    context_summary = _build_relationship_context_summary(item_with_upload_context)
+    timing_nudge = _build_relationship_timing_nudge(item_with_upload_context, current_time)
+    recent_changes_summary = _build_recent_changes_summary(item_with_upload_context, current_time)
+    last_30_days_summary = _build_last_30_days_summary(item_with_upload_context, current_time)
+    meeting_prep_summary = _build_meeting_prep_summary(item_with_upload_context, current_time)
+    reconnect_why_now = _build_reconnect_why_now(item_with_upload_context, current_time)
+    reconnect_next_move = _build_reconnect_next_move(item_with_upload_context, current_time)
+    reconnect_message_hint = _build_reconnect_message_hint(item_with_upload_context, current_time)
     return replace(
-        item_with_reminders,
+        item_with_upload_context,
         last_meaningful_interaction_at=last_meaningful,
         relationship_health_score=health_score,
         relationship_health_label=_health_label(health_score),
-        relationship_state=_relationship_state(health_score, dormant, item_with_reminders, current_time),
+        relationship_state=_relationship_state(health_score, dormant, item_with_upload_context, current_time),
         relationship_timing_nudge=timing_nudge,
         relationship_context_summary=context_summary,
         relationship_recent_changes_summary=recent_changes_summary,
@@ -249,9 +250,19 @@ def _build_relationship_reminders(
 
 def _build_relationship_context_summary(item: LeadFollowUp) -> str:
     parts: list[str] = []
-    latest_timeline = sorted(item.timeline, key=lambda entry: entry.occurred_at, reverse=True)
+    upload_context = _build_upload_memory_snippet(item)
+    if upload_context:
+        parts.append(upload_context.rstrip("."))
+
+    latest_timeline = sorted(
+        (entry for entry in item.timeline if entry.kind != "import"),
+        key=lambda entry: entry.occurred_at,
+        reverse=True,
+    )
     if latest_timeline:
-        parts.append(latest_timeline[0].summary.rstrip("."))
+        timeline_summary = latest_timeline[0].summary.rstrip(".")
+        if not any(timeline_summary.lower() in existing.lower() for existing in parts):
+            parts.append(timeline_summary)
 
     latest_reply_thread = next((thread for thread in sorted(item.recent_email_threads, key=lambda thread: thread.last_message_at, reverse=True) if thread.snippet.strip()), None)
     if latest_reply_thread and latest_reply_thread.snippet.strip():
@@ -259,7 +270,7 @@ def _build_relationship_context_summary(item: LeadFollowUp) -> str:
         if not any(snippet.lower() in existing.lower() for existing in parts):
             parts.append(snippet)
 
-    if item.notes.strip():
+    if item.notes.strip() and not _looks_like_imported_context(item.notes):
         note = item.notes.strip().rstrip(".")
         if not any(note.lower() in existing.lower() for existing in parts):
             parts.append(note)
@@ -298,12 +309,19 @@ def _build_relationship_timing_nudge(item: LeadFollowUp, current_time: datetime)
 def _build_recent_changes_summary(item: LeadFollowUp, current_time: datetime) -> str:
     latest_entries = sorted(item.timeline, key=lambda entry: entry.occurred_at, reverse=True)[:2]
     changes: list[str] = []
+    latest_upload = _get_latest_upload_entry(item)
+    upload_context = _build_upload_memory_snippet(item)
+
+    if latest_upload and upload_context:
+        changes.append(
+            f"{_relative_days(latest_upload.occurred_at, current_time)} new client context landed: {upload_context}"
+        )
 
     if latest_entries:
         latest = latest_entries[0]
-        changes.append(
-            f"{_relative_days(latest.occurred_at, current_time)} Brivoly logged {summarize_timeline_kind(latest.kind)}: {_sentence_case(latest.summary.rstrip('.'))}."
-        )
+        latest_change = f"{_relative_days(latest.occurred_at, current_time)} Brivoly logged {summarize_timeline_kind(latest.kind)}: {_sentence_case(latest.summary.rstrip('.'))}."
+        if latest_change not in changes:
+            changes.append(latest_change)
 
     latest_thread = sorted(item.recent_email_threads, key=lambda thread: thread.last_message_at, reverse=True)[:1]
     if latest_thread:
@@ -324,27 +342,12 @@ def _build_recent_changes_summary(item: LeadFollowUp, current_time: datetime) ->
 
 
 def _build_recent_upload_summary(item: LeadFollowUp, current_time: datetime) -> str:
-    latest_upload = next(
-        (
-            entry
-            for entry in sorted(item.timeline, key=lambda entry: entry.occurred_at, reverse=True)
-            if entry.kind == "import" or entry.channel in {"image", "magic_link", "telegram"}
-        ),
-        None,
-    )
+    latest_upload = _get_latest_upload_entry(item)
     if latest_upload is None:
         return ""
 
     source = _describe_upload_source(latest_upload.channel, latest_upload.summary, item.notes)
-    summary = _sentence_case(latest_upload.summary.rstrip("."))
-    if item.notes.strip() and _looks_like_imported_context(item.notes):
-        note = _sentence_case(item.notes.strip().rstrip("."))
-        if note.lower() not in summary.lower():
-            summary = f"{summary}. Notes captured: {note}."
-        else:
-            summary = f"{summary}."
-    else:
-        summary = _ensure_sentence(summary)
+    summary = _build_upload_memory_snippet(item)
     return f"{_relative_days(latest_upload.occurred_at, current_time)} Brivoly attached new client context from {source}: {summary}"
 
 
@@ -361,6 +364,9 @@ def _build_last_30_days_summary(item: LeadFollowUp, current_time: datetime) -> s
     if len(recent_entries) > 1:
         second = recent_entries[1]
         parts.append(f"Before that, Brivoly logged {summarize_timeline_kind(second.kind)}: {_sentence_case(second.summary.rstrip('.'))}.")
+    upload_context = _build_upload_memory_snippet(item)
+    if upload_context:
+        parts.append(f"Client-shared context recently added: {upload_context}")
     latest_thread = sorted(item.recent_email_threads, key=lambda thread: thread.last_message_at, reverse=True)[:1]
     if latest_thread:
         thread = latest_thread[0]
@@ -373,6 +379,9 @@ def _build_meeting_prep_summary(item: LeadFollowUp, current_time: datetime) -> s
     latest_entries = sorted(item.timeline, key=lambda entry: entry.occurred_at, reverse=True)[:2]
     thread = sorted(item.recent_email_threads, key=lambda thread: thread.last_message_at, reverse=True)[:1]
     parts: list[str] = []
+    upload_context = _build_upload_memory_snippet(item)
+    if upload_context:
+        parts.append(f"Latest client-sent context: {upload_context}")
     if latest_entries:
         parts.append(f"The last meaningful discussion centered on {_sentence_case(latest_entries[0].summary.rstrip('.'))}.")
     if item.next_step.strip():
@@ -462,6 +471,30 @@ def summarize_timeline_kind(kind: str) -> str:
         "email": "an email update",
     }
     return mapping.get(normalized, "an update")
+
+
+def _get_latest_upload_entry(item: LeadFollowUp) -> LeadTimelineEntry | None:
+    return next(
+        (
+            entry
+            for entry in sorted(item.timeline, key=lambda entry: entry.occurred_at, reverse=True)
+            if entry.kind == "import" or entry.channel in {"image", "magic_link", "telegram"}
+        ),
+        None,
+    )
+
+
+def _build_upload_memory_snippet(item: LeadFollowUp) -> str:
+    latest_upload = _get_latest_upload_entry(item)
+    if latest_upload is None:
+        return ""
+    summary = _sentence_case(latest_upload.summary.rstrip("."))
+    if item.notes.strip() and _looks_like_imported_context(item.notes):
+        note = _sentence_case(item.notes.strip().rstrip("."))
+        if note.lower() not in summary.lower():
+            return f"{summary}. Notes captured: {note}."
+        return f"{summary}."
+    return _ensure_sentence(summary)
 
 
 def _describe_upload_source(channel: str, summary: str, notes: str = "") -> str:

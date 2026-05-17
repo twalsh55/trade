@@ -93,13 +93,14 @@ cd web && npm run e2e
 - `/crm` remains as a compatibility alias.
 - Current Client OS capabilities:
   - left taskbar with dedicated Client OS pages
+  - Today priorities with direct draft/review actions
   - follow-up queue
   - inbox-native relationship page for auto-logging email threads
   - email-thread ingestion that can auto-create/update contacts from inbox activity
   - attention board view by relationship stage
   - complete and snooze actions
   - relationship history + internal notes
-  - relationship memory summaries, reconnect cues, and recent upload context
+  - relationship memory summaries that blend email, notes, uploads, reconnect cues, and recent upload context
   - auto email designer for reconnects and follow-ups with in-app draft editing
   - last meaningful interaction tracking
   - dormant client detection

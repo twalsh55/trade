@@ -682,6 +682,8 @@ def test_crm_helper_branches_cover_remaining_health_context_and_merge_paths() ->
     )
     assert "the shared upload link" in _build_recent_upload_summary(upload_follow_up, now)
     assert "Notes captured: Imported from note image." in _build_recent_upload_summary(upload_follow_up, now)
+    assert "Imported from magic link image" in _build_relationship_context_summary(upload_follow_up)
+    assert "Latest client-sent context" in _build_meeting_prep_summary(upload_follow_up, now)
     duplicate_note_follow_up = build_follow_up(
         now=now,
         notes="Imported from phone-note.jpg",
