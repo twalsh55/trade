@@ -1229,6 +1229,8 @@ function TodayPrioritiesPanel({
   const proposalCount = items.filter((item) => isProposalFollowThrough(item)).length;
   const recentUploadCount = items.filter((item) => hasRecentUploadContext(item)).length;
   const freshContextCount = items.filter((item) => hasFreshContext(item)).length;
+  const urgentCount = replyCount + proposalCount + reconnectCount;
+  const contextCount = recentUploadCount + Math.max(0, freshContextCount - recentUploadCount);
 
   return (
     <section className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm">
@@ -1258,29 +1260,23 @@ function TodayPrioritiesPanel({
       </div>
       <div className="mt-5 grid gap-3 md:grid-cols-2">
         <TodaySignal
-          label="Reply pressure"
-          value={replyCount ? String(replyCount) : "Clear"}
-          detail={replyCount ? `conversation${replyCount === 1 ? "" : "s"} waiting on you` : "No replies piling up"}
+          label="Needs you now"
+          value={urgentCount ? String(urgentCount) : "Clear"}
+          detail={
+            urgentCount
+              ? `${replyCount ? `${replyCount} repl${replyCount === 1 ? "y" : "ies"}` : "no replies"}, ${reconnectCount ? `${reconnectCount} reconnect${reconnectCount === 1 ? "" : "s"}` : "no reconnects"}, and ${proposalCount ? `${proposalCount} proposal follow-up${proposalCount === 1 ? "" : "s"}` : "no proposal nudges"} are in play`
+              : "Nothing urgent is stacking up right now"
+          }
         />
         <TodaySignal
-          label="Reconnects"
-          value={reconnectCount ? String(reconnectCount) : "Steady"}
-          detail={reconnectCount ? `relationship${reconnectCount === 1 ? "" : "s"} could cool off` : "No quiet relationships need a nudge"}
-        />
-        <TodaySignal
-          label="Proposal momentum"
-          value={proposalCount ? String(proposalCount) : "Clear"}
-          detail={proposalCount ? `proposal${proposalCount === 1 ? "" : "s"} need follow-through` : "No proposals need a push today"}
-        />
-        <TodaySignal
-          label="Client context"
-          value={recentUploadCount ? String(recentUploadCount) : freshContextCount ? String(freshContextCount) : "Quiet"}
+          label="Fresh context"
+          value={contextCount ? String(contextCount) : "Quiet"}
           detail={
             recentUploadCount
-              ? `client upload${recentUploadCount === 1 ? "" : "s"} landed recently`
+              ? `${recentUploadCount} client upload${recentUploadCount === 1 ? "" : "s"} landed recently`
               : freshContextCount
-                ? `relationship${freshContextCount === 1 ? "" : "s"} picked up new context recently`
-                : "No new context landed overnight"
+                ? `${freshContextCount} relationship${freshContextCount === 1 ? "" : "s"} picked up new context recently`
+                : "No new client context landed overnight"
           }
         />
       </div>
@@ -1326,7 +1322,7 @@ function TodayPrioritiesPanel({
           ))}
         </div>
       ) : null}
-      <div className="mt-5 grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
+      <div className="mt-5 grid gap-4 md:grid-cols-3">
         <QuickLinkCard href="/clientos/follow-ups" title="Relationship memory" body="Keep the last touch, the next touch, and the full story together." />
         <QuickLinkCard href="/clientos/inbox" title="Inbox continuity" body="Let email quietly carry the thread forward instead of asking you to log everything." />
         <QuickLinkCard href="/clientos/intake" title="Client updates" body="Let clients send files and notes without friction when something changes." />
@@ -1359,18 +1355,29 @@ function QuickLinkCard({ href, title, body }: { href: string; title: string; bod
 }
 
 function RelationshipContinuityPanel({ summary }: { summary: NonNullable<CRMFollowUpOverview["relationship_summary"]> }) {
+  const steadyCount = summary.active_count + summary.warm_count;
+  const needsCareCount = summary.drifting_count + summary.stale_count + summary.at_risk_count;
+  const warmMoments = summary.referral_reminder_count + summary.milestone_reminder_count;
   return (
     <section className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm">
       <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Relationship continuity</p>
       <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Stay warm without holding everything in your head.</h2>
-      <div className="mt-5 grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
-        <CompactMetricLight label="Active" value={String(summary.active_count)} tone="positive" />
-        <CompactMetricLight label="Warm" value={String(summary.warm_count)} tone="neutral" />
-        <CompactMetricLight label="Needs care" value={String(summary.drifting_count + summary.stale_count + summary.at_risk_count)} tone="warning" />
+      <div className="mt-5 rounded-[1.3rem] border bg-slate-50/80 px-5 py-5">
+        <p className="text-sm leading-6 text-slate-700">
+          <span className="font-semibold text-slate-950">{steadyCount}</span> relationship{steadyCount === 1 ? "" : "s"} still feel steady.
+          {" "}
+          {needsCareCount
+            ? (
+              <>
+                <span className="font-semibold text-slate-950">{needsCareCount}</span> may need a warmer touch soon.
+              </>
+            )
+            : "Nothing feels especially fragile right now."}
+        </p>
       </div>
-      <div className="mt-4 space-y-3">
-        <TimelineTile label="Warm re-entry paths" value={`${summary.warm_intro_connections.length} contact${summary.warm_intro_connections.length === 1 ? "" : "s"} could help reopen a thread`} />
-        <TimelineTile label="Personal reminders" value={`${summary.referral_reminder_count + summary.milestone_reminder_count} moment${summary.referral_reminder_count + summary.milestone_reminder_count === 1 ? "" : "s"} worth a thoughtful touch`} />
+      <div className="mt-4 grid gap-3 md:grid-cols-2">
+        <TimelineTile label="Warm re-entry paths" value={summary.warm_intro_connections.length ? `${summary.warm_intro_connections.length} contact${summary.warm_intro_connections.length === 1 ? "" : "s"} could help reopen a thread` : "No warm intro paths are mapped yet"} />
+        <TimelineTile label="Thoughtful touchpoints" value={warmMoments ? `${warmMoments} personal or referral moment${warmMoments === 1 ? "" : "s"} could help you reconnect naturally` : "No personal or referral touchpoints are waiting right now"} />
       </div>
     </section>
   );
@@ -1495,8 +1502,10 @@ function PipelineBoardPanel({
                       <div className="mt-3 rounded-xl border bg-slate-50 px-3 py-3">
                         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Best re-entry</p>
                         <p className="mt-2 text-sm leading-6 text-slate-700">{item.relationship_reconnect_next_move || item.next_step}</p>
-                        <p className="mt-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Message angle</p>
-                        <p className="mt-2 text-sm leading-6 text-slate-700">{item.relationship_reconnect_message_hint || item.relationship_timing_nudge}</p>
+                        <p className="mt-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Why it can still land</p>
+                        <p className="mt-2 text-sm leading-6 text-slate-700">{describeReconnectWindow(item)}</p>
+                        <p className="mt-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Starter line</p>
+                        <p className="mt-2 text-sm leading-6 text-slate-700">{buildReconnectStarterLine(item)}</p>
                       </div>
                     ) : null}
                     <p className="mt-3 text-xs text-slate-500">
@@ -1591,7 +1600,7 @@ function PipelineBoardPanel({
                       <p className="mt-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Best next touch</p>
                       <p className="mt-1 text-sm leading-6 text-slate-600">{isReconnectMoment(item) ? item.relationship_reconnect_next_move || item.next_step : item.next_step}</p>
                       {isReconnectMoment(item) ? (
-                        <p className="mt-3 text-sm leading-6 text-slate-600">{item.relationship_reconnect_message_hint || item.relationship_timing_nudge}</p>
+                        <p className="mt-3 text-sm leading-6 text-slate-600">{buildReconnectStarterLine(item)}</p>
                       ) : null}
                     </button>
                   );
@@ -2762,10 +2771,11 @@ function LeadMemoryPanel({
               </Button>
             </div>
           </div>
-          <div className="mt-4 grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
+          <div className="mt-4 grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
             <TimelineTile label="Why now" value={lead.relationship_reconnect_why_now || lead.relationship_timing_nudge || "Brivoly is keeping a reconnect path ready."} />
+            <TimelineTile label="Why it can still land" value={describeReconnectWindow(lead)} />
             <TimelineTile label="Best re-entry" value={lead.relationship_reconnect_next_move || lead.next_step} />
-            <TimelineTile label="Message angle" value={lead.relationship_reconnect_message_hint || "Keep it short, warm, and easy to answer."} />
+            <TimelineTile label="Starter line" value={buildReconnectStarterLine(lead)} />
           </div>
         </section>
       ) : null}
@@ -3016,7 +3026,7 @@ function RelationshipSignalsPanel({ summary }: { summary: NonNullable<CRMFollowU
       <p className="mt-3 text-sm leading-6 text-slate-600">
         Instead of a dashboard full of counters, Brivoly keeps a short read on what is healthy, what is slipping, and where a thoughtful touch could reopen momentum.
       </p>
-      <div className="mt-5 grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
+      <div className="mt-5 space-y-3">
         <TimelineTile
           label="Holding steady"
           value={`${summary.active_count + summary.warm_count} relationship${summary.active_count + summary.warm_count === 1 ? "" : "s"} still feel warm or active`}
@@ -3025,10 +3035,12 @@ function RelationshipSignalsPanel({ summary }: { summary: NonNullable<CRMFollowU
           label="Needs attention"
           value={needsAttention ? `${needsAttention} relationship${needsAttention === 1 ? "" : "s"} may need a warmer touch soon` : "Nothing feels especially fragile right now"}
         />
-        <TimelineTile
-          label="Thoughtful touchpoints"
-          value={warmMoments ? `${warmMoments} personal or referral moment${warmMoments === 1 ? "" : "s"} could help you reconnect naturally` : "No personal or referral touchpoints are waiting right now"}
-        />
+        {warmMoments ? (
+          <TimelineTile
+            label="Thoughtful touchpoints"
+            value={`${warmMoments} personal or referral moment${warmMoments === 1 ? "" : "s"} could help you reconnect naturally`}
+          />
+        ) : null}
       </div>
     </section>
   );
@@ -3582,6 +3594,41 @@ function buildSuggestedResponsePresets(lead: CRMLeadFollowUp) {
 
 function isReconnectMoment(lead: CRMLeadFollowUp) {
   return lead.relationship_state === "stale" || lead.relationship_state === "drifting" || lead.relationship_state === "at_risk";
+}
+
+function describeReconnectWindow(lead: CRMLeadFollowUp) {
+  if (lead.referral_source_name) {
+    return `There is still a warmer path here through ${lead.referral_source_name}.`;
+  }
+  if (lead.relationship_recent_upload_summary) {
+    return "Fresh client context gives you a natural reason to step back in.";
+  }
+  if (lead.recent_email_threads.some((thread) => thread.continuity_memory || thread.carry_forward_hint || thread.unresolved_hint)) {
+    return "Brivoly is still holding enough thread context that you do not need to reopen this cold.";
+  }
+  if (lead.relationship_reminders.length) {
+    return "A personal or company moment gives this a softer reason to reopen now.";
+  }
+  if (lead.last_meaningful_interaction_at) {
+    return "There is still enough recent context to make a brief check-in feel natural.";
+  }
+  return "Keep it light and simple. Brivoly will hold the context you do have.";
+}
+
+function buildReconnectStarterLine(lead: CRMLeadFollowUp) {
+  if (lead.relationship_reconnect_message_hint) {
+    return lead.relationship_reconnect_message_hint;
+  }
+  if (lead.relationship_recent_upload_summary) {
+    return "Wanted to circle back while the new context you sent is still fresh.";
+  }
+  if (lead.relationship_reminders[0]?.message) {
+    return `Wanted to check back in while ${lead.relationship_reminders[0].message.toLowerCase()}`;
+  }
+  if (lead.last_meaningful_interaction_at) {
+    return "Wanted to check back in and make the next step easy from here.";
+  }
+  return "Wanted to reconnect and see if this is worth picking back up.";
 }
 
 function formatReminderKind(value: string) {
