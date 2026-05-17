@@ -537,6 +537,10 @@ def _build_meeting_prep_summary(item: LeadFollowUp, current_time: datetime) -> s
 
 
 def _build_reconnect_why_now(item: LeadFollowUp, current_time: datetime) -> str:
+    upload_context = _build_upload_memory_snippet(item)
+    latest_upload = _get_latest_upload_entry(item)
+    if upload_context and latest_upload:
+        return f"{_relative_days(latest_upload.occurred_at, current_time)} the client shared new context, which gives you a natural way back in."
     if item.relationship_state == "stale":
         if item.last_meaningful_interaction_at:
             return f"It has been {_relative_days(item.last_meaningful_interaction_at, current_time).lower()} since the last meaningful touch."
@@ -566,6 +570,10 @@ def _build_reconnect_next_move(item: LeadFollowUp, current_time: datetime) -> st
         if thread.snippet.strip():
             return f"Restart around the last open thread: {_truncate_sentence(thread.snippet.strip(), 120)}"
 
+    upload_context = _build_upload_memory_snippet(item)
+    if upload_context:
+        return f"Reopen around the fresh client context: {_truncate_sentence(upload_context, 120)}"
+
     if item.next_step.strip():
         return _sentence_case(_ensure_sentence(item.next_step))
     if item.last_meaningful_interaction_at:
@@ -586,6 +594,10 @@ def _build_reconnect_message_hint(item: LeadFollowUp, current_time: datetime) ->
         thread = latest_thread[0]
         if thread.snippet.strip():
             return f'Quick angle: "Wanted to circle back on {_truncate_sentence(thread.snippet.strip(), 90)}"'
+
+    upload_context = _build_upload_memory_snippet(item)
+    if upload_context:
+        return f'Quick angle: "Wanted to follow up while the new context around {_truncate_sentence(upload_context, 90)} is still fresh."'
 
     if item.relationship_context_summary.strip() and item.relationship_context_summary != "Brivoly has not captured enough relationship context yet.":
         return f'Quick angle: "Wanted to circle back while the context around {_truncate_sentence(item.relationship_context_summary, 90)} is still fresh."'

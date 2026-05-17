@@ -104,7 +104,7 @@ cd web && npm run e2e
   - complete and snooze actions
   - relationship history + internal notes
   - relationship memory summaries that blend email, notes, uploads, reconnect cues, and recent upload context
-  - recent client-shared context now has its own memory view, can be pulled straight into the next drafted note, and generates a backend-driven follow-through hint
+  - recent client-shared context now has its own memory view, can be pulled straight into the next drafted note, generates a backend-driven follow-through hint, and now creates a more natural reconnect path plus fresher meeting-prep context
   - auto email designer for reconnects and follow-ups with in-app draft editing
   - last meaningful interaction tracking
   - dormant client detection
@@ -133,7 +133,8 @@ cd web && npm run e2e
   - reconnect guidance now includes a clearer `why it can still land` read plus a starter line for reopening stale, drifting, and at-risk relationships
   - intake and attention copy now lean further into relationship continuity and away from setup / pipeline language
   - text-heavy card layouts now prefer wider 2-column patterns so copy does not collapse into cramped narrow cards
-  - shell, taskbar, import, and handoff copy now consistently point to Client OS instead of older workspace/portal language
+  - shell, taskbar, import, relationship-memory, and handoff copy now consistently point to Client OS instead of older workspace/portal language
+  - overview density is calmer now, with lighter warm-intro panels and a less dashboard-like fallback shell
 
 ### Relationship OS Todo
 

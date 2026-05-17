@@ -629,7 +629,7 @@ export function CRMFollowUpWorkspace({
                   setImportError(null);
                 }}
               >
-                File upload
+                Spreadsheet or file
               </Button>
               <Button
                 variant={sourceType === "google_sheets" ? "default" : "outline"}
@@ -644,13 +644,13 @@ export function CRMFollowUpWorkspace({
                   setImportError(null);
                 }}
               >
-                Google Sheets
+                Sheet link
               </Button>
             </div>
 
             {sourceType === "file_upload" ? (
               <section className="mt-5 rounded-[1.4rem] border bg-slate-50/80 p-5">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Upload a file</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Bring in a file</p>
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -669,7 +669,7 @@ export function CRMFollowUpWorkspace({
                   }}
                 />
                 <p className="mt-3 text-xs text-slate-500">
-                  Supported uploads: CSV, XLSX, XLS, PNG, JPG, JPEG, and WEBP. Note images use paid AI intake. Helpful columns include contact, company, owner, where things stand, next touch, and notes.
+                  Supported formats: CSV, XLSX, XLS, PNG, JPG, JPEG, and WEBP. Note images use the paid AI memory layer. Helpful columns include contact, company, owner, where things stand, next touch, and notes.
                 </p>
                 {selectedFile ? <p className="mt-2 text-sm font-medium text-slate-700">{selectedFile.name}</p> : null}
                 {selectedFile && isImageFile(selectedFile.name) ? (
@@ -680,7 +680,7 @@ export function CRMFollowUpWorkspace({
               </section>
             ) : (
               <section className="mt-5 rounded-[1.4rem] border bg-slate-50/80 p-5">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Google Sheets link</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Sheet link</p>
                 <input
                   value={sheetUrl}
                   onChange={(event) => {
@@ -696,7 +696,7 @@ export function CRMFollowUpWorkspace({
                   placeholder="https://docs.google.com/spreadsheets/d/..."
                   className="mt-3 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400"
                 />
-                <p className="mt-3 text-xs text-slate-500">Use a shareable Google Sheets URL. Brivoly will request the CSV export directly.</p>
+                <p className="mt-3 text-xs text-slate-500">Use a shareable Google Sheets URL. Brivoly will pull the sheet in directly.</p>
               </section>
             )}
 
@@ -1071,7 +1071,7 @@ function CRMViewHeader({ view }: { view: CRMWorkspaceView }) {
     intake: {
       eyebrow: "Client handoff",
       title: "Make it easy for clients to send context when it matters.",
-      body: "Use no-login upload links, light routing rules, and mobile-first capture so updates land where the relationship already lives.",
+      body: "Use no-login upload links, simple default paths, and mobile-first capture so updates land in relationship memory without extra back-and-forth.",
     },
   }[view];
 
@@ -2970,11 +2970,11 @@ function LeadMemoryPanel({
       </section>
 
       <section className="mt-6 rounded-[1.5rem] border bg-white p-5">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Add context</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Keep the memory current</p>
         <textarea
           value={noteDraft}
           onChange={(event) => onNoteDraftChange(event.target.value)}
-          placeholder="Capture discovery context, objections, handoff notes, or what changed after the last touch."
+          placeholder="Capture what changed, what matters, or what you will want to remember before the next touch."
           className="mt-3 min-h-28 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:bg-white"
         />
         <div className="mt-4 flex items-center justify-between gap-4">
@@ -3048,26 +3048,26 @@ function RelationshipSignalsPanel({ summary }: { summary: NonNullable<CRMFollowU
 
 function WarmIntroGraphPanel({ summary }: { summary: NonNullable<CRMFollowUpOverview["relationship_summary"]> }) {
   return (
-    <section className="rounded-[1.75rem] border bg-slate-950 p-6 text-slate-50 shadow-[0_24px_80px_-55px_rgba(15,23,42,0.9)]">
-      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300">Warm paths back in</p>
-      <h2 className="mt-3 text-3xl font-semibold tracking-tight">Know who can help reopen a quiet conversation.</h2>
-      <p className="mt-3 text-sm leading-6 text-slate-300">
-        Brivoly keeps track of referral-backed relationships so a reconnect can come through a warmer path instead of another cold nudge.
+    <section className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm">
+      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Warm ways back in</p>
+      <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Know who can help you reopen a quiet relationship more naturally.</h2>
+      <p className="mt-3 text-sm leading-6 text-slate-600">
+        When a past intro or referral gives you a softer re-entry path, Brivoly keeps it close instead of leaving it buried in old notes.
       </p>
-      <div className="mt-5 space-y-3">
+      <div className="mt-5 grid gap-3 md:grid-cols-2">
         {summary.warm_intro_connections.length ? (
           summary.warm_intro_connections.map((connection) => (
-            <div key={`${connection.source_name}-${connection.target_lead_id}`} className="rounded-[1.2rem] border border-white/10 bg-white/5 px-4 py-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">{connection.source_name}</p>
-              <p className="mt-2 text-sm text-slate-200">
-                can reopen <span className="font-medium text-white">{connection.target_lead_name}</span> at {connection.target_company_name}
+            <div key={`${connection.source_name}-${connection.target_lead_id}`} className="rounded-[1.2rem] border bg-slate-50/80 px-4 py-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{connection.source_name}</p>
+              <p className="mt-2 text-sm text-slate-700">
+                could help reopen <span className="font-medium text-slate-950">{connection.target_lead_name}</span> at {connection.target_company_name}
               </p>
-              <p className="mt-2 text-xs text-slate-400">Owner: {connection.owner_name}</p>
+              <p className="mt-2 text-xs text-slate-500">Best person to pick it up: {connection.owner_name}</p>
             </div>
           ))
         ) : (
-          <div className="rounded-[1.2rem] border border-dashed border-white/10 bg-white/5 px-4 py-4 text-sm text-slate-300">
-            No warm intro links are mapped yet. Capture referral sources on leads so Brivoly can turn them into usable paths.
+          <div className="rounded-[1.2rem] border border-dashed bg-slate-50/80 px-4 py-4 text-sm text-slate-600">
+            No warm intro links are mapped yet. When you save referral context on a relationship, Brivoly can turn it into a softer path back in later.
           </div>
         )}
       </div>

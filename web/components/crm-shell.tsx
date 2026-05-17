@@ -46,11 +46,12 @@ export function CRMShell({ data }: { data: CRMPageData }) {
           </button>
         </div>
       </section>
-      <section className="mt-6 grid gap-6 lg:grid-cols-4">
-        <FeatureCard title="Today" body="Start with the relationships that need you first." />
-        <FeatureCard title="Relationships" body="Keep notes, continuity, and the next touch in one place." />
-        <FeatureCard title="Attention" body="Spot quiet or slipping relationships before they cool off." />
-        <FeatureCard title="Context" body="Bring older spreadsheets, uploads, and new client context back into memory." />
+      <section className="mt-6 rounded-[1.5rem] border bg-white/85 p-5 shadow-sm">
+        <p className="ui-eyebrow text-slate-500">What should appear here</p>
+        <div className="mt-3 grid gap-3 md:grid-cols-2">
+          <FeatureCard title="Today" body="Start with the relationships that need you first, plus the freshest client context." />
+          <FeatureCard title="Relationship memory" body="Keep notes, continuity, uploads, and the next touch close together." />
+        </div>
       </section>
     </>
   );
@@ -89,9 +90,9 @@ function resolveCRMView(pathname: string): CRMWorkspaceView {
 
 function FeatureCard({ title, body }: { title: string; body: string }) {
   return (
-    <section className="rounded-[1.6rem] border bg-white/80 p-6 shadow-sm">
-      <h2 className="text-2xl font-semibold tracking-tight text-slate-950">{title}</h2>
-      <p className="mt-3 text-sm leading-7 text-slate-600">{body}</p>
+    <section className="rounded-[1.25rem] border bg-slate-50/80 px-4 py-4">
+      <h2 className="text-lg font-semibold tracking-tight text-slate-950">{title}</h2>
+      <p className="mt-2 text-sm leading-6 text-slate-600">{body}</p>
     </section>
   );
 }
