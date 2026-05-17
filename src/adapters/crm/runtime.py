@@ -1,19 +1,32 @@
 from __future__ import annotations
 
+import os
+from functools import lru_cache
+
+from psycopg import OperationalError
+
 from src.adapters.crm.in_memory_follow_up_repository import InMemoryLeadFollowUpRepository
+from src.adapters.crm.postgres_follow_up_repository import PostgresLeadFollowUpRepository
 from src.adapters.llm.openai_crm_image_intake import OpenAICRMImageIntakeAgent
 from src.adapters.llm.openai_crm_spreadsheet_assist import OpenAICRMSpreadsheetAssistAgent
 from src.env_utils import get_first_configured_env
 
 
-_repository: InMemoryLeadFollowUpRepository | None = None
+@lru_cache(maxsize=1)
+def build_lead_follow_up_repository() -> InMemoryLeadFollowUpRepository | PostgresLeadFollowUpRepository:
+    database_url = os.getenv("DATABASE_URL", "").strip()
+    if not database_url:
+        return InMemoryLeadFollowUpRepository()
 
-
-def build_lead_follow_up_repository() -> InMemoryLeadFollowUpRepository:
-    global _repository
-    if _repository is None:
-        _repository = InMemoryLeadFollowUpRepository()
-    return _repository
+    repository = PostgresLeadFollowUpRepository(database_url=database_url)
+    try:
+        repository.ensure_schema()
+    except OperationalError as exc:
+        raise RuntimeError(
+            "CRM database is unavailable. Check DATABASE_URL. "
+            "Railway internal hostnames such as 'postgres.railway.internal' only work inside Railway's private network."
+        ) from exc
+    return repository
 
 
 def build_crm_image_intake_agent_from_env() -> OpenAICRMImageIntakeAgent:

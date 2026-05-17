@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 import pytest
+from psycopg import OperationalError
 
 from src.adapters.crm.in_memory_follow_up_repository import InMemoryLeadFollowUpRepository
 from src.adapters.crm import runtime as crm_runtime
@@ -80,11 +81,52 @@ def test_in_memory_lead_follow_up_repository_supports_complete_snooze_and_notes(
     assert imported_row.owner_name == "Samir Patel"
 
 
-def test_build_lead_follow_up_repository_returns_singleton() -> None:
-    crm_runtime._repository = None
+def test_build_lead_follow_up_repository_returns_singleton(monkeypatch) -> None:
+    crm_runtime.build_lead_follow_up_repository.cache_clear()
+    monkeypatch.delenv("DATABASE_URL", raising=False)
     first = crm_runtime.build_lead_follow_up_repository()
     second = crm_runtime.build_lead_follow_up_repository()
     assert first is second
+    crm_runtime.build_lead_follow_up_repository.cache_clear()
+
+
+def test_build_lead_follow_up_repository_uses_postgres_when_database_url_is_set(monkeypatch) -> None:
+    crm_runtime.build_lead_follow_up_repository.cache_clear()
+    monkeypatch.setenv("DATABASE_URL", "postgres://example")
+
+    class FakeRepository:
+        def __init__(self, database_url: str) -> None:
+            self.database_url = database_url
+            self.ensured = False
+
+        def ensure_schema(self) -> None:
+            self.ensured = True
+
+    monkeypatch.setattr(crm_runtime, "PostgresLeadFollowUpRepository", FakeRepository)
+
+    repository = crm_runtime.build_lead_follow_up_repository()
+
+    assert repository.database_url == "postgres://example"
+    assert repository.ensured is True
+    crm_runtime.build_lead_follow_up_repository.cache_clear()
+
+
+def test_build_lead_follow_up_repository_raises_clear_error_when_crm_database_is_unavailable(monkeypatch) -> None:
+    crm_runtime.build_lead_follow_up_repository.cache_clear()
+    monkeypatch.setenv("DATABASE_URL", "postgres://example")
+
+    class BrokenRepository:
+        def __init__(self, database_url: str) -> None:
+            self.database_url = database_url
+
+        def ensure_schema(self) -> None:
+            raise OperationalError("down")
+
+    monkeypatch.setattr(crm_runtime, "PostgresLeadFollowUpRepository", BrokenRepository)
+
+    with pytest.raises(RuntimeError, match="CRM database is unavailable"):
+        crm_runtime.build_lead_follow_up_repository()
+    crm_runtime.build_lead_follow_up_repository.cache_clear()
 
 
 def test_build_crm_image_intake_agent_from_env_uses_app_key(monkeypatch) -> None:

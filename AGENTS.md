@@ -93,6 +93,8 @@ cd web && npm run e2e
 - `/crm` remains as a compatibility alias.
 - Current Client OS capabilities:
   - left taskbar with dedicated Client OS pages
+  - CRM relationship memory now persists in Postgres when `DATABASE_URL` is configured, including imported follow-ups, notes, timeline history, and inbox-ingested thread state
+  - anonymous guest mode now bootstraps the sample relationship set once into durable CRM storage instead of rebuilding it from process memory on every restart
   - Today priorities with a clear `Start here` focus card, direct draft/review actions, action-labeled quick-start pills, calmer 2-column summary layouts, and stronger upload-aware next-touch framing
   - follow-up queue
   - inbox-native relationship page for auto-logging email threads and reconnect-aware next moves
