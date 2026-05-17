@@ -47,6 +47,7 @@ class LeadEmailThreadSummary:
     open_loop: str = ""
     relationship_pulse: str = ""
     continuity_span: str = ""
+    recent_change_hint: str = ""
 
 
 @dataclass(frozen=True)

@@ -231,6 +231,10 @@ class LeadEmailThreadSummaryDTO:
     waiting_on_contact: bool
     memory_summary: str
     next_touch_hint: str
+    open_loop: str
+    relationship_pulse: str
+    continuity_span: str
+    recent_change_hint: str
 
 
 @dataclass(frozen=True)
@@ -631,6 +635,10 @@ def build_lead_email_thread_summary_dto(thread: LeadEmailThreadSummary) -> LeadE
         waiting_on_contact=thread.waiting_on_contact,
         memory_summary=thread.memory_summary,
         next_touch_hint=thread.next_touch_hint,
+        open_loop=thread.open_loop,
+        relationship_pulse=thread.relationship_pulse,
+        continuity_span=thread.continuity_span,
+        recent_change_hint=thread.recent_change_hint,
     )
 
 

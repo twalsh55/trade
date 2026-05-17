@@ -37,6 +37,7 @@ from src.application.crm import (
     _build_thread_next_touch_hint,
     _build_thread_open_loop,
     _build_thread_relationship_pulse,
+    _build_thread_recent_change_hint,
     _build_thread_continuity_span,
     _compute_relationship_health_score,
     _describe_upload_source,
@@ -327,6 +328,7 @@ def test_follow_up_overview_enriches_relationship_intelligence() -> None:
     assert amber.recent_email_threads[0].open_loop
     assert amber.recent_email_threads[0].relationship_pulse
     assert amber.recent_email_threads[0].continuity_span
+    assert amber.recent_email_threads[0].recent_change_hint
     assert overview.relationship_summary is not None
     assert overview.relationship_summary.stale_count >= 1
     assert overview.relationship_summary.referral_reminder_count >= 1
@@ -471,6 +473,9 @@ def test_crm_helper_branches_cover_thread_memory_and_timing_paths() -> None:
         needs_reply=False,
         waiting_on_contact=False,
     )
+    reply_snippet_thread = replace(reply_thread, snippet="pricing concern came up again")
+    waiting_snippet_thread = replace(waiting_thread, snippet="sent revised onboarding recap")
+    active_snippet_thread = replace(active_thread, snippet="they approved the revised scope")
 
     next_step_lead = build_follow_up(now=now, next_step="check in next week", notes="", threads=(reply_thread,))
     notes_lead = build_follow_up(now=now, next_step="   ", notes="notes only", threads=(waiting_thread,))
@@ -505,6 +510,17 @@ def test_crm_helper_branches_cover_thread_memory_and_timing_paths() -> None:
     assert "Single-message thread" in _build_thread_continuity_span(reply_thread, now)
     assert "2-message exchange" in _build_thread_continuity_span(light_thread, now)
     assert "4-message thread" in _build_thread_continuity_span(active_thread, now)
+    assert "New since your last touch" in _build_thread_recent_change_hint(next_step_lead, reply_snippet_thread, now)
+    assert "Last thing you sent" in _build_thread_recent_change_hint(notes_lead, waiting_snippet_thread, now)
+    assert "Most recent turn" in _build_thread_recent_change_hint(empty_lead, active_snippet_thread, now)
+    assert "Fresh context around this thread" in _build_thread_recent_change_hint(upload_context_lead, light_thread, now)
+    assert "Something shifted recently." in _build_thread_recent_change_hint(
+        replace(empty_lead, relationship_recent_changes_summary="Something shifted recently."),
+        quiet_thread,
+        now,
+    )
+    assert "Still orbiting" in _build_thread_recent_change_hint(next_step_lead, reply_thread, now)
+    assert "Not much shifted here" in _build_thread_recent_change_hint(empty_lead, quiet_thread, now)
 
 
 def test_crm_helper_branches_cover_relationship_summaries() -> None:

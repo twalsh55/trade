@@ -106,6 +106,7 @@ def _build_enriched_threads(item: LeadFollowUp, current_time: datetime) -> list[
             open_loop=_build_thread_open_loop(item, thread),
             relationship_pulse=_build_thread_relationship_pulse(item, thread, current_time),
             continuity_span=_build_thread_continuity_span(thread, current_time),
+            recent_change_hint=_build_thread_recent_change_hint(item, thread, current_time),
         )
         for thread in item.recent_email_threads
     ]
@@ -169,6 +170,25 @@ def _build_thread_continuity_span(thread: LeadEmailThreadSummary, current_time: 
     if thread.message_count >= 2:
         return f"{thread.message_count}-message exchange, latest turn {recency}."
     return f"Single-message thread, latest turn {recency}."
+
+
+def _build_thread_recent_change_hint(item: LeadFollowUp, thread: LeadEmailThreadSummary, current_time: datetime) -> str:
+    snippet = thread.snippet.strip().rstrip(".")
+    if snippet:
+        condensed = _truncate_sentence(_sentence_case(snippet), 120)
+        if thread.needs_reply:
+            return f"New since your last touch: {condensed}"
+        if thread.waiting_on_contact:
+            return f"Last thing you sent: {condensed}"
+        return f"Most recent turn: {condensed}"
+    upload_context = _build_upload_memory_snippet(item)
+    if upload_context:
+        return f"Fresh context around this thread: {upload_context}"
+    if item.relationship_recent_changes_summary.strip():
+        return _truncate_sentence(item.relationship_recent_changes_summary.strip(), 120)
+    if item.next_step.strip():
+        return f"Still orbiting: {_ensure_sentence(_sentence_case(item.next_step.strip().rstrip('.')))}"
+    return f"Not much shifted here since {_relative_days(thread.last_message_at, current_time).lower()}."
 
 
 def _resolve_last_meaningful_interaction(item: LeadFollowUp) -> datetime | None:

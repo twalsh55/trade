@@ -150,6 +150,7 @@ export type CRMEmailThreadSummary = {
   open_loop: string;
   relationship_pulse: string;
   continuity_span: string;
+  recent_change_hint: string;
 };
 
 export type CRMRelationshipReminder = {
