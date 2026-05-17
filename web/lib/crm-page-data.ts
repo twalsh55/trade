@@ -11,7 +11,18 @@ import {
 } from "@/lib/api";
 import { resolveUserDisplayName } from "@/lib/user-display";
 
-export async function loadCRMPageData() {
+export type CRMPageData = {
+  bootstrap: Awaited<ReturnType<typeof getSettingsBootstrap>> | null;
+  session: Awaited<ReturnType<typeof getSession>> | null;
+  user: Awaited<ReturnType<typeof getSession>>["user"] | null | undefined;
+  userLabel: string | null;
+  followUps: Awaited<ReturnType<typeof getCrmFollowUpOverview>> | null;
+  accountSettings: Awaited<ReturnType<typeof getAccountSettings>> | null;
+  billing: Awaited<ReturnType<typeof getBillingOverview>> | null;
+  intakeChannel: Awaited<ReturnType<typeof getCrmRemoteIntakeChannel>> | null;
+};
+
+export async function loadCRMPageData(): Promise<CRMPageData> {
   const cookieStore = await cookies();
   const sessionToken =
     cookieStore.get(BRIVOLY_SESSION_COOKIE)?.value ?? cookieStore.get(LEGACY_TRADE_SESSION_COOKIE)?.value ?? null;

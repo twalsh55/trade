@@ -1,7 +1,3 @@
-import { CRMPortalPage } from "@/components/crm-portal-page";
-
-export const dynamic = "force-dynamic";
-
-export default async function CRMPortalRoute() {
-  return <CRMPortalPage view="overview" />;
+export default function CRMPortalRoute() {
+  return null;
 }
