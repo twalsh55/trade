@@ -294,6 +294,7 @@ export type CRMMailboxSendResult = {
   follow_up_id: string;
   thread_id: string;
   sent_at: string;
+  continuity_note: string;
   overview: CRMFollowUpOverview;
 };
 

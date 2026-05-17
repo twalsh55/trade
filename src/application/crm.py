@@ -1745,6 +1745,7 @@ class SendLeadFollowUpEmailUseCase:
             thread_id=resolved_thread_id,
             sent_at=current_time,
             overview=overview,
+            continuity_note=receipt.continuity_note if connection.connection_mode == "oauth" else "Saved as an outbound note inside Brivoly's relationship memory.",
         )
 
 

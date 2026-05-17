@@ -1061,7 +1061,7 @@ export function CRMFollowUpWorkspace({
           }),
         });
         const body = (await response.json().catch(() => null)) as
-          | { connection: CRMMailboxConnection; overview: CRMFollowUpOverview; sent_at: string }
+          | { connection: CRMMailboxConnection; overview: CRMFollowUpOverview; sent_at: string; continuity_note: string }
           | { error?: string }
           | null;
         if (!response.ok || !body || !("connection" in body)) {
@@ -1070,7 +1070,9 @@ export function CRMFollowUpWorkspace({
         setOverview(body.overview);
         upsertMailboxConnection(body.connection);
         setEmailStatus(
-          `Sent through ${body.connection.provider === "gmail" ? "Gmail" : "Outlook"} at ${body.connection.email_address}${selectedThread ? ` and kept attached to ${selectedThread.subject}.` : "."}`,
+          body.continuity_note.trim()
+            ? `${body.continuity_note} Sent through ${body.connection.provider === "gmail" ? "Gmail" : "Outlook"} at ${body.connection.email_address}.`
+            : `Sent through ${body.connection.provider === "gmail" ? "Gmail" : "Outlook"} at ${body.connection.email_address}${selectedThread ? ` and kept attached to ${selectedThread.subject}.` : "."}`,
         );
         router.refresh();
       } catch (sendError) {

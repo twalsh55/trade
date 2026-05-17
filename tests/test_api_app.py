@@ -280,6 +280,7 @@ class FakeMailboxProvider:
                 body_text=body,
                 snippet=body[:280],
             ),
+            continuity_note="Sent back into the same provider thread.",
         )
 
 
@@ -1208,6 +1209,33 @@ def test_crm_mailbox_sync_endpoint_updates_relationship_memory() -> None:
     assert payload["synced_threads"] >= 1
     assert payload["connection"]["last_sync_status"] == "ok"
     assert payload["overview"]["inbox_summary"]["active_thread_count"] >= 1
+
+
+def test_crm_followup_send_endpoint_returns_continuity_note() -> None:
+    repository = InMemoryLeadFollowUpRepository(now=lambda: datetime(2024, 5, 17, 12, 30, tzinfo=UTC))
+    client = make_client(user=make_user(), lead_follow_up_repository=repository)
+
+    connection = client.post(
+        "/api/crm/inbox/mailboxes/oauth/complete",
+        headers={"Authorization": "Bearer session-token"},
+        json={"provider": "gmail", "code": "auth-code", "state": api_app_module._build_mailbox_oauth_state(make_user(), "gmail", datetime(2024, 5, 6, 12, 30, tzinfo=UTC))},
+    )
+    assert connection.status_code == 200
+
+    response = client.post(
+        "/api/crm/followups/lead-amber-studio/send",
+        headers={"Authorization": "Bearer session-token"},
+        json={
+            "subject": "Quick follow-up",
+            "body": "Wanted to keep this moving without making you dig for context.",
+            "thread_id": "thread-amber-recap",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["continuity_note"] == "Sent back into the same provider thread."
+    assert payload["connection"]["last_sync_status"] == "sent"
 
 
 def test_account_privacy_export_returns_settings_mailboxes_and_relationship_memory() -> None:

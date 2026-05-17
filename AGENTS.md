@@ -117,6 +117,7 @@ cd web && npm run e2e
   - email-thread ingestion that can auto-create/update contacts from inbox activity
   - mailbox sync now feeds the same inbox-ingest path Brivoly already uses, so provider-synced email activity and provider watch callbacks land in relationship memory instead of a separate mailbox subsystem
   - sending a drafted note now writes the outbound message back into the same relationship timeline and thread history, including notes sent through the provider-backed mailbox path, now carries forward stored external message ids for better reply continuity, and now keeps the selected inbox thread attached all the way from Inbox / Today into the composer send path
+  - provider-backed sends now also return a calmer continuity note so Brivoly can tell the user whether it truly replied inside the same Gmail / Outlook conversation or had to fall back to a fresh provider note while still keeping relationship memory attached
   - account settings now include locale defaults, retention-window defaults, an AI-processing toggle, and privacy-consent metadata as the first localization/GDPR groundwork layer
   - `/api/account/privacy/export` and the settings export action can now download a JSON snapshot of account settings, connected mailboxes, and stored relationship memory for GDPR-oriented export groundwork
   - `/api/account/privacy/erase` and the settings erase actions can now clear stored relationship memory or wipe memory plus connected mailbox links as an early GDPR delete/control path

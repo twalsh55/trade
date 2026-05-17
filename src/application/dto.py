@@ -341,6 +341,7 @@ class MailboxSendResultDTO:
     follow_up_id: str
     thread_id: str
     sent_at: str
+    continuity_note: str
     overview: "LeadFollowUpOverviewDTO"
 
 
@@ -815,6 +816,7 @@ def build_mailbox_send_result_dto(result: MailboxSendResult) -> MailboxSendResul
         follow_up_id=result.follow_up_id,
         thread_id=result.thread_id,
         sent_at=result.sent_at.isoformat(),
+        continuity_note=result.continuity_note,
         overview=build_lead_follow_up_overview_dto(result.overview),
     )
 

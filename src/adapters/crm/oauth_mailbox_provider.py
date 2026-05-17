@@ -281,6 +281,11 @@ class OAuthMailboxProviderAdapter(MailboxProviderPort):
             resolved_thread_id = _optional_string(response_payload.get("threadId")) or thread_id or f"gmail-{uuid4().hex[:12]}"
             message_id = _optional_string(response_payload.get("id")) or f"gmail-sent-{uuid4().hex[:12]}"
             external_message_id = generated_message_id
+            continuity_note = (
+                "Sent back into the same Gmail conversation."
+                if thread_id and reply_to_external_message_id
+                else "Sent through Gmail and kept tied to this relationship memory."
+            )
         else:
             external_message_id = f"<outlook-{uuid4().hex[:18]}@brivoly.mail>"
             provider_message_id, conversation_id = (
@@ -316,6 +321,7 @@ class OAuthMailboxProviderAdapter(MailboxProviderPort):
                     expect_json=False,
                 )
                 message_id = draft_id
+                continuity_note = "Replied inside the same Outlook conversation."
             else:
                 resolved_thread_id, message_id = self._send_outlook_message(
                     hydrated,
@@ -326,6 +332,11 @@ class OAuthMailboxProviderAdapter(MailboxProviderPort):
                     thread_id=thread_id,
                     external_message_id=external_message_id,
                     reply_to_external_message_id=reply_to_external_message_id,
+                )
+                continuity_note = (
+                    "Sent through Outlook as a fresh provider note while Brivoly kept the relationship thread attached."
+                    if reply_to_external_message_id
+                    else "Sent through Outlook and kept tied to this relationship memory."
                 )
 
         sent_message = MailboxThreadMessage(
@@ -352,6 +363,7 @@ class OAuthMailboxProviderAdapter(MailboxProviderPort):
             ),
             thread_id=resolved_thread_id,
             message=sent_message,
+            continuity_note=continuity_note,
         )
 
     def _send_outlook_message(

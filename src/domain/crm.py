@@ -165,6 +165,7 @@ class MailboxSendReceipt:
     connection: MailboxConnection
     thread_id: str
     message: MailboxThreadMessage
+    continuity_note: str = ""
 
 
 @dataclass(frozen=True)
@@ -255,6 +256,7 @@ class MailboxSendResult:
     thread_id: str
     sent_at: datetime
     overview: LeadFollowUpOverview
+    continuity_note: str = ""
 
 
 @dataclass(frozen=True)
