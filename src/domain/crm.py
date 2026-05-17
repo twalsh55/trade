@@ -46,6 +46,7 @@ class LeadEmailThreadSummary:
     next_touch_hint: str = ""
     open_loop: str = ""
     relationship_pulse: str = ""
+    continuity_span: str = ""
 
 
 @dataclass(frozen=True)

@@ -1213,6 +1213,8 @@ function TodayPrioritiesPanel({
     meta: `${item.lead_name} · ${formatDateTime(item.next_follow_up_at)}`,
   }));
   const visiblePriorities = (priorities.length ? priorities : fallbackPriorities).slice(0, 4);
+  const primaryPriority = visiblePriorities[0] ?? null;
+  const secondaryPriorities = visiblePriorities.slice(1);
 
   const replyCount = inboxSummary?.needs_reply_count ?? 0;
   const reconnectCount = items.filter((item) => item.relationship_state === "stale" || item.relationship_state === "at_risk" || item.relationship_state === "drifting").length;
@@ -1255,20 +1257,46 @@ function TodayPrioritiesPanel({
           }
         />
       </div>
-      <div className="mt-5 space-y-3">
-        {visiblePriorities.map((item) => (
-          <PriorityCard
-            key={item.id}
-            href={item.href}
-            eyebrow={item.eyebrow}
-            title={item.title}
-            body={item.body}
-            meta={item.meta}
-            actionLabel={item.actionLabel}
-            onAction={item.onAction}
-          />
-        ))}
-      </div>
+      {primaryPriority ? (
+        <div className="mt-5 rounded-[1.5rem] border border-slate-900 bg-slate-950 px-5 py-5 text-white shadow-sm">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="max-w-2xl">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">Start here</p>
+              <p className="mt-2 text-2xl font-semibold tracking-tight">{primaryPriority.title}</p>
+              <p className="mt-3 text-sm leading-6 text-slate-200">{primaryPriority.body}</p>
+              <p className="mt-4 text-xs text-slate-300">{primaryPriority.meta}</p>
+            </div>
+            <div className="flex flex-wrap gap-2 lg:justify-end">
+              <Button
+                type="button"
+                onClick={primaryPriority.onAction}
+                className="border border-white/20 bg-white text-slate-950 hover:bg-slate-100"
+              >
+                {primaryPriority.actionLabel ?? "Open"}
+              </Button>
+              <Button asChild variant="outline" className="border-white/20 bg-transparent text-white hover:bg-white/10 hover:text-white">
+                <Link href={primaryPriority.href}>Open context</Link>
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {secondaryPriorities.length ? (
+        <div className="mt-5 grid gap-3 md:grid-cols-2">
+          {secondaryPriorities.map((item) => (
+            <PriorityCard
+              key={item.id}
+              href={item.href}
+              eyebrow={item.eyebrow}
+              title={item.title}
+              body={item.body}
+              meta={item.meta}
+              actionLabel={item.actionLabel}
+              onAction={item.onAction}
+            />
+          ))}
+        </div>
+      ) : null}
       <div className="mt-5 grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
         <QuickLinkCard href="/clientos/follow-ups" title="Relationship memory" body="Keep the last touch, the next touch, and the full story together." />
         <QuickLinkCard href="/clientos/inbox" title="Inbox continuity" body="Let email quietly update context instead of asking you to log everything." />
@@ -1587,6 +1615,8 @@ function InboxActivityPanel({
     )
     .sort((left, right) => new Date(right.thread.last_message_at).getTime() - new Date(left.thread.last_message_at).getTime());
   const filteredThreads = threads.filter((item) => matchesInboxThread(item, inboxQuery, inboxFilter));
+  const urgentThreads = filteredThreads.filter(({ thread }) => thread.needs_reply || thread.waiting_on_contact || isQuietThread(thread));
+  const steadyThreads = filteredThreads.filter(({ thread }) => !(thread.needs_reply || thread.waiting_on_contact || isQuietThread(thread)));
 
   return (
     <section className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm">
@@ -1626,82 +1656,39 @@ function InboxActivityPanel({
           {filteredThreads.length} conversation{filteredThreads.length === 1 ? "" : "s"} match the current view.
         </p>
       </div>
-      <div className="mt-6 space-y-4">
-        {filteredThreads.map(({ leadId, leadName, companyName, stage, thread }) => {
-          const selected = leadId === selectedLeadId;
-          return (
-            <div
-              key={thread.thread_id}
-              className={`block w-full rounded-[1.35rem] border px-5 py-5 text-left transition ${
-                selected ? "border-slate-900 bg-white shadow-sm" : "bg-slate-50/80 hover:border-slate-400 hover:bg-white"
-              }`}
-            >
-              <button type="button" onClick={() => onSelectLead(leadId)} className="block w-full text-left">
-              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                    {formatStageLabel(stage)} · {thread.last_message_direction === "inbound" ? "Needs your reply" : "Waiting on them"}
-                  </p>
-                  <h3 className="mt-2 text-xl font-semibold tracking-tight text-slate-950">{thread.subject}</h3>
-                  <p className="mt-1 text-sm text-slate-600">
-                    {leadName} · {companyName}
-                  </p>
-                  <p className="mt-3 text-sm font-medium text-slate-900">{thread.relationship_pulse}</p>
-                  <p className="mt-3 text-sm leading-6 text-slate-600">{thread.memory_summary}</p>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  {thread.needs_reply ? <MiniFlag tone="critical" label="Reply" /> : null}
-                  {thread.waiting_on_contact ? <MiniFlag tone="warning" label="Waiting" /> : null}
-                  {isQuietThread(thread) ? <MiniFlag tone="neutral" label="Quiet" /> : null}
-                  <div className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">
-                    {thread.message_count} msg
-                  </div>
-                </div>
+      <div className="mt-6 space-y-6">
+        {urgentThreads.length ? (
+          <div>
+            <div className="flex items-end justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Needs you now</p>
+                <p className="mt-2 text-sm leading-6 text-slate-600">These threads are waiting on your reply, sitting quiet, or are worth reopening before they cool off.</p>
               </div>
-              <div className="mt-4 grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
-                <TimelineTile label="Brivoly read" value={thread.next_touch_hint} />
-                <TimelineTile label="Open loop" value={thread.open_loop} />
-                <TimelineTile label="Last message" value={formatDateTime(thread.last_message_at)} />
-              </div>
-              </button>
-              <div className="mt-4 flex flex-wrap gap-3">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    onDraftAction(
-                      leadId,
-                      thread.needs_reply
-                        ? {
-                            objective: "follow_up",
-                            tone: "warm",
-                            length: "short",
-                            status: "Drafting a reply from Inbox...",
-                          }
-                        : {
-                            objective: "revive",
-                            tone: "warm",
-                            length: "short",
-                            status: "Drafting a reconnect from Inbox...",
-                          },
-                    );
-                  }}
-                >
-                  {thread.needs_reply ? "Draft reply" : "Draft reconnect"}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    onSelectLead(leadId);
-                  }}
-                >
-                  Open relationship
-                </Button>
-              </div>
+              <p className="text-xs text-slate-500">{urgentThreads.length} conversation{urgentThreads.length === 1 ? "" : "s"}</p>
             </div>
-          );
-        })}
+            <div className="mt-4 space-y-4">
+              {urgentThreads.map((item) => (
+                <InboxThreadCard key={item.thread.thread_id} item={item} selected={item.leadId === selectedLeadId} onSelectLead={onSelectLead} onDraftAction={onDraftAction} />
+              ))}
+            </div>
+          </div>
+        ) : null}
+        {steadyThreads.length ? (
+          <div>
+            <div className="flex items-end justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Still warm</p>
+                <p className="mt-2 text-sm leading-6 text-slate-600">Brivoly is holding onto the context here so you can step back in without rereading the whole thread.</p>
+              </div>
+              <p className="text-xs text-slate-500">{steadyThreads.length} conversation{steadyThreads.length === 1 ? "" : "s"}</p>
+            </div>
+            <div className="mt-4 space-y-4">
+              {steadyThreads.map((item) => (
+                <InboxThreadCard key={item.thread.thread_id} item={item} selected={item.leadId === selectedLeadId} onSelectLead={onSelectLead} onDraftAction={onDraftAction} />
+              ))}
+            </div>
+          </div>
+        ) : null}
         {!filteredThreads.length ? (
           <div className="rounded-[1.35rem] border border-dashed bg-slate-50/70 p-6 text-sm leading-6 text-slate-600">
             No conversations match this view yet. Once inbox sync is flowing, this becomes the quiet memory layer for who said what and who needs a reply.
@@ -1709,6 +1696,108 @@ function InboxActivityPanel({
         ) : null}
       </div>
     </section>
+  );
+}
+
+function InboxThreadCard({
+  item,
+  selected,
+  onSelectLead,
+  onDraftAction,
+}: {
+  item: {
+    leadId: string;
+    leadName: string;
+    companyName: string;
+    stage: string;
+    thread: CRMLeadFollowUp["recent_email_threads"][number];
+  };
+  selected: boolean;
+  onSelectLead: (leadId: string) => void;
+  onDraftAction: (
+    leadId: string,
+    draft: {
+      objective: CRMEmailDraft["objective"];
+      tone: CRMEmailDraft["tone"];
+      length: CRMEmailDraft["length"];
+      status: string;
+    },
+  ) => void;
+}) {
+  const { leadId, leadName, companyName, stage, thread } = item;
+
+  return (
+    <div
+      className={`block w-full rounded-[1.35rem] border px-5 py-5 text-left transition ${
+        selected ? "border-slate-900 bg-white shadow-sm" : "bg-slate-50/80 hover:border-slate-400 hover:bg-white"
+      }`}
+    >
+      <button type="button" onClick={() => onSelectLead(leadId)} className="block w-full text-left">
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+              {formatStageLabel(stage)} · {thread.last_message_direction === "inbound" ? "Needs your reply" : "Waiting on them"}
+            </p>
+            <h3 className="mt-2 text-xl font-semibold tracking-tight text-slate-950">{thread.subject}</h3>
+            <p className="mt-1 text-sm text-slate-600">
+              {leadName} · {companyName}
+            </p>
+            <p className="mt-3 text-sm font-medium text-slate-900">{thread.relationship_pulse}</p>
+            <p className="mt-2 text-sm leading-6 text-slate-600">{thread.continuity_span}</p>
+            <p className="mt-3 text-sm leading-6 text-slate-600">{thread.memory_summary}</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {thread.needs_reply ? <MiniFlag tone="critical" label="Reply" /> : null}
+            {thread.waiting_on_contact ? <MiniFlag tone="warning" label="Waiting" /> : null}
+            {isQuietThread(thread) ? <MiniFlag tone="neutral" label="Quiet" /> : null}
+            <div className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">
+              {thread.message_count} msg
+            </div>
+          </div>
+        </div>
+        <div className="mt-4 grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
+          <TimelineTile label="Brivoly read" value={thread.next_touch_hint} />
+          <TimelineTile label="Open loop" value={thread.open_loop} />
+          <TimelineTile label="Thread shape" value={thread.continuity_span} />
+          <TimelineTile label="Last message" value={formatDateTime(thread.last_message_at)} />
+        </div>
+      </button>
+      <div className="mt-4 flex flex-wrap gap-3">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => {
+            onDraftAction(
+              leadId,
+              thread.needs_reply
+                ? {
+                    objective: "follow_up",
+                    tone: "warm",
+                    length: "short",
+                    status: "Drafting a reply from Inbox...",
+                  }
+                : {
+                    objective: "revive",
+                    tone: "warm",
+                    length: "short",
+                    status: "Drafting a reconnect from Inbox...",
+                  },
+            );
+          }}
+        >
+          {thread.needs_reply ? "Draft reply" : "Draft reconnect"}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => {
+            onSelectLead(leadId);
+          }}
+        >
+          Open relationship
+        </Button>
+      </div>
+    </div>
   );
 }
 
@@ -2042,6 +2131,17 @@ function IntakeRoutingPanel({
               {preset.label}
             </button>
           ))}
+          <button
+            type="button"
+            onClick={() =>
+              onRoutingNotesDraftChange(
+                "Use the shared link for screenshots and quick updates. Use email when a client sends a longer file, thread, or fuller project context.",
+              )
+            }
+            className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
+          >
+            Use recommended note
+          </button>
         </div>
         <label className="block">
           <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Handoff notes</span>
@@ -2138,6 +2238,17 @@ function AIIntakePanel({
               {preset.label}
             </button>
           ))}
+          <button
+            type="button"
+            onClick={() =>
+              onAiPromptDraftChange(
+                "Treat uploads and messy files as relationship context first. Pull out what changed, what matters now, and the clearest next touch without adding admin work.",
+              )
+            }
+            className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
+          >
+            Use recommended prompt
+          </button>
         </div>
         <label className="block">
           <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Custom AI memory prompt</span>
@@ -3125,7 +3236,7 @@ function matchesInboxThread(
   item: {
     leadName: string;
     companyName: string;
-      thread: {
+    thread: {
       subject: string;
       counterpart_email: string;
       counterpart_name: string;
@@ -3134,6 +3245,7 @@ function matchesInboxThread(
       next_touch_hint: string;
       open_loop: string;
       relationship_pulse: string;
+      continuity_span: string;
       waiting_on_contact: boolean;
       needs_reply: boolean;
       last_message_at: string;
@@ -3156,6 +3268,7 @@ function matchesInboxThread(
       item.thread.next_touch_hint,
       item.thread.open_loop,
       item.thread.relationship_pulse,
+      item.thread.continuity_span,
     ]
       .join(" ")
       .toLowerCase()

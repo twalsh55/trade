@@ -105,6 +105,7 @@ def _build_enriched_threads(item: LeadFollowUp, current_time: datetime) -> list[
             next_touch_hint=_build_thread_next_touch_hint(item, thread, current_time),
             open_loop=_build_thread_open_loop(item, thread),
             relationship_pulse=_build_thread_relationship_pulse(item, thread, current_time),
+            continuity_span=_build_thread_continuity_span(thread, current_time),
         )
         for thread in item.recent_email_threads
     ]
@@ -159,6 +160,15 @@ def _build_thread_relationship_pulse(item: LeadFollowUp, thread: LeadEmailThread
     if thread.message_count >= 3:
         return "There is active back-and-forth here, so Brivoly is keeping the context easy to re-enter."
     return "This conversation is still light, but Brivoly is keeping the thread context warm."
+
+
+def _build_thread_continuity_span(thread: LeadEmailThreadSummary, current_time: datetime) -> str:
+    recency = _relative_days(thread.last_message_at, current_time).lower()
+    if thread.message_count >= 4:
+        return f"{thread.message_count}-message thread, latest turn {recency}."
+    if thread.message_count >= 2:
+        return f"{thread.message_count}-message exchange, latest turn {recency}."
+    return f"Single-message thread, latest turn {recency}."
 
 
 def _resolve_last_meaningful_interaction(item: LeadFollowUp) -> datetime | None:

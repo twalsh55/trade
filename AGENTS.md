@@ -93,10 +93,10 @@ cd web && npm run e2e
 - `/crm` remains as a compatibility alias.
 - Current Client OS capabilities:
   - left taskbar with dedicated Client OS pages
-  - Today priorities with direct draft/review actions
+  - Today priorities with a clear `Start here` focus card, direct draft/review actions, and calmer 2-column summary layouts
   - follow-up queue
   - inbox-native relationship page for auto-logging email threads and reconnect-aware next moves
-  - inbox cards now surface backend-driven relationship pulse and open-loop memory, plus direct draft actions
+  - inbox cards now surface backend-driven relationship pulse, open-loop memory, and thread continuity cues, grouped into `Needs you now` and `Still warm`
   - email-thread ingestion that can auto-create/update contacts from inbox activity
   - attention view with reconnect-first guidance and direct draft actions
   - complete and snooze actions
@@ -125,7 +125,7 @@ cd web && npm run e2e
   - magic-link remote note capture for phone image uploads
   - client-facing upload flow with lighter no-login handoff copy, simpler share-link language, and camera-friendly mobile capture
   - relationship history now visually calls out client-shared upload context instead of burying it in generic activity
-  - intake setup now has one-tap channel and source-format defaults to reduce typing
+  - intake setup now has one-tap channel, handoff-note, source-format, and AI-prompt defaults to reduce typing
   - text-heavy card layouts now prefer wider 2-column patterns so copy does not collapse into cramped narrow cards
   - auth and handoff copy now consistently points to Client OS instead of older workspace/portal language
 
@@ -194,8 +194,8 @@ cd web && npm run e2e
 
 - Highest-conviction Client OS next steps:
   - finish the relationship-OS copy cleanup across remaining user-facing surfaces
-  - make `Today` the clearest expression of who needs attention right now
-  - deepen inbox-native memory and thread summaries
+  - keep sharpening `Today` so the daily home feels instantly actionable without reading around
+  - deepen inbox-native memory around unresolved threads, recent changes, and multi-message continuity
   - embed AI follow-up intelligence into `Today`, inbox, and relationship views as calm timing nudges
   - add ambient conversation memory that summarizes emails, notes, uploads, and timeline events into concise relationship context
   - improve inline suggested responses for follow-ups, recap emails, reconnects, proposal nudges, and scheduling replies

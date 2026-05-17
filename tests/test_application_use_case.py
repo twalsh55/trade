@@ -37,6 +37,7 @@ from src.application.crm import (
     _build_thread_next_touch_hint,
     _build_thread_open_loop,
     _build_thread_relationship_pulse,
+    _build_thread_continuity_span,
     _compute_relationship_health_score,
     _describe_upload_source,
     _derive_company_from_email,
@@ -325,6 +326,7 @@ def test_follow_up_overview_enriches_relationship_intelligence() -> None:
     assert amber.recent_email_threads[0].next_touch_hint
     assert amber.recent_email_threads[0].open_loop
     assert amber.recent_email_threads[0].relationship_pulse
+    assert amber.recent_email_threads[0].continuity_span
     assert overview.relationship_summary is not None
     assert overview.relationship_summary.stale_count >= 1
     assert overview.relationship_summary.referral_reminder_count >= 1
@@ -369,6 +371,7 @@ def test_ingest_lead_email_thread_auto_updates_relationship_memory() -> None:
     assert "Reply to Priya Nair" in lead.recent_email_threads[0].next_touch_hint
     assert "Sheets first" in lead.recent_email_threads[0].open_loop
     assert "waiting on you" in lead.recent_email_threads[0].relationship_pulse
+    assert "Single-message thread" in lead.recent_email_threads[0].continuity_span
     assert any(entry.id == "email-msg-1" for entry in lead.timeline)
     assert overview.inbox_summary is not None
     assert overview.inbox_summary.needs_reply_count >= 1
@@ -499,6 +502,9 @@ def test_crm_helper_branches_cover_thread_memory_and_timing_paths() -> None:
     assert "has been quiet" in _build_thread_relationship_pulse(empty_lead, quiet_thread, now)
     assert "active back-and-forth" in _build_thread_relationship_pulse(build_follow_up(now=now, threads=(active_thread,)), active_thread, now)
     assert "still light" in _build_thread_relationship_pulse(upload_context_lead, light_thread, now)
+    assert "Single-message thread" in _build_thread_continuity_span(reply_thread, now)
+    assert "2-message exchange" in _build_thread_continuity_span(light_thread, now)
+    assert "4-message thread" in _build_thread_continuity_span(active_thread, now)
 
 
 def test_crm_helper_branches_cover_relationship_summaries() -> None:
