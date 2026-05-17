@@ -461,7 +461,7 @@ def _build_recent_upload_summary(item: LeadFollowUp, current_time: datetime) -> 
 
     source = _describe_upload_source(latest_upload.channel, latest_upload.summary, item.notes)
     summary = _build_upload_memory_snippet(item)
-    return f"{_relative_days(latest_upload.occurred_at, current_time)} Brivoly attached new client context from {source}: {summary}"
+    return f"{_relative_days(latest_upload.occurred_at, current_time)} new client context came in through {source}: {summary}"
 
 
 def _build_upload_follow_through_hint(item: LeadFollowUp, current_time: datetime) -> str:
@@ -473,19 +473,19 @@ def _build_upload_follow_through_hint(item: LeadFollowUp, current_time: datetime
     if latest_thread:
         thread = latest_thread[0]
         if thread.needs_reply:
-            return "Reply while the new client context is still fresh and connect it back to the last thread."
+            return "Reply while the new client context is still fresh and tie it back to the last thread."
         if thread.waiting_on_contact:
-            return "If the thread stays quiet, fold the new client context into your next check-in."
+            return "If the thread stays quiet, use the new client context in your next check-in."
 
     if item.next_step.strip():
-        return f"Best next touch from the new context: {_ensure_sentence(item.next_step)}"
+        return f"Best next touch from this new context: {_ensure_sentence(item.next_step)}"
 
     if item.relationship_state in {"stale", "at_risk", "drifting"}:
-        return "Use the new client context as the easiest reason to reopen the relationship while it is still fresh."
+        return "Use this new client context as the easiest reason to reopen the relationship while it is still fresh."
 
     if latest_upload.occurred_at >= current_time - timedelta(days=2):
-        return "Use the new client context while it is still fresh and turn it into a short follow-through note."
-    return "Keep the new client context in view the next time you reach back out."
+        return "Use this new client context while it is still fresh and turn it into a short follow-through note."
+    return "Keep this new client context in view the next time you reach back out."
 
 
 def _build_last_30_days_summary(item: LeadFollowUp, current_time: datetime) -> str:

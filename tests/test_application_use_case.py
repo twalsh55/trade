@@ -580,10 +580,10 @@ def test_crm_helper_branches_cover_thread_memory_and_timing_paths() -> None:
         active_thread,
     )
     assert _build_thread_continuity_memory(empty_lead, quiet_thread) == ""
-    assert "Best next touch from the new context" in _build_upload_follow_through_hint(upload_for_next_step, now)
-    assert "fold the new client context" in _build_upload_follow_through_hint(upload_waiting_lead, now)
-    assert "Use the new client context while it is still fresh" in _build_upload_follow_through_hint(upload_context_lead, now)
-    assert "Keep the new client context in view" in _build_upload_follow_through_hint(stale_upload_follow_up, now)
+    assert "Best next touch from this new context" in _build_upload_follow_through_hint(upload_for_next_step, now)
+    assert "use the new client context in your next check-in" in _build_upload_follow_through_hint(upload_waiting_lead, now)
+    assert "Use this new client context while it is still fresh" in _build_upload_follow_through_hint(upload_context_lead, now)
+    assert "Keep this new client context in view" in _build_upload_follow_through_hint(stale_upload_follow_up, now)
     assert "easiest reason to reopen the relationship" in _build_upload_follow_through_hint(reconnect_upload_follow_up, now)
 
 
@@ -840,7 +840,7 @@ def test_crm_helper_branches_cover_remaining_health_context_and_merge_paths() ->
     assert "Notes captured: Imported from note image." in _build_recent_upload_summary(upload_follow_up, now)
     assert "Imported from magic link image" in _build_relationship_context_summary(upload_follow_up)
     assert "Latest client-sent context" in _build_meeting_prep_summary(upload_follow_up, now)
-    assert "Best next touch from the new context" in _build_upload_follow_through_hint(upload_follow_up, now)
+    assert "Best next touch from this new context" in _build_upload_follow_through_hint(upload_follow_up, now)
     assert "Best use of it right now" in _build_meeting_prep_summary(upload_follow_up, now)
     upload_follow_up_without_next_step = replace(upload_follow_up, next_step="   ")
     assert "Walk in ready to reference the new client context first" in _build_meeting_prep_summary(upload_follow_up_without_next_step, now)

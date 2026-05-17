@@ -1216,8 +1216,8 @@ function TodayPrioritiesPanel({
       ? {
           id: `${recentUploadLead.id}-upload`,
           href: "/clientos/follow-ups",
-          eyebrow: isReconnectMoment(recentUploadLead) ? "Fresh way back in" : "Client upload",
-          title: isReconnectMoment(recentUploadLead) ? `Use new context to reopen ${recentUploadLead.lead_name}` : `Review new files from ${recentUploadLead.lead_name}`,
+          eyebrow: isReconnectMoment(recentUploadLead) ? "Fresh way back in" : "Fresh client update",
+          title: isReconnectMoment(recentUploadLead) ? `Use new context to reopen ${recentUploadLead.lead_name}` : `Follow up on new context from ${recentUploadLead.lead_name}`,
           body:
             (isReconnectMoment(recentUploadLead)
               ? recentUploadLead.relationship_reconnect_why_now || recentUploadLead.relationship_upload_follow_through_hint
