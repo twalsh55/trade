@@ -98,10 +98,10 @@ export default async function SignUpPage({ searchParams }: SignUpPageProps) {
           />
         ) : (
           <section className="rounded-[1.75rem] border bg-white/85 p-6 shadow-sm">
-            <p className="ui-eyebrow">Configuration</p>
-            <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">Sign-up is unavailable</h2>
+            <p className="ui-eyebrow">Create account</p>
+            <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">Account creation is not ready yet</h2>
             <p className="mt-3 text-sm leading-6 text-slate-600">
-              Set <code>CLERK_PUBLISHABLE_KEY</code> so the frontend can render account creation for users.
+              Add <code>CLERK_PUBLISHABLE_KEY</code> so Brivoly can show account creation here.
             </p>
             {bootstrap?.clerk_sign_up_url ? (
               <p className="mt-4 text-sm text-slate-600">
