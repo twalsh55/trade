@@ -122,7 +122,10 @@ export type CRMImportPreviewRow = {
   company_name: string;
   owner_name: string;
   stage: string;
+  priority: string;
+  contact_channel: string;
   next_follow_up_at: string | null;
+  next_step: string;
   notes: string;
   duplicate: boolean;
   issues: CRMImportIssue[];

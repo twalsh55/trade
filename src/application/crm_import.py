@@ -354,9 +354,12 @@ def _build_preview_row(
     company_name = _value_for(raw_row, field_map, "company_name")
     owner_name = _value_for(raw_row, field_map, "owner_name") or "Unassigned"
     stage = _normalize_stage(_value_for(raw_row, field_map, "stage"))
+    priority = _normalize_priority(_value_for(raw_row, field_map, "priority"))
+    contact_channel = _normalize_contact_channel(_value_for(raw_row, field_map, "contact_channel"))
     notes = _value_for(raw_row, field_map, "notes")
     next_follow_up_raw = _value_for(raw_row, field_map, "next_follow_up_at")
     next_follow_up_at = _parse_datetime(next_follow_up_raw)
+    next_step = _value_for(raw_row, field_map, "next_step")
     row_issues: list[LeadImportIssue] = []
 
     if not lead_name and not company_name:
@@ -423,7 +426,10 @@ def _build_preview_row(
         company_name=company_name or "Unspecified company",
         owner_name=owner_name,
         stage=stage,
+        priority=priority,
+        contact_channel=contact_channel,
         next_follow_up_at=next_follow_up_at,
+        next_step=next_step,
         notes=notes,
         duplicate=duplicate,
         issues=issues,
@@ -434,7 +440,7 @@ def _build_imported_follow_up(row: LeadImportPreviewRow, source_label: str, impo
     if row.next_follow_up_at is None:
         raise ValueError("A next follow-up date is required before import.")
     slug = _slug_token(f"{row.lead_name}-{row.company_name}")
-    next_step = f"{row.owner_name} to send the next follow-up and confirm the current {row.stage.lower()} status."
+    next_step = row.next_step or f"{row.owner_name} to send the next follow-up and confirm the current {row.stage.lower()} status."
     import_summary = f"Imported from {source_label}. Owner: {row.owner_name}. Stage: {row.stage}."
     timeline: tuple[LeadTimelineEntry, ...] = (
         LeadTimelineEntry(
@@ -463,8 +469,8 @@ def _build_imported_follow_up(row: LeadImportPreviewRow, source_label: str, impo
         company_name=row.company_name,
         owner_name=row.owner_name,
         stage=row.stage,
-        priority=_derive_priority(row.next_follow_up_at, imported_at),
-        contact_channel="spreadsheet",
+        priority=row.priority or _derive_priority(row.next_follow_up_at, imported_at),
+        contact_channel=row.contact_channel or "spreadsheet",
         last_contacted_at=None,
         next_follow_up_at=row.next_follow_up_at,
         next_step=next_step,
@@ -582,6 +588,20 @@ def _normalize_stage(value: str) -> str:
     if not normalized:
         return "Imported"
     return normalized[:1].upper() + normalized[1:]
+
+
+def _normalize_priority(value: str) -> str:
+    normalized = _slug_header(value)
+    if normalized in {"high", "medium", "low"}:
+        return normalized
+    return ""
+
+
+def _normalize_contact_channel(value: str) -> str:
+    normalized = _slug_header(value)
+    if not normalized:
+        return ""
+    return normalized.replace(" ", "_")
 
 
 def _derive_priority(next_follow_up_at: datetime, imported_at: datetime) -> str:

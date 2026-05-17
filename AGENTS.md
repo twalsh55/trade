@@ -96,6 +96,8 @@ cd web && npm run e2e
   - contact timeline + internal notes
   - CSV/XLSX/XLS/Google Sheets import
   - guided field mapping
+  - import now preserves mapped priority, contact channel, and next step from source sheets instead of replacing them with generic defaults
+  - import preview now shows the actual staged priority, channel, and next step before commit
   - duplicate detection + validation preview
   - AI header rescue for messy spreadsheets
   - interactive AI clarification questions when mapping is still ambiguous

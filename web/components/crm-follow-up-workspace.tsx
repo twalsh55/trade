@@ -876,6 +876,11 @@ function ImportPreviewRowCard({ row }: { row: CRMImportPreviewRow }) {
           <p className="mt-2 text-sm text-slate-200">{formatDateTime(row.next_follow_up_at)}</p>
         </div>
       </div>
+      <div className="mt-3 grid gap-3 md:grid-cols-3">
+        <TimelineTileDark label="Priority" value={row.priority ? `${row.priority} priority` : "Auto after import"} />
+        <TimelineTileDark label="Channel" value={row.contact_channel || "Spreadsheet default"} />
+        <TimelineTileDark label="Next step" value={row.next_step || "Brivoly will draft a default follow-up task"} />
+      </div>
       {row.notes ? <p className="mt-3 text-sm leading-6 text-slate-300">{row.notes}</p> : null}
       {row.issues.length ? (
         <div className="mt-3 space-y-2">
@@ -1003,6 +1008,15 @@ function TimelineTile({ label, value }: { label: string; value: string }) {
     <div className="rounded-2xl border bg-white px-4 py-3">
       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">{label}</p>
       <p className="mt-2 text-sm text-slate-700">{value}</p>
+    </div>
+  );
+}
+
+function TimelineTileDark({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-slate-900/40 px-4 py-3">
+      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">{label}</p>
+      <p className="mt-2 text-sm text-slate-200">{value}</p>
     </div>
   );
 }

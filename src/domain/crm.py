@@ -61,7 +61,10 @@ class LeadImportPreviewRow:
     company_name: str
     owner_name: str
     stage: str
+    priority: str
+    contact_channel: str
     next_follow_up_at: datetime | None
+    next_step: str
     notes: str
     duplicate: bool
     issues: tuple[LeadImportIssue, ...]

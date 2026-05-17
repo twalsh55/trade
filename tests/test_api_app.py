@@ -1569,19 +1569,25 @@ def test_crm_import_preview_and_commit_endpoints_support_csv_and_google_sheets(m
     assert preview.json()["importable_rows"] == 1
     assert preview.json()["duplicate_rows"] == 1
     assert preview.json()["rows"][0]["owner_name"] == "Samir Patel"
+    assert preview.json()["rows"][0]["priority"] == ""
+    assert preview.json()["rows"][0]["contact_channel"] == ""
+    assert preview.json()["rows"][0]["next_step"] == ""
 
     commit = client.post(
         "/api/crm/import",
         headers={"Authorization": "Bearer session-token"},
         json={
             "source_type": "csv",
-            "csv_content": "Contact,Company,Owner,Status,Next Follow-Up,Notes\nTaylor Brooks,Beacon Ridge,Samir Patel,Qualification,2024-05-09,Imported from sheet\n",
+            "csv_content": "Contact,Company,Owner,Status,Next Follow-Up,Notes,Priority,Contact Channel,Next Step\nTaylor Brooks,Beacon Ridge,Samir Patel,Qualification,2024-05-09,Imported from sheet,medium,linkedin,Send pricing recap\n",
         },
     )
     assert commit.status_code == 200
     assert commit.json()["imported_count"] == 1
     imported = next(item for item in commit.json()["overview"]["items"] if item["company_name"] == "Beacon Ridge")
     assert imported["owner_name"] == "Samir Patel"
+    assert imported["priority"] == "medium"
+    assert imported["contact_channel"] == "linkedin"
+    assert imported["next_step"] == "Send pricing recap"
     assert imported["timeline"][0]["kind"] == "import"
 
     monkeypatch.setattr(

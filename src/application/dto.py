@@ -183,7 +183,10 @@ class LeadImportPreviewRowDTO:
     company_name: str
     owner_name: str
     stage: str
+    priority: str
+    contact_channel: str
     next_follow_up_at: str | None
+    next_step: str
     notes: str
     duplicate: bool
     issues: list[LeadImportIssueDTO]
@@ -432,7 +435,10 @@ def build_lead_import_preview_row_dto(row: LeadImportPreviewRow) -> LeadImportPr
         company_name=row.company_name,
         owner_name=row.owner_name,
         stage=row.stage,
+        priority=row.priority,
+        contact_channel=row.contact_channel,
         next_follow_up_at=row.next_follow_up_at.isoformat() if row.next_follow_up_at else None,
+        next_step=row.next_step,
         notes=row.notes,
         duplicate=row.duplicate,
         issues=[build_lead_import_issue_dto(issue) for issue in row.issues],

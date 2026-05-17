@@ -77,7 +77,7 @@ def test_commit_lead_import_adds_follow_ups_to_queue() -> None:
     repository = InMemoryLeadFollowUpRepository(now=lambda: now)
     result = CommitLeadImportUseCase(repository=repository, now=lambda: now).execute(
         make_user(),
-        "contact,company,owner,status,next follow-up,notes\nTaylor Brooks,Beacon Ridge,Samir Patel,Qualification,2024-05-09,Imported from founder sheet\n",
+        "contact,company,owner,status,next follow-up,notes,priority,contact channel,next step\nTaylor Brooks,Beacon Ridge,Samir Patel,Qualification,2024-05-09,Imported from founder sheet,medium,linkedin,Send the recap and book the demo\n",
         "csv",
         "CSV upload",
     )
@@ -85,7 +85,9 @@ def test_commit_lead_import_adds_follow_ups_to_queue() -> None:
     assert result.imported_count == 1
     imported = next(item for item in result.overview.items if item.company_name == "Beacon Ridge")
     assert imported.owner_name == "Samir Patel"
-    assert imported.contact_channel == "spreadsheet"
+    assert imported.priority == "medium"
+    assert imported.contact_channel == "linkedin"
+    assert imported.next_step == "Send the recap and book the demo"
     assert imported.timeline[0].kind == "import"
 
 
@@ -329,6 +331,9 @@ def test_preview_lead_import_recognizes_canonical_machine_headers() -> None:
 
     assert preview.importable_rows == 1
     assert preview.rows[0].owner_name == "Samir Patel"
+    assert preview.rows[0].priority == ""
+    assert preview.rows[0].contact_channel == ""
+    assert preview.rows[0].next_step == ""
 
 
 def test_build_google_sheets_csv_url_keeps_gid() -> None:
@@ -483,6 +488,9 @@ def test_preview_lead_import_surfaces_missing_fields_invalid_dates_and_note_warn
     assert preview.rows[0].company_name == "Unspecified company"
     assert preview.rows[0].owner_name == "Unassigned"
     assert preview.rows[0].stage == "Imported"
+    assert preview.rows[0].priority == ""
+    assert preview.rows[0].contact_channel == ""
+    assert preview.rows[0].next_step == ""
     assert preview.rows[0].next_follow_up_at is None
     assert [issue.severity for issue in preview.rows[0].issues] == ["error", "error", "warning"]
     assert preview.rows[1].issues[0].message == "Add a next follow-up date so the row can enter the queue."
@@ -504,7 +512,10 @@ def test_import_helpers_cover_datetime_stage_priority_and_duplicate_edge_cases()
         company_name="Beacon Ridge",
         owner_name="Samir Patel",
         stage="Qualification",
+        priority="",
+        contact_channel="",
         next_follow_up_at=datetime(2024, 5, 8, 12, 30, tzinfo=UTC),
+        next_step="",
         notes="",
         duplicate=False,
         issues=(),
@@ -515,7 +526,10 @@ def test_import_helpers_cover_datetime_stage_priority_and_duplicate_edge_cases()
         company_name="Stone Harbor",
         owner_name="Riley Chen",
         stage="Proposal",
+        priority="medium",
+        contact_channel="linkedin",
         next_follow_up_at=datetime(2024, 5, 10, 12, 30, tzinfo=UTC),
+        next_step="Follow up after proposal review",
         notes="Imported note",
         duplicate=False,
         issues=(),
@@ -528,7 +542,10 @@ def test_import_helpers_cover_datetime_stage_priority_and_duplicate_edge_cases()
             company_name="Signal Peak",
             owner_name="Ada Lovelace",
             stage="Discovery",
+            priority="",
+            contact_channel="",
             next_follow_up_at=datetime(2024, 5, 7, 11, 30, tzinfo=UTC),
+            next_step="",
             notes="",
             duplicate=False,
             issues=(),
@@ -539,8 +556,11 @@ def test_import_helpers_cover_datetime_stage_priority_and_duplicate_edge_cases()
     low_item = _build_imported_follow_up(low_row, "Google Sheets", imported_at)
     assert high_item.priority == "high"
     assert medium_item.priority == "medium"
+    assert medium_item.contact_channel == "spreadsheet"
     assert medium_item.notes == "Imported without notes."
-    assert low_item.priority == "low"
+    assert low_item.priority == "medium"
+    assert low_item.contact_channel == "linkedin"
+    assert low_item.next_step == "Follow up after proposal review"
     assert low_item.timeline[1].kind == "internal_note"
 
     with pytest.raises(ValueError, match="next follow-up date is required"):
@@ -551,7 +571,10 @@ def test_import_helpers_cover_datetime_stage_priority_and_duplicate_edge_cases()
                 company_name="Missing Time",
                 owner_name="Owner",
                 stage="Imported",
+                priority="",
+                contact_channel="",
                 next_follow_up_at=None,
+                next_step="",
                 notes="",
                 duplicate=False,
                 issues=(),
