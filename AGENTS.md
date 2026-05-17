@@ -103,7 +103,7 @@ cd web && npm run e2e
   - attention view with reconnect-first guidance and direct draft actions
   - complete and snooze actions
   - relationship history + internal notes
-  - relationship memory summaries that blend email, notes, uploads, reconnect cues, and recent upload context
+  - relationship memory summaries that blend email, notes, uploads, reconnect cues, and recent upload context, with lighter `Conversation memory` and `Latest saved context` reads instead of repetitive stacked boxes
   - recent client-shared context now has its own memory view, can be pulled straight into the next drafted note, generates a backend-driven follow-through hint, creates a more natural reconnect path, and now plays a bigger role in meeting prep, 30-day summaries, and follow-through guidance
   - auto email designer for reconnects and follow-ups with in-app draft editing
   - last meaningful interaction tracking
@@ -127,7 +127,7 @@ cd web && npm run e2e
   - first-login business onboarding with skip-for-now path
   - paid image-note intake
   - magic-link remote note capture for phone image uploads
-  - client-facing upload flow with lighter no-login handoff copy, simpler share-link language, and camera-friendly mobile capture
+  - client-facing upload flow with quieter `Client dropzone` language, simpler share-link language, calmer set-once defaults, and camera-friendly mobile capture
   - relationship history now visually calls out client-shared upload context instead of burying it in generic activity
   - intake setup now has calmer set-once defaults for channels, handoff notes, source formats, and AI memory prompts to reduce typing and configuration
   - reconnect guidance now includes a clearer `why it can still land` read plus a starter line for reopening stale, drifting, and at-risk relationships, with gentler company-aware and saved-context fallbacks when Brivoly has thinner history
@@ -205,6 +205,7 @@ cd web && npm run e2e
   - keep sharpening `Today` so the daily home feels instantly actionable without reading around
   - deepen inbox-native memory around recent changes and multi-message continuity across longer conversations
   - let client-shared uploads influence even more suggested next moves, meeting prep, and follow-through guidance
+  - keep improving reconnect paths when Brivoly only has thin saved context
   - embed AI follow-up intelligence into `Today`, inbox, and relationship views as calm timing nudges
   - add ambient conversation memory that summarizes emails, notes, uploads, and timeline events into concise relationship context
   - improve inline suggested responses for follow-ups, recap emails, reconnects, proposal nudges, and scheduling replies
