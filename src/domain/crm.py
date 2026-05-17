@@ -50,6 +50,7 @@ class LeadEmailThreadSummary:
     recent_change_hint: str = ""
     carry_forward_hint: str = ""
     unresolved_hint: str = ""
+    continuity_memory: str = ""
 
 
 @dataclass(frozen=True)

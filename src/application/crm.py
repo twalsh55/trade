@@ -111,6 +111,7 @@ def _build_enriched_threads(item: LeadFollowUp, current_time: datetime) -> list[
             recent_change_hint=_build_thread_recent_change_hint(item, thread, current_time),
             carry_forward_hint=_build_thread_carry_forward_hint(item, thread),
             unresolved_hint=_build_thread_unresolved_hint(item, thread),
+            continuity_memory=_build_thread_continuity_memory(item, thread),
         )
         for thread in item.recent_email_threads
     ]
@@ -228,6 +229,19 @@ def _build_thread_unresolved_hint(item: LeadFollowUp, thread: LeadEmailThreadSum
         return f"Keep the new client context tied to this thread: {upload_context}"
     if item.relationship_recent_changes_summary.strip():
         return f"Carry forward what changed: {_truncate_sentence(item.relationship_recent_changes_summary.strip(), 100)}"
+    return ""
+
+
+def _build_thread_continuity_memory(item: LeadFollowUp, thread: LeadEmailThreadSummary) -> str:
+    snippet = thread.snippet.strip().rstrip(".")
+    if thread.message_count >= 5 and thread.needs_reply and snippet:
+        return f"Longer thread to re-enter: they are still circling around {_truncate_sentence(_sentence_case(snippet), 110)} A brief reply can move it forward."
+    if thread.message_count >= 4 and thread.waiting_on_contact and snippet:
+        return f"Longer thread to re-enter: you already covered {_truncate_sentence(_sentence_case(snippet), 110)} If they come back, restart there instead of rebuilding the thread."
+    if thread.message_count >= 4 and item.relationship_recent_changes_summary.strip():
+        return f"Thread through-line: {_truncate_sentence(item.relationship_recent_changes_summary.strip(), 130)}"
+    if thread.message_count >= 4 and item.next_step.strip():
+        return f"Thread through-line: {_truncate_sentence(_ensure_sentence(_sentence_case(item.next_step.strip().rstrip('.'))), 130)}"
     return ""
 
 

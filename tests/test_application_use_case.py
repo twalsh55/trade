@@ -39,6 +39,7 @@ from src.application.crm import (
     _build_thread_open_loop,
     _build_thread_relationship_pulse,
     _build_thread_carry_forward_hint,
+    _build_thread_continuity_memory,
     _build_thread_unresolved_hint,
     _build_thread_recent_change_hint,
     _build_thread_continuity_span,
@@ -335,6 +336,7 @@ def test_follow_up_overview_enriches_relationship_intelligence() -> None:
     assert amber.recent_email_threads[0].recent_change_hint
     assert amber.recent_email_threads[0].carry_forward_hint
     assert amber.recent_email_threads[0].unresolved_hint
+    assert amber.recent_email_threads[0].continuity_memory
     assert overview.relationship_summary is not None
     assert overview.relationship_summary.stale_count >= 1
     assert overview.relationship_summary.referral_reminder_count >= 1
@@ -482,6 +484,8 @@ def test_crm_helper_branches_cover_thread_memory_and_timing_paths() -> None:
     reply_snippet_thread = replace(reply_thread, snippet="pricing concern came up again")
     waiting_snippet_thread = replace(waiting_thread, snippet="sent revised onboarding recap")
     active_snippet_thread = replace(active_thread, snippet="they approved the revised scope")
+    long_reply_thread = replace(active_snippet_thread, message_count=5, needs_reply=True)
+    long_waiting_thread = replace(waiting_snippet_thread, message_count=4, waiting_on_contact=True)
 
     next_step_lead = build_follow_up(now=now, next_step="check in next week", notes="", threads=(reply_thread,))
     notes_lead = build_follow_up(now=now, next_step="   ", notes="notes only", threads=(waiting_thread,))
@@ -557,6 +561,17 @@ def test_crm_helper_branches_cover_thread_memory_and_timing_paths() -> None:
     assert "Keep the new client context tied to this thread" in _build_thread_unresolved_hint(upload_context_lead, light_thread)
     assert "Carry forward what changed" in _build_thread_unresolved_hint(replace(empty_lead, relationship_recent_changes_summary="Something shifted recently."), quiet_thread)
     assert _build_thread_unresolved_hint(empty_lead, quiet_thread) == ""
+    assert "Longer thread to re-enter" in _build_thread_continuity_memory(next_step_lead, long_reply_thread)
+    assert "restart there instead of rebuilding the thread" in _build_thread_continuity_memory(notes_lead, long_waiting_thread)
+    assert "Thread through-line: Something shifted recently." in _build_thread_continuity_memory(
+        replace(empty_lead, relationship_recent_changes_summary="Something shifted recently."),
+        active_thread,
+    )
+    assert "Thread through-line: Send the recap." in _build_thread_continuity_memory(
+        build_follow_up(now=now, next_step="send the recap", notes="   ", threads=(active_thread,)),
+        active_thread,
+    )
+    assert _build_thread_continuity_memory(empty_lead, quiet_thread) == ""
     assert "Best next touch from the new context" in _build_upload_follow_through_hint(upload_for_next_step, now)
     assert "fold the new client context" in _build_upload_follow_through_hint(upload_waiting_lead, now)
     assert "A short recap" in _build_upload_follow_through_hint(upload_context_lead, now)

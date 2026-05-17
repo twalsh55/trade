@@ -249,6 +249,7 @@ def _payload_to_thread(payload: dict[str, Any]) -> LeadEmailThreadSummary:
         recent_change_hint=str(payload.get("recent_change_hint", "")),
         carry_forward_hint=str(payload.get("carry_forward_hint", "")),
         unresolved_hint=str(payload.get("unresolved_hint", "")),
+        continuity_memory=str(payload.get("continuity_memory", "")),
     )
 
 

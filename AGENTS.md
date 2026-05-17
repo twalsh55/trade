@@ -98,7 +98,7 @@ cd web && npm run e2e
   - Today priorities with a clear `Start here` focus card, direct draft/review actions, action-labeled quick-start pills, calmer 2-column summary layouts, and stronger upload-aware next-touch framing
   - follow-up queue
   - inbox-native relationship page for auto-logging email threads and reconnect-aware next moves
-  - inbox cards now surface backend-driven relationship pulse, open-loop memory, thread continuity cues, `what changed` hints, unresolved-thread cues, and a carry-forward cue for longer threads, grouped into `Needs you now` and `Still warm`
+  - inbox cards now surface backend-driven relationship pulse, open-loop memory, thread continuity cues, `what changed` hints, unresolved-thread cues, a clearer long-thread `through-line`, and a carry-forward cue for longer threads, grouped into `Needs you now` and `Still warm`
   - email-thread ingestion that can auto-create/update contacts from inbox activity
   - attention view with reconnect-first guidance and direct draft actions
   - complete and snooze actions
@@ -129,7 +129,7 @@ cd web && npm run e2e
   - magic-link remote note capture for phone image uploads
   - client-facing upload flow with lighter no-login handoff copy, simpler share-link language, and camera-friendly mobile capture
   - relationship history now visually calls out client-shared upload context instead of burying it in generic activity
-  - intake setup now has one-tap starter defaults for channels, handoff notes, source formats, and AI memory prompts to reduce typing
+  - intake setup now has calmer set-once defaults for channels, handoff notes, source formats, and AI memory prompts to reduce typing and configuration
   - intake and attention copy now lean further into relationship continuity and away from setup / pipeline language
   - text-heavy card layouts now prefer wider 2-column patterns so copy does not collapse into cramped narrow cards
   - shell, taskbar, import, and handoff copy now consistently point to Client OS instead of older workspace/portal language

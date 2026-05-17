@@ -612,7 +612,7 @@ export function CRMFollowUpWorkspace({
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Bring in context</p>
             <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Bring relationship context in without retyping it.</h2>
             <p className="mt-3 text-sm leading-6 text-slate-600">
-              Upload a CSV, XLSX, XLS, or note image, or paste a Google Sheets link. Brivoly cleans up messy headers, spots missing context, and keeps only what is ready to support better follow-through.
+              Upload a CSV, XLSX, XLS, or note image, or paste a Google Sheets link. Brivoly cleans up messy headers, spots what is missing, and keeps only what is ready to support the next touch.
             </p>
 
             <div className="mt-5 flex flex-wrap gap-3">
@@ -669,7 +669,7 @@ export function CRMFollowUpWorkspace({
                   }}
                 />
                 <p className="mt-3 text-xs text-slate-500">
-                  Supported uploads: CSV, XLSX, XLS, PNG, JPG, JPEG, and WEBP. Note images use paid AI intake. Helpful columns include contact, company, owner, current status, next touch, and notes.
+                  Supported uploads: CSV, XLSX, XLS, PNG, JPG, JPEG, and WEBP. Note images use paid AI intake. Helpful columns include contact, company, owner, where things stand, next touch, and notes.
                 </p>
                 {selectedFile ? <p className="mt-2 text-sm font-medium text-slate-700">{selectedFile.name}</p> : null}
                 {selectedFile && isImageFile(selectedFile.name) ? (
@@ -702,7 +702,7 @@ export function CRMFollowUpWorkspace({
 
             <div className="mt-5 flex flex-wrap gap-3">
               <Button disabled={isImportPending} onClick={() => requestImportPreview()}>
-                  {isImportPending ? "Checking..." : importPreview ? "Refresh preview" : "Preview context"}
+                  {isImportPending ? "Checking..." : importPreview ? "Re-check context" : "Check context"}
               </Button>
               <Button
                 variant="outline"
@@ -715,7 +715,7 @@ export function CRMFollowUpWorkspace({
                 }
                 onClick={commitImport}
               >
-                {isImportPending ? "Importing..." : "Keep these rows"}
+                {isImportPending ? "Importing..." : "Bring this in"}
               </Button>
             </div>
 
@@ -723,7 +723,7 @@ export function CRMFollowUpWorkspace({
             {importStatus ? <p className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{importStatus}</p> : null}
             {isImportMappingDirty ? (
               <p className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                Column mappings changed. Refresh the preview before importing so Brivoly can validate the updated layout.
+                Column mappings changed. Re-check the preview so Brivoly can validate the updated layout before bringing this in.
               </p>
             ) : null}
           </section>
@@ -1691,7 +1691,7 @@ function InboxActivityPanel({
             <div className="flex items-end justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Needs you now</p>
-                <p className="mt-2 text-sm leading-6 text-slate-600">These threads are waiting on your reply, sitting quiet, or worth reopening before the relationship loses momentum.</p>
+                <p className="mt-2 text-sm leading-6 text-slate-600">These threads are waiting on you, starting to drift, or worth reopening before the relationship loses warmth.</p>
               </div>
               <p className="text-xs text-slate-500">{urgentThreads.length} conversation{urgentThreads.length === 1 ? "" : "s"}</p>
             </div>
@@ -1772,6 +1772,7 @@ function InboxThreadCard({
               {leadName} · {companyName}
             </p>
             <p className="mt-3 text-sm font-medium text-slate-900">{thread.relationship_pulse}</p>
+            {thread.continuity_memory ? <p className="mt-2 text-sm leading-6 text-slate-700">{thread.continuity_memory}</p> : null}
             <p className="mt-2 text-sm leading-6 text-slate-600">{thread.continuity_span}</p>
             <p className="mt-3 text-sm leading-6 text-slate-600">{thread.memory_summary}</p>
             {thread.carry_forward_hint ? <p className="mt-3 text-sm leading-6 text-slate-700">{thread.carry_forward_hint}</p> : null}
@@ -1790,7 +1791,7 @@ function InboxThreadCard({
           <TimelineTile label="Brivoly read" value={thread.next_touch_hint} />
           <TimelineTile label="Open loop" value={thread.open_loop} />
           <TimelineTile label="What changed" value={thread.recent_change_hint} />
-          <TimelineTile label="Last message" value={formatDateTime(thread.last_message_at)} />
+          <TimelineTile label="Last turn" value={formatDateTime(thread.last_message_at)} />
         </div>
       </button>
       <div className="mt-4 flex flex-wrap gap-3">
@@ -1893,8 +1894,15 @@ function InboxNextMovePanel({
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Latest thread</p>
           <p className="mt-2 text-sm font-medium text-slate-900">{latestThread.subject}</p>
           <p className="mt-2 text-sm font-medium text-slate-900">{latestThread.relationship_pulse}</p>
+          {latestThread.continuity_memory ? <p className="mt-2 text-sm leading-6 text-slate-700">{latestThread.continuity_memory}</p> : null}
           <p className="mt-2 text-sm leading-6 text-slate-600">{latestThread.continuity_span}</p>
           <p className="mt-2 text-sm leading-6 text-slate-600">{latestThread.memory_summary}</p>
+        </div>
+      ) : null}
+      {latestThread?.continuity_memory ? (
+        <div className="mt-4 rounded-[1.2rem] border bg-slate-50/80 px-4 py-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Thread through-line</p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">{latestThread.continuity_memory}</p>
         </div>
       ) : null}
       {latestThread?.carry_forward_hint ? (
@@ -2000,7 +2008,7 @@ function RemoteImageCapturePanel({
       <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Client handoff</p>
       <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Give clients an easy place to send updates.</h2>
       <p className="mt-3 text-sm leading-6 text-slate-600">
-        Brivoly gives you a simple no-login handoff page for screenshots, whiteboard photos, and note images. Clients can send context from their phone, and it lands back in the relationship history without extra back-and-forth.
+        Brivoly gives you a simple no-login handoff page for screenshots, whiteboard photos, and note images. Set it once, then let clients send context from their phone whenever something changes.
       </p>
 
       {!advancedAiUnlocked ? (
@@ -2017,7 +2025,7 @@ function RemoteImageCapturePanel({
           </p>
         </div>
         <div className="rounded-[1.3rem] border bg-slate-50 px-4 py-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">What Brivoly does next</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">What happens next</p>
           <p className="mt-2 text-sm leading-6 text-slate-700">
             The upload is attached to the right relationship memory so you can reopen the context later without hunting through email or messages.
           </p>
@@ -2068,10 +2076,10 @@ function RemoteImageCapturePanel({
 
 function IntakeTaskNav({ activeTask }: { activeTask: CRMIntakeTask }) {
   const items: Array<{ href: string; title: string; body: string; task: CRMIntakeTask }> = [
-    { href: "/clientos/intake", title: "Overview", body: "See the full client handoff flow.", task: "hub" },
-    { href: "/clientos/intake/profile", title: "Typical formats", body: "Show the kinds of messy files and notes you usually receive.", task: "profile" },
-    { href: "/clientos/intake/routing", title: "Where updates land", body: "Choose the paths and notes that fit this account.", task: "routing" },
-    { href: "/clientos/intake/capture", title: "Share link", body: "Send the no-login page clients can use on their phone.", task: "capture" },
+    { href: "/clientos/intake", title: "Overview", body: "See the handoff flow at a glance.", task: "hub" },
+    { href: "/clientos/intake/profile", title: "Typical formats", body: "Show what clients usually send.", task: "profile" },
+    { href: "/clientos/intake/routing", title: "Best paths", body: "Pick the easiest default handoff paths.", task: "routing" },
+    { href: "/clientos/intake/capture", title: "Share link", body: "Use the phone-friendly page clients can open anytime.", task: "capture" },
   ];
 
   return (
@@ -2121,7 +2129,7 @@ function IntakeTaskHub({
         href="/clientos/intake/routing"
         eyebrow="Step 2"
         title="Choose the easiest handoff path"
-        body={normalizedChannels.length ? `Best handoff paths are set: ${normalizedChannels.join(", ")}.` : "Set the paths and short notes that make it obvious how this account usually sends context back."}
+        body={normalizedChannels.length ? `Default paths are set: ${normalizedChannels.join(", ")}.` : "Set the paths and one short note that make sending updates feel obvious."}
       />
       <TaskSummaryCard
         href="/clientos/intake/capture"
@@ -2175,9 +2183,9 @@ function IntakeRoutingPanel({
   return (
     <section className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm">
       <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Where updates land</p>
-      <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Choose the paths that make sending context feel easy.</h2>
+      <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Set the easiest path once.</h2>
       <p className="mt-3 text-sm leading-6 text-slate-600">
-        Keep this simple: choose the best handoff channels for this account and leave a short note so the next update arrives in the right place.
+        Keep this simple: choose the default handoff channels for this account and leave one short note so the next update arrives in the right place.
       </p>
 
       <div className="mt-5 space-y-4">
@@ -2201,12 +2209,11 @@ function IntakeRoutingPanel({
             }}
             className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
           >
-            Use freelancer starter
+            Use calm default
           </button>
           {[
-            { label: "Upload + link", value: "upload, magic_link" },
-            { label: "Upload + email", value: "upload, email" },
-            { label: "Upload + WhatsApp", value: "upload, whatsapp" },
+            { label: "Shared link + email", value: "upload, magic_link, email" },
+            { label: "Shared link + WhatsApp", value: "upload, magic_link, whatsapp" },
           ].map((preset) => (
             <button
               key={preset.label}
@@ -2242,7 +2249,7 @@ function IntakeRoutingPanel({
 
       <div className="mt-5 flex items-center gap-3">
         <Button onClick={onSave} disabled={isSaving || !canPersistSettings}>
-          {isSaving ? "Saving..." : "Save handoff defaults"}
+          {isSaving ? "Saving..." : "Save once"}
         </Button>
         {saveStatus ? <p className="text-sm text-slate-500">{saveStatus}</p> : null}
       </div>
@@ -2283,9 +2290,9 @@ function AIIntakePanel({
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Typical formats</p>
-          <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Show Brivoly the context you usually receive.</h2>
+          <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Show Brivoly what clients usually send.</h2>
           <p className="mt-3 text-sm leading-6 text-slate-600">
-            Keep a short memory prompt and common source formats here so future spreadsheet, file, and image interpretation stays close to how you actually work.
+            Keep a short memory prompt and your common source formats here so future spreadsheet, file, and image interpretation stays close to how you actually work.
           </p>
         </div>
         <div className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${advancedAiUnlocked ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-amber-50 text-amber-800"}`}>
@@ -2320,10 +2327,10 @@ function AIIntakePanel({
             }}
             className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
           >
-            Use freelancer starter
+            Use calm default
           </button>
           {[
-            { label: "Freelancer default", value: "csv, google_sheets, spreadsheet_screenshot" },
+            { label: "Sheets + screenshots", value: "csv, google_sheets, spreadsheet_screenshot" },
             { label: "Image-first", value: "spreadsheet_screenshot, whiteboard_photo, handwritten_note" },
             { label: "Ops-heavy", value: "csv, google_sheets, pdf_export, spreadsheet_screenshot" },
           ].map((preset) => (
@@ -2349,7 +2356,7 @@ function AIIntakePanel({
           </button>
         </div>
         <label className="block">
-          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Custom AI memory prompt</span>
+          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Memory prompt</span>
           <textarea
             value={aiPromptDraft}
             onChange={(event) => onAiPromptDraftChange(event.target.value)}
@@ -2361,7 +2368,7 @@ function AIIntakePanel({
 
       <div className="mt-5 flex items-center gap-3">
         <Button onClick={onSave} disabled={isSaving || !canPersistSettings}>
-          {isSaving ? "Saving..." : "Save AI memory profile"}
+          {isSaving ? "Saving..." : "Save once"}
         </Button>
         {saveStatus ? <p className="text-sm text-slate-500">{saveStatus}</p> : null}
       </div>
@@ -3360,6 +3367,7 @@ function matchesInboxThread(
       continuity_span: string;
       carry_forward_hint: string;
       unresolved_hint: string;
+      continuity_memory: string;
       waiting_on_contact: boolean;
       needs_reply: boolean;
       last_message_at: string;
@@ -3386,6 +3394,7 @@ function matchesInboxThread(
       item.thread.continuity_span,
       item.thread.carry_forward_hint,
       item.thread.unresolved_hint,
+      item.thread.continuity_memory,
     ]
       .join(" ")
       .toLowerCase()

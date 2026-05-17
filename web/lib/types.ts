@@ -154,6 +154,7 @@ export type CRMEmailThreadSummary = {
   recent_change_hint: string;
   carry_forward_hint: string;
   unresolved_hint: string;
+  continuity_memory: string;
 };
 
 export type CRMRelationshipReminder = {
