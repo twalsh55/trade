@@ -137,6 +137,12 @@ This runs:
 - `scripts/deploy_web.sh` to deploy the frontend with `npx vercel deploy --prod --yes --cwd web`
 - hosted smoke checks against `https://api.brivoly.com` and `https://www.brivoly.com`
 
+The API deploy helper also:
+
+- fails fast with a clear message when Railway CLI auth has expired
+- retries transient Railway control-plane failures such as `RegionServices/ListRegions UNAVAILABLE` / `No connection established`
+- lets you tune retries with `RAILWAY_DEPLOY_RETRIES` and `RAILWAY_RETRY_DELAY_SECONDS`
+
 Required service environment variables:
 
 - Railway API:

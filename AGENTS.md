@@ -65,6 +65,7 @@ cd web && npm run e2e
 ## Deployment Notes
 
 - Railway deploys the API from repo root using `Dockerfile`, `railway.toml`, and `scripts/start_railway.sh`.
+- `scripts/deploy_api.sh` now fails fast on expired Railway auth and retries the known transient Railway control-plane outage (`RegionServices/ListRegions UNAVAILABLE` / `No connection established`) before giving up.
 - Vercel uses `web/` as project root.
 - Never push to production unless the user explicitly asks for a deploy/push to production in the current session.
 - Important envs:
