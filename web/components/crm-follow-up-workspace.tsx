@@ -5766,6 +5766,18 @@ function InboxActivityPanel({
                       }
                     />
                   </div>
+                  <div className="mt-3 rounded-[1rem] border bg-slate-50/80 px-4 py-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+                      Smallest first follow-through
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-slate-700">
+                      {newestThread?.needs_reply
+                        ? buildThreadReplyAngle(newestThread)
+                        : lead.relationship_reconnect_message_hint ||
+                          lead.relationship_reconnect_next_move ||
+                          "Send one short note that locks in the next step while the thread still feels live."}
+                    </p>
+                  </div>
                   <div className="mt-4 flex flex-wrap gap-2">
                     <Button
                       type="button"
