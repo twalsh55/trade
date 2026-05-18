@@ -163,9 +163,11 @@ cd web && npm run e2e
   - paid image-note intake
   - magic-link remote note capture for phone image uploads
   - client-facing upload flow with quieter `Client dropzone` language, simpler share-link language, calmer set-once defaults, and camera-friendly mobile capture
+  - intake, handoff, and AI-format setup surfaces now lean even further into calm defaults and quieter handoff language, with less setup-heavy wording and fewer operator-ish labels
   - Dropzones now lean further into a low-friction handoff-page feel, with calmer `handoff link` language, softer setup copy, and a more phone-friendly `send update` upload flow
   - remote intake instructions and note-image import confirmations now also describe this flow as relationship memory / handoff capture instead of older CRM queue language
   - relationship history now visually calls out client-shared upload context instead of burying it in generic activity
+  - relationship pages now also give client-shared uploads their own short `Client-shared history` section so screenshots, whiteboard photos, and handoff notes stay visibly attached to the relationship story
   - intake setup now has calmer set-once defaults for channels, handoff notes, source formats, and AI memory prompts to reduce typing and configuration
   - reconnect guidance now includes a clearer `why it can still land` read plus a starter line for reopening stale, drifting, and at-risk relationships, with gentler company-aware and saved-context fallbacks when Brivoly has thinner history and a softer sparse-context restart path when almost nothing is saved yet
   - intake and attention copy now lean further into relationship continuity and away from setup / pipeline language
@@ -175,6 +177,7 @@ cd web && npm run e2e
   - intake defaults now read more like set-it-and-forget-it guidance, with quieter `Client dropzone` language, lighter `Usual path` / `What to notice` wording, `First / Next / Then` task framing, recommended helper actions, and simple `Save` actions instead of configuration-heavy language
   - auth, shell fallback, API fallback, loading, draft-composer, and client-upload surfaces now use calmer language and lighter guidance with less system-heavy phrasing
   - Today navigation and other dense summary areas are progressively flattening into lighter pills and calmer summaries instead of equal-weight cards
+  - Today now leans more clearly into a daily starting point, with fewer equal-weight summary blocks, a stronger `Start here` move, and a lighter `After that` sequence for the next warm openings
   - scheduled mailbox automation now reports both watch-ready and event-ready inbox coverage so the always-on sync layer is easier to reason about than a raw thread count alone
   - Today, Inbox, Attention, and Relationships now quietly refresh from connected inbox/calendar memory while the page is open, so fresh context can surface without asking the user to manually refresh
   - Today and Attention now surface whether Brivoly is still holding context quietly in the background or whether paused / reconnect-needed inbox and calendar connections are starting to thin that memory layer out

@@ -3272,12 +3272,12 @@ function TodayPrioritiesPanel({
         Today’s priorities
       </p>
       <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
-        A short list of who needs your attention right now.
+        Your daily starting point.
       </h2>
       <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
         Brivoly pulls together replies, reconnects, proposal follow-through,
-        upcoming meeting prep, and new client context so you can pick the right
-        next move without re-reading everything first.
+        meeting prep, and fresh client context so the first move is obvious
+        without re-reading everything first.
       </p>
       <p className="mt-3 text-sm font-medium text-slate-700">
         Start with one relationship and one next move. Brivoly will hold the
@@ -3368,88 +3368,11 @@ function TodayPrioritiesPanel({
             }}
             className="rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-700 transition hover:border-slate-400 hover:bg-white hover:text-slate-950"
           >
-            {item.actionLabel ?? item.eyebrow}
+            Jump to {item.actionLabel?.toLowerCase() ?? item.eyebrow.toLowerCase()}
           </button>
         ))}
       </div>
-      <div className="mt-5 grid gap-3 lg:grid-cols-3">
-        <DailyFlowCard
-          label="Start here"
-          title={
-            primaryPriority?.title ||
-            "Nothing fragile is asking for the first move right now."
-          }
-          body={
-            primaryPriority?.nextMove ||
-            primaryPriority?.body ||
-            "Brivoly will keep the rest warm while you pick the lightest useful next step."
-          }
-          tone="primary"
-        />
-        <DailyFlowCard
-          label="Then keep moving"
-          title={
-            secondaryPriorities[0]?.title || "Pick up the next warm thread."
-          }
-          body={
-            secondaryPriorities[0]?.nextMove ||
-            secondaryPriorities[0]?.body ||
-            "After the first move lands, Brivoly keeps the next best follow-through close."
-          }
-          tone="secondary"
-        />
-        <DailyFlowCard
-          label="Keep warm"
-          title={
-            ambientMemorySummary?.continuity_summary ||
-            "Background memory is ready to support the next touch."
-          }
-          body={
-            ambientMemorySummary?.suggested_action_note ||
-            "If continuity goes quiet, Brivoly will point to the calmest fix without turning this into admin work."
-          }
-          tone="neutral"
-        />
-      </div>
-      <div className="mt-5 grid gap-3 xl:grid-cols-4">
-        <CompactMetricLight
-          label="Reply pressure"
-          value={
-            replyCount
-              ? `${replyCount} thread${replyCount === 1 ? "" : "s"}`
-              : "Clear"
-          }
-          tone={replyCount ? "critical" : "neutral"}
-        />
-        <CompactMetricLight
-          label="At risk now"
-          value={
-            atRiskCount
-              ? `${atRiskCount} relationship${atRiskCount === 1 ? "" : "s"}`
-              : "None"
-          }
-          tone={atRiskCount ? "critical" : "neutral"}
-        />
-        <CompactMetricLight
-          label="Ready to reopen"
-          value={
-            staleCount + driftingCount
-              ? `${staleCount + driftingCount} relationship${staleCount + driftingCount === 1 ? "" : "s"}`
-              : "Quiet"
-          }
-          tone={staleCount + driftingCount ? "warning" : "neutral"}
-        />
-        <CompactMetricLight
-          label="Fresh context"
-          value={
-            contextCount
-              ? `${contextCount} update${contextCount === 1 ? "" : "s"}`
-              : "Quiet"
-          }
-          tone={contextCount ? "positive" : "neutral"}
-        />
-      </div>
-      <div className="mt-5 grid gap-3 md:grid-cols-2">
+      <div className="mt-5 grid gap-3 md:grid-cols-3">
         <TodaySignal
           label="Needs care now"
           value={urgentCount ? String(urgentCount) : "Clear"}
@@ -3538,6 +3461,28 @@ function TodayPrioritiesPanel({
                 <Link href={primaryPriority.href}>Open relationship</Link>
               </Button>
             </div>
+          </div>
+        </div>
+      ) : null}
+      {secondaryPriorities.length ? (
+        <div className="mt-5 rounded-[1.35rem] border bg-slate-50/80 px-5 py-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+            After that
+          </p>
+          <div className="mt-3 grid gap-3 md:grid-cols-2">
+            {secondaryPriorities.slice(0, 2).map((item) => (
+              <div
+                key={`${item.id}-after`}
+                className="rounded-[1rem] border bg-white px-4 py-4"
+              >
+                <p className="text-sm font-medium text-slate-900">
+                  {item.title}
+                </p>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  {item.nextMove || item.body}
+                </p>
+              </div>
+            ))}
           </div>
         </div>
       ) : null}
