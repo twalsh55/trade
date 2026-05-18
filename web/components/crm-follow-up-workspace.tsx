@@ -7414,6 +7414,7 @@ function LeadMemoryPanel({
   const latestUploadEntry = getLatestUploadContextEntry(lead);
   const latestMeaningfulEntry = getLatestMeaningfulTimelineEntry(lead);
   const keyTimelineMoments = getKeyTimelineMoments(lead);
+  const recentShiftEntries = getSortedTimelineEntries(lead).slice(0, 3);
   const uploadTimelineEntries = getUploadTimelineEntries(lead);
   const latestThread = selectedThread ?? getNewestThread(lead);
   const prepOpenLoop =
@@ -7919,6 +7920,50 @@ function LeadMemoryPanel({
           <TimelineTile label="Where the next note starts" value={storyNextTouch} />
         </div>
       </section>
+
+      {recentShiftEntries.length ? (
+        <section className="mt-6 rounded-[1.5rem] border bg-slate-50/70 p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div className="max-w-3xl">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                Recent shifts
+              </p>
+              <h3 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+                See what actually changed before you write the next note.
+              </h3>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Brivoly keeps the freshest thread movement, client-shared
+                context, and saved notes in one short run so you can enter the
+                relationship story at the right moment.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setMemoryView("recent_changes")}
+              >
+                Review recent changes
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => jumpToSection(fullTimelineSectionRef)}
+              >
+                Open full timeline
+              </Button>
+            </div>
+          </div>
+          <div className="mt-4 grid gap-3 lg:grid-cols-3">
+            {recentShiftEntries.map((entry) => (
+              <StoryMomentCard
+                key={`${entry.occurred_at}-${entry.kind}-${entry.summary}`}
+                entry={entry}
+              />
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <section className="mt-6 rounded-[1.5rem] border bg-slate-50 p-5">
         <p className="ui-eyebrow">Relationship memory</p>
