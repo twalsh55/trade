@@ -120,6 +120,7 @@ cd web && npm run e2e
   - inbox cards now surface backend-driven relationship pulse, open-loop memory, thread continuity cues, `what changed` hints, unresolved-thread cues, a clearer long-thread `through-line`, and a carry-forward cue for longer threads, grouped into `Needs you now` and `Still warm`
   - inbox thread cards and the inbox-side next-move view now surface a tighter `One read` summary plus a clearer `Reply angle`, so longer threads are easier to trust and answer from the list itself
   - Inbox now also lifts the most urgent thread into a `Start here` spotlight so the first reply or reconnect can happen from one high-context card instead of a long scan
+  - Inbox now also makes it easier to move in and out of filtered views with a direct `waiting` focus, clearer reset actions, and less fiddly search recovery when a narrowed view comes back empty
   - Inbox now also supports open-loop and long-thread filtering plus a direct `Close loop` draft path so longer conversations can move forward with less scanning
   - email-thread ingestion that can auto-create/update contacts from inbox activity
   - mailbox sync now feeds the same inbox-ingest path Brivoly already uses, so provider-synced email activity and provider watch callbacks land in relationship memory instead of a separate mailbox subsystem
@@ -132,6 +133,7 @@ cd web && npm run e2e
   - `/api/account/privacy/erase` and the settings erase actions can now clear stored relationship memory or wipe memory plus connected mailbox links as an early GDPR delete/control path
   - attention view with reconnect-first guidance and direct draft actions
   - attention view now lifts the most fragile relationship first and gives protect-first cards clearer `latest saved moment`, `reply angle`, and draft actions so fragile threads are easier to save without digging
+  - the wider Attention view now softens stage-heavy framing into calmer relationship groups, with warmer lane copy and less emphasis on stage jargon when scanning for risk
   - Attention now puts reply pressure, at-risk relationships, reopening moments, and warm openings ahead of the older stage lanes so the page reads more like continuity protection than pipeline tracking
   - complete and snooze actions
   - relationship history + internal notes
@@ -178,6 +180,7 @@ cd web && npm run e2e
   - intake and attention copy now lean further into relationship continuity and away from setup / pipeline language
   - text-heavy card layouts now prefer wider 2-column patterns so copy does not collapse into cramped narrow cards
   - shell, taskbar, import, relationship-memory, and handoff copy now consistently point to Client OS instead of older workspace/portal language
+  - taskbar and top-of-page framing now lean further into cognitive-state language such as `Today`, `Inbox`, `Attention`, `Saved context`, and `Dropzones` instead of section-heavy software framing
   - overview density is calmer now, with lighter warm-intro panels, a simpler relationship continuity read, a lighter conversation-memory stack in inbox follow-through, a less repetitive relationship-memory panel, and a less dashboard-like fallback shell
   - intake defaults now read more like set-it-and-forget-it guidance, with quieter `Client dropzone` language, lighter `Usual path` / `What to notice` wording, `First / Next / Then` task framing, recommended helper actions, and simple `Save` actions instead of configuration-heavy language
   - auth, shell fallback, API fallback, loading, draft-composer, and client-upload surfaces now use calmer language and lighter guidance with less system-heavy phrasing
