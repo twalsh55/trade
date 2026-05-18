@@ -42,7 +42,7 @@ export function SettingsEditor({
       business_logo_data_url: "",
       onboarding_profile_deferred: false,
       crm_ai_prompt:
-        "Focus on extracting follow-up-critical CRM fields from messy spreadsheets, files, and images. Prioritize lead name, company, owner, stage, next follow-up date, notes, and next step. Preserve evidence when uncertain.",
+        "Focus on relationship-memory details from messy spreadsheets, files, and images. Prioritize contact name, company, owner, current relationship state, next touch timing, context notes, and the clearest next step. Preserve evidence when uncertain.",
       crm_preferred_import_formats: [
         "csv",
         "google_sheets",
@@ -50,7 +50,7 @@ export function SettingsEditor({
       ],
       crm_image_intake_channels: ["upload", "magic_link"],
       crm_image_intake_notes:
-        "Default to uploads inside Brivoly, then use the signed magic link when phone capture is easier.",
+        "Default to uploads inside Brivoly, then use the signed handoff link when phone capture is easier.",
       preferred_language: "en",
       preferred_locale: "en-US",
       data_retention_days: 365,
@@ -443,7 +443,7 @@ export function SettingsEditor({
             Enable Telegram alerts in dashboard defaults
           </label>
         </Field>
-        <Field label="AI Intake Formats">
+        <Field label="Usual memory formats">
           <input
             className={inputClassName(
               Boolean(errors.crm_preferred_import_formats),
@@ -460,7 +460,7 @@ export function SettingsEditor({
             <FieldError message={errors.crm_preferred_import_formats} />
           ) : null}
         </Field>
-        <Field label="Image Intake Channels">
+        <Field label="Usual capture paths">
           <input
             className={inputClassName(
               Boolean(errors.crm_image_intake_channels),
@@ -479,18 +479,22 @@ export function SettingsEditor({
         </Field>
       </div>
 
-      <Field label="AI Intake Prompt">
+      <Field label="What Brivoly should look for">
         <textarea
           className={inputClassName(Boolean(errors.crm_ai_prompt))}
           value={form.crm_ai_prompt}
           onChange={(event) => updateField("crm_ai_prompt", event.target.value)}
           rows={5}
         />
+        <p className="mt-2 text-xs text-slate-500">
+          Keep this focused on the relationship details you most want Brivoly to
+          recover from messy source material.
+        </p>
         {errors.crm_ai_prompt ? (
           <FieldError message={errors.crm_ai_prompt} />
         ) : null}
       </Field>
-      <Field label="Image Intake Routing Notes">
+      <Field label="Remote handoff notes">
         <textarea
           className={inputClassName(Boolean(errors.crm_image_intake_notes))}
           value={form.crm_image_intake_notes}
@@ -499,6 +503,10 @@ export function SettingsEditor({
           }
           rows={4}
         />
+        <p className="mt-2 text-xs text-slate-500">
+          Capture the calm default path Brivoly should use when someone sends a
+          note, screenshot, or phone photo from outside the app.
+        </p>
         {errors.crm_image_intake_notes ? (
           <FieldError message={errors.crm_image_intake_notes} />
         ) : null}

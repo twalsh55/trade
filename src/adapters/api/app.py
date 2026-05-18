@@ -574,11 +574,11 @@ def create_app(dependencies: ApiDependencies | None = None) -> FastAPI:
                     payload.note_body,
                 )
             else:
-                raise HTTPException(status_code=422, detail="Unsupported CRM follow-up action.")
+                raise HTTPException(status_code=422, detail="Unsupported relationship follow-through action.")
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         except KeyError as exc:
-            raise HTTPException(status_code=404, detail="CRM follow-up not found.") from exc
+            raise HTTPException(status_code=404, detail="Relationship follow-through was not found.") from exc
 
         overview = GetLeadFollowUpOverviewUseCase(repository=repository, now=deps.now).execute(user)
         return dto_to_dict(build_lead_follow_up_overview_dto(overview))
@@ -610,7 +610,7 @@ def create_app(dependencies: ApiDependencies | None = None) -> FastAPI:
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         except KeyError as exc:
-            raise HTTPException(status_code=404, detail="CRM follow-up not found.") from exc
+            raise HTTPException(status_code=404, detail="Relationship follow-through was not found.") from exc
         return dto_to_dict(build_lead_follow_up_email_draft_dto(draft))
 
     @app.post("/api/crm/inbox/threads")
@@ -935,7 +935,7 @@ def create_app(dependencies: ApiDependencies | None = None) -> FastAPI:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         except KeyError as exc:
             missing_id = str(exc).strip("'")
-            message = "Mailbox connection not found." if payload.connection_id and missing_id == payload.connection_id else "CRM follow-up not found."
+            message = "Mailbox connection not found." if payload.connection_id and missing_id == payload.connection_id else "Relationship follow-through was not found."
             raise HTTPException(status_code=404, detail=message) from exc
         return dto_to_dict(build_mailbox_send_result_dto(result))
 
@@ -1195,7 +1195,7 @@ def create_app(dependencies: ApiDependencies | None = None) -> FastAPI:
         intake = _extract_telegram_image_intake(payload)
         if intake is not None:
             notifier = _build_telegram_notifier(chat_id=intake.chat_id)
-            notifier.send_message("Received your note image. Brivoly is importing it into your CRM now.")
+            notifier.send_message("Received your note image. Brivoly is bringing it into relationship memory now.")
             background_tasks.add_task(_run_telegram_crm_image_intake, notifier, intake, deps)
             return {"ok": True, "handled": True, "command": intake.command_name}
         command = _extract_telegram_command(payload)
@@ -1620,10 +1620,10 @@ def _parse_crm_intake_token(token: str, secret: str) -> UUID:
     compact_user_id, separator, compact_signature = token.partition(".")
     if separator:
         if len(compact_user_id) != 32 or len(compact_signature) != 12:
-            raise ValueError("The CRM intake code is invalid.")
+            raise ValueError("That Brivoly handoff code is invalid.")
         expected_signature = hmac.new(secret.encode("utf-8"), compact_user_id.encode("utf-8"), hashlib.sha256).hexdigest()[:12]
         if not hmac.compare_digest(compact_signature, expected_signature):
-            raise ValueError("The CRM intake code is invalid.")
+            raise ValueError("That Brivoly handoff code is invalid.")
         return UUID(compact_user_id)
 
     padded = token + "=" * (-len(token) % 4)
@@ -1631,16 +1631,16 @@ def _parse_crm_intake_token(token: str, secret: str) -> UUID:
         payload = base64.urlsafe_b64decode(padded.encode("ascii"))
         parsed = json.loads(payload.decode("utf-8"))
     except (ValueError, json.JSONDecodeError, UnicodeDecodeError) as exc:
-        raise ValueError("The CRM intake code is invalid.") from exc
+        raise ValueError("That Brivoly handoff code is invalid.") from exc
     if not isinstance(parsed, dict):
-        raise ValueError("The CRM intake code is invalid.")
+        raise ValueError("That Brivoly handoff code is invalid.")
     user_id_text = parsed.get("user_id")
     signature = parsed.get("signature")
     if not isinstance(user_id_text, str) or not isinstance(signature, str):
-        raise ValueError("The CRM intake code is invalid.")
+        raise ValueError("That Brivoly handoff code is invalid.")
     expected_signature = hmac.new(secret.encode("utf-8"), user_id_text.encode("utf-8"), hashlib.sha256).hexdigest()[:24]
     if not hmac.compare_digest(signature, expected_signature):
-        raise ValueError("The CRM intake code is invalid.")
+        raise ValueError("That Brivoly handoff code is invalid.")
     return UUID(user_id_text)
 
 

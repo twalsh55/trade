@@ -913,7 +913,7 @@ def test_telegram_webhook_handles_remote_crm_image_intake(monkeypatch) -> None:
     )
 
     assert response.json() == {"ok": True, "handled": True, "command": "/intake"}
-    assert sent[-1] == "Received your note image. Brivoly is importing it into your CRM now."
+    assert sent[-1] == "Received your note image. Brivoly is bringing it into relationship memory now."
     assert tasks == [("456", "large", "telegram-photo.jpg")]
 
 
@@ -1375,7 +1375,7 @@ def test_crm_intake_upload_imports_rows(monkeypatch) -> None:
     assert payload["imported_count"] == 1
     assert payload["skipped_duplicates"] == 0
     assert payload["skipped_invalid"] == 0
-    assert "imported your note image" in payload["message"].lower()
+    assert "relationship memory" in payload["message"].lower()
     overview = GetLeadFollowUpOverviewUseCase(repository=repository, now=lambda: datetime(2024, 5, 6, 12, 30, tzinfo=UTC)).execute(user)
     assert any(item.notes == "Imported from magic link image" for item in overview.items)
     imported = next(item for item in overview.items if item.notes == "Imported from magic link image")
@@ -1397,7 +1397,7 @@ def test_crm_intake_upload_returns_validation_errors(monkeypatch) -> None:
         },
     )
     assert response.status_code == 422
-    assert response.json()["detail"] == "Remote CRM note capture is not configured yet."
+    assert response.json()["detail"] == "Remote handoff capture is not configured yet."
 
     monkeypatch.setenv("CRM_INTAKE_SECRET", "secret")
     response = client.post(
@@ -1525,7 +1525,7 @@ def test_run_telegram_crm_image_intake_reports_failure_branches(monkeypatch) -> 
         ),
         deps,
     )
-    assert sent[-1] == "CRM note import failed: Remote CRM note capture is not configured yet."
+    assert sent[-1] == "Brivoly handoff import failed: Remote handoff capture is not configured yet."
 
     monkeypatch.setenv("CRM_INTAKE_SECRET", "crm-secret")
     api_app_module._run_telegram_crm_image_intake(  # type: ignore[attr-defined]
@@ -1539,7 +1539,7 @@ def test_run_telegram_crm_image_intake_reports_failure_branches(monkeypatch) -> 
         ),
         deps,
     )
-    assert "active Brivoly account" in sent[-1]
+    assert "active account" in sent[-1]
 
     deps_without_repo = ApiDependencies(
         auth_use_case_factory=deps.auth_use_case_factory,
@@ -1977,7 +1977,7 @@ def test_dashboard_settings_helpers_normalize_defaults_and_build_config() -> Non
     assert defaults.telegram_enabled is True
     assert defaults.business_name == ""
     assert defaults.onboarding_profile_deferred is False
-    assert "follow-up-critical CRM fields" in defaults.crm_ai_prompt
+    assert "relationship-memory details" in defaults.crm_ai_prompt
     assert defaults.crm_image_intake_channels == ["upload", "magic_link"]
 
     normalized = normalize_dashboard_settings(
@@ -2363,7 +2363,7 @@ def test_crm_followups_endpoint_supports_complete_snooze_and_notes() -> None:
         json={"action": "complete"},
     )
     assert missing.status_code == 404
-    assert missing.json()["detail"] == "CRM follow-up not found."
+    assert missing.json()["detail"] == "Relationship follow-through was not found."
 
     invalid = client.patch(
         "/api/crm/followups/lead-riverbridge",
@@ -2483,7 +2483,7 @@ def test_crm_followup_email_draft_endpoint_handles_invalid_payload_and_missing_f
         json={"objective": "follow_up", "tone": "warm", "length": "medium"},
     )
     assert missing.status_code == 404
-    assert missing.json()["detail"] == "CRM follow-up not found."
+    assert missing.json()["detail"] == "Relationship follow-through was not found."
 
 
 def test_crm_import_preview_and_commit_endpoints_support_csv_and_google_sheets(monkeypatch) -> None:
@@ -2630,7 +2630,7 @@ def test_crm_import_preview_and_commit_endpoints_support_csv_and_google_sheets(m
 
     class FakeImageIntake:
         def extract_spreadsheet_rows_from_image(self, prompt: str, preferred_formats: list[str], file_name: str, file_bytes: bytes) -> str:
-            assert "follow-up-critical CRM fields" in prompt
+            assert "relationship-memory details" in prompt
             assert file_name == "note.png"
             assert file_bytes == b"note-image"
             return (
@@ -2662,7 +2662,7 @@ def test_crm_import_preview_and_commit_endpoints_support_csv_and_google_sheets(m
             sample_rows: list[dict[str, str]],
             clarification_answers: dict[str, str] | None = None,
         ) -> tuple[dict[str, str | None], object | None]:
-            assert "follow-up-critical CRM fields" in prompt
+            assert "relationship-memory details" in prompt
             assert source_label == "CSV upload"
             assert headers == ["Person", "Organisation", "Followup", "Context"]
             assert sample_rows[0]["Person"] == "Taylor Brooks"

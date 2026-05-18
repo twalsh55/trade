@@ -63,10 +63,10 @@ function makeState() {
       business_logo_data_url: "",
       onboarding_profile_deferred: false,
       crm_ai_prompt:
-        "Focus on extracting follow-up-critical CRM fields from messy spreadsheets, files, and images. Prioritize lead name, company, owner, stage, next follow-up date, notes, and next step. Preserve evidence when uncertain.",
+        "Focus on relationship-memory details from messy spreadsheets, files, and images. Prioritize contact name, company, owner, current relationship state, next touch timing, context notes, and the clearest next step. Preserve evidence when uncertain.",
       crm_preferred_import_formats: ["csv", "google_sheets", "spreadsheet_screenshot"],
       crm_image_intake_channels: ["upload", "magic_link"],
-      crm_image_intake_notes: "Default to uploads inside Brivoly, then use the signed magic link for phone-captured note images.",
+      crm_image_intake_notes: "Default to uploads inside Brivoly, then use the signed handoff link for phone-captured note images.",
     },
     alertRequests: 0,
     alerts: [
@@ -420,7 +420,7 @@ const server = http.createServer(async (request, response) => {
     const payload = await readRequestBody(request);
     const index = state.crmFollowUps.findIndex((item) => item.id === followUpId);
     if (index === -1) {
-      json(response, 404, { detail: "CRM follow-up not found." });
+      json(response, 404, { detail: "Relationship follow-through was not found." });
       return;
     }
 
