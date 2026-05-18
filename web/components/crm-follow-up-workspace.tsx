@@ -1861,6 +1861,14 @@ export function CRMFollowUpWorkspace({
                           </p>
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
+                          {item.recent_email_threads.some(
+                            (thread) => thread.needs_reply,
+                          ) ? (
+                            <MiniFlag tone="critical" label="Reply soon" />
+                          ) : null}
+                          {hasRecentUploadContext(item) ? (
+                            <MiniFlag tone="neutral" label="Fresh context" />
+                          ) : null}
                           {item.relationship_state === "stale" ? (
                             <MiniFlag tone="warning" label="Stale" />
                           ) : null}
@@ -1879,6 +1887,16 @@ export function CRMFollowUpWorkspace({
                       <p className="mt-1 text-sm leading-6 text-slate-600">
                         {item.next_step}
                       </p>
+                      <div className="mt-4 grid gap-3 md:grid-cols-2">
+                        <TimelineTile
+                          label="Why now"
+                          value={getLeadCardWhyNow(item)}
+                        />
+                        <TimelineTile
+                          label="Latest saved moment"
+                          value={getLeadCardStory(item)}
+                        />
+                      </div>
                       <div className="mt-5 grid gap-3 md:grid-cols-2">
                         <TimelineTile
                           label="Last touch"
@@ -1891,6 +1909,50 @@ export function CRMFollowUpWorkspace({
                       </div>
                     </button>
                     <div className="mt-5 flex flex-wrap gap-3">
+                      {item.recent_email_threads.some(
+                        (thread) => thread.needs_reply,
+                      ) ? (
+                        <Button
+                          variant="outline"
+                          onClick={() =>
+                            runTodayPriorityAction(
+                              item.id,
+                              "/clientos/follow-ups",
+                              {
+                                objective: "follow_up",
+                                tone: "warm",
+                                length: "short",
+                                status:
+                                  "Drafting a reply from relationship memory...",
+                              },
+                              undefined,
+                              getReplyThread(item)?.thread_id ?? null,
+                            )
+                          }
+                        >
+                          Draft reply
+                        </Button>
+                      ) : null}
+                      {isReconnectMoment(item) ? (
+                        <Button
+                          variant="outline"
+                          onClick={() =>
+                            runTodayPriorityAction(
+                              item.id,
+                              "/clientos/follow-ups",
+                              {
+                                objective: "revive",
+                                tone: "warm",
+                                length: "short",
+                                status:
+                                  "Drafting a reconnect from relationship memory...",
+                              },
+                            )
+                          }
+                        >
+                          Draft reconnect
+                        </Button>
+                      ) : null}
                       <Button
                         disabled={rowPending}
                         onClick={() =>
@@ -3264,6 +3326,45 @@ function TodayPrioritiesPanel({
           </button>
         ))}
       </div>
+      <div className="mt-5 grid gap-3 lg:grid-cols-3">
+        <DailyFlowCard
+          label="Start here"
+          title={
+            primaryPriority?.title ||
+            "Nothing fragile is asking for the first move right now."
+          }
+          body={
+            primaryPriority?.nextMove ||
+            primaryPriority?.body ||
+            "Brivoly will keep the rest warm while you pick the lightest useful next step."
+          }
+          tone="primary"
+        />
+        <DailyFlowCard
+          label="Then keep moving"
+          title={
+            secondaryPriorities[0]?.title || "Pick up the next warm thread."
+          }
+          body={
+            secondaryPriorities[0]?.nextMove ||
+            secondaryPriorities[0]?.body ||
+            "After the first move lands, Brivoly keeps the next best follow-through close."
+          }
+          tone="secondary"
+        />
+        <DailyFlowCard
+          label="Keep warm"
+          title={
+            ambientMemorySummary?.continuity_summary ||
+            "Background memory is ready to support the next touch."
+          }
+          body={
+            ambientMemorySummary?.suggested_action_note ||
+            "If continuity goes quiet, Brivoly will point to the calmest fix without turning this into admin work."
+          }
+          tone="neutral"
+        />
+      </div>
       <div className="mt-5 grid gap-3 xl:grid-cols-4">
         <CompactMetricLight
           label="Reply pressure"
@@ -3395,20 +3496,36 @@ function TodayPrioritiesPanel({
         </div>
       ) : null}
       {secondaryPriorities.length ? (
-        <div className="mt-5 grid gap-3 md:grid-cols-2">
-          {secondaryPriorities.map((item) => (
-            <PriorityCard
-              key={item.id}
-              href={item.href}
-              eyebrow={item.eyebrow}
-              title={item.title}
-              body={item.body}
-              meta={item.meta}
-              nextMove={item.nextMove}
-              actionLabel={item.actionLabel}
-              onAction={item.onAction}
-            />
-          ))}
+        <div className="mt-5">
+          <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                Then keep moving
+              </p>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Once the first move is handled, these are the next warm openings
+                Brivoly would keep close.
+              </p>
+            </div>
+            <p className="text-xs text-slate-500">
+              Keep this list short. One move at a time is enough.
+            </p>
+          </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            {secondaryPriorities.map((item) => (
+              <PriorityCard
+                key={item.id}
+                href={item.href}
+                eyebrow={item.eyebrow}
+                title={item.title}
+                body={item.body}
+                meta={item.meta}
+                nextMove={item.nextMove}
+                actionLabel={item.actionLabel}
+                onAction={item.onAction}
+              />
+            ))}
+          </div>
         </div>
       ) : null}
       <div className="mt-5 flex flex-wrap gap-3">
@@ -3449,6 +3566,39 @@ function TodaySignal({
       <p className="mt-4 max-w-[24rem] break-words text-sm leading-6 text-slate-700 [overflow-wrap:anywhere]">
         {detail}
       </p>
+    </div>
+  );
+}
+
+function DailyFlowCard({
+  label,
+  title,
+  body,
+  tone,
+}: {
+  label: string;
+  title: string;
+  body: string;
+  tone: "primary" | "secondary" | "neutral";
+}) {
+  const className =
+    tone === "primary"
+      ? "border-slate-900 bg-slate-950 text-white"
+      : tone === "secondary"
+        ? "border-sky-200 bg-sky-50 text-slate-950"
+        : "border-slate-200 bg-slate-50 text-slate-950";
+  const eyebrowClass = tone === "primary" ? "text-cyan-200" : "text-slate-500";
+  const bodyClass = tone === "primary" ? "text-slate-200" : "text-slate-600";
+
+  return (
+    <div className={`rounded-[1.35rem] border px-4 py-4 ${className}`}>
+      <p
+        className={`text-xs font-semibold uppercase tracking-[0.16em] ${eyebrowClass}`}
+      >
+        {label}
+      </p>
+      <p className="mt-3 text-lg font-semibold tracking-tight">{title}</p>
+      <p className={`mt-3 text-sm leading-6 ${bodyClass}`}>{body}</p>
     </div>
   );
 }
@@ -5641,6 +5791,8 @@ function LeadMemoryPanel({
   >(initialMemoryView ?? "overview");
   const latestTimelineEntry = getLatestContextEntry(lead);
   const latestUploadEntry = getLatestUploadContextEntry(lead);
+  const latestMeaningfulEntry = getLatestMeaningfulTimelineEntry(lead);
+  const keyTimelineMoments = getKeyTimelineMoments(lead);
   const memoryPanels = [
     {
       value: "overview" as const,
@@ -5958,8 +6110,8 @@ function LeadMemoryPanel({
           <TimelineTile
             label="Latest saved moment"
             value={
-              latestTimelineEntry
-                ? `${formatTimelineEntryLabel(latestTimelineEntry)} · ${latestTimelineEntry.summary}`
+              latestMeaningfulEntry
+                ? `${formatTimelineEntryLabel(latestMeaningfulEntry)} · ${latestMeaningfulEntry.summary}`
                 : "No relationship history saved yet"
             }
           />
@@ -5990,6 +6142,22 @@ function LeadMemoryPanel({
           />
         </div>
       </section>
+
+      {keyTimelineMoments.length ? (
+        <section className="mt-6 rounded-[1.5rem] border bg-white p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+            Key moments
+          </p>
+          <h3 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+            The moments most likely to shape the next touch.
+          </h3>
+          <div className="mt-4 grid gap-3 md:grid-cols-3">
+            {keyTimelineMoments.map((entry) => (
+              <StoryMomentCard key={`story-${entry.id}`} entry={entry} />
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <section
         ref={composerSectionRef}
@@ -6196,7 +6364,7 @@ function LeadMemoryPanel({
 
       <section className="mt-6">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
-          Relationship history
+          Full timeline
         </p>
         <p className="mt-2 text-sm leading-6 text-slate-600">
           The timeline is the running memory of what happened, what changed, and
@@ -6362,6 +6530,35 @@ function RelationshipReminderCard({
       <p className="mt-2 text-sm leading-6 text-slate-700">
         {reminder.message}
       </p>
+    </div>
+  );
+}
+
+function StoryMomentCard({
+  entry,
+}: {
+  entry: CRMLeadFollowUp["timeline"][number];
+}) {
+  const uploadContext = isUploadTimelineEntry(entry);
+  return (
+    <div
+      className={`rounded-[1.2rem] border px-4 py-4 ${
+        uploadContext
+          ? "border-sky-200 bg-sky-50/80"
+          : "border-slate-200 bg-slate-50/80"
+      }`}
+    >
+      <p
+        className={`text-xs font-semibold uppercase tracking-[0.18em] ${
+          uploadContext ? "text-sky-700" : "text-slate-400"
+        }`}
+      >
+        {formatTimelineEntryLabel(entry)}
+      </p>
+      <p className="mt-2 text-sm font-medium text-slate-950">
+        {formatDateTime(entry.occurred_at)}
+      </p>
+      <p className="mt-3 text-sm leading-6 text-slate-700">{entry.summary}</p>
     </div>
   );
 }
@@ -6572,17 +6769,11 @@ function getNewestThreadTime(item: CRMLeadFollowUp) {
 }
 
 function getLatestContextEntry(item: CRMLeadFollowUp) {
-  const timeline = [...item.timeline];
-  timeline.sort(
-    (left, right) =>
-      new Date(right.occurred_at).getTime() -
-      new Date(left.occurred_at).getTime(),
-  );
-  return timeline[0] ?? null;
+  return getSortedTimelineEntries(item)[0] ?? null;
 }
 
 function getLatestUploadContextEntry(item: CRMLeadFollowUp) {
-  const timeline = [...item.timeline]
+  const timeline = getSortedTimelineEntries(item)
     .filter(
       (entry) =>
         entry.kind === "import" ||
@@ -6596,6 +6787,32 @@ function getLatestUploadContextEntry(item: CRMLeadFollowUp) {
         new Date(left.occurred_at).getTime(),
     );
   return timeline[0] ?? null;
+}
+
+function getSortedTimelineEntries(item: CRMLeadFollowUp) {
+  const timeline = [...item.timeline];
+  timeline.sort(
+    (left, right) =>
+      new Date(right.occurred_at).getTime() -
+      new Date(left.occurred_at).getTime(),
+  );
+  return timeline;
+}
+
+function getLatestMeaningfulTimelineEntry(item: CRMLeadFollowUp) {
+  return (
+    getSortedTimelineEntries(item).find((entry) =>
+      isMeaningfulTimelineEntry(entry),
+    ) ??
+    getSortedTimelineEntries(item)[0] ??
+    null
+  );
+}
+
+function getKeyTimelineMoments(item: CRMLeadFollowUp) {
+  return getSortedTimelineEntries(item)
+    .filter((entry) => isMeaningfulTimelineEntry(entry))
+    .slice(0, 3);
 }
 
 function getReplySummary(item: CRMLeadFollowUp) {
@@ -6715,6 +6932,39 @@ function hasRecentUploadContext(item: CRMLeadFollowUp) {
   return Date.now() - latest <= 1000 * 60 * 60 * 24 * 3;
 }
 
+function getLeadCardWhyNow(item: CRMLeadFollowUp) {
+  if (item.recent_email_threads.some((thread) => thread.needs_reply)) {
+    return (
+      getReplyThread(item)?.next_touch_hint ||
+      getReplyThread(item)?.open_loop ||
+      "There is an active thread waiting on you."
+    );
+  }
+  if (isReconnectMoment(item)) {
+    return (
+      item.relationship_reconnect_why_now ||
+      item.relationship_timing_nudge ||
+      describeReconnectWindow(item)
+    );
+  }
+  if (hasRecentUploadContext(item)) {
+    return (
+      item.relationship_upload_follow_through_hint ||
+      item.relationship_recent_upload_summary ||
+      "Fresh client context gives you a natural way back in."
+    );
+  }
+  return item.relationship_timing_nudge || item.next_step;
+}
+
+function getLeadCardStory(item: CRMLeadFollowUp) {
+  const latest = getLatestMeaningfulTimelineEntry(item);
+  if (!latest) {
+    return item.notes || "No saved relationship story yet.";
+  }
+  return `${formatTimelineEntryLabel(latest)} · ${latest.summary}`;
+}
+
 function relationshipStateUrgency(state: string) {
   if (state === "at_risk") {
     return 3;
@@ -6726,6 +6976,10 @@ function relationshipStateUrgency(state: string) {
     return 1;
   }
   return 0;
+}
+
+function isMeaningfulTimelineEntry(entry: CRMLeadFollowUp["timeline"][number]) {
+  return entry.kind !== "internal_note";
 }
 
 function compareAttentionPriority(

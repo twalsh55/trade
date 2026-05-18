@@ -66,6 +66,7 @@ cd web && npm run e2e
 
 - Railway deploys the API from repo root using `Dockerfile`, `railway.toml`, and `scripts/start_railway.sh`.
 - Vercel uses `web/` as project root.
+- Never push to production unless the user explicitly asks for a deploy/push to production in the current session.
 - Important envs:
   - API: `DATABASE_URL`, Clerk vars, Stripe vars, Telegram vars, `APP_OPENAI_API_KEY`/`OPENAI_API_KEY`, `ALLOW_ANONYMOUS_CRM`, Google OAuth vars, Microsoft OAuth vars, `MAILBOX_WATCH_WEBHOOK_SECRET`
   - Web: `BRIVOLY_API_BASE_URL`, `APP_BASE_URL`, Clerk frontend vars
@@ -106,6 +107,7 @@ cd web && npm run e2e
   - anonymous guest mode now bootstraps the sample relationship set once into durable CRM storage instead of rebuilding it from process memory on every restart
   - Today priorities now collapse into one obvious `Start here` move, lighter `Needs care now` and `Freshest opening` summaries, direct draft/review actions, stronger upload-aware next-touch framing, a lightweight `Prepare now` path for upcoming meeting-like moments, and a clearer `Next move` cue on each priority so the daily home asks for less scanning
   - Today now also surfaces a tighter triage read for reply pressure, at-risk relationships, reopening moments, and fresh context so the default home makes fragile relationships more obvious before anything else
+  - Today now also frames the day more explicitly as `Start here`, `Then keep moving`, and `Keep warm`, so the home feels more like one calm starting point than a dashboard of equal-weight panels
   - follow-up queue
   - inbox-native relationship page for auto-logging email threads and reconnect-aware next moves
   - mailbox beta now includes real Gmail / Outlook OAuth-ready connection start/complete routes, provider-backed sync for OAuth-linked accounts, provider-watch event callbacks, and provider-backed sending through Gmail API / Microsoft Graph when those accounts are connected
@@ -128,7 +130,9 @@ cd web && npm run e2e
   - Attention now puts reply pressure, at-risk relationships, reopening moments, and warm openings ahead of the older stage lanes so the page reads more like continuity protection than pipeline tracking
   - complete and snooze actions
   - relationship history + internal notes
+  - relationship list cards now surface a clearer `Why now`, the latest saved relationship moment, and direct reply/reconnect drafting so quiet relationships are easier to reopen from the list itself
   - relationship pages now open with a `Timeline focus` read that pulls the latest saved moment, client-shared context, current open loop, and best next touch together before the full history log
+  - relationship pages now also surface `Key moments` ahead of the full timeline so the most meaningful saved events are easier to trust at a glance before reading the full running history
   - relationship memory summaries now blend email, notes, uploads, reconnect cues, recent upload context, and upcoming meeting prep signals, with lighter `Conversation memory` and `Latest saved context` reads instead of repetitive stacked boxes
   - relationship pages now surface upcoming meeting-like moments with a direct `Prepare me` path into the meeting-prep memory view when Brivoly detects that a near-term next touch looks like a call, demo, review, or sync
   - explicit calendar events now land as `meeting` timeline context, can temporarily become the next prep moment, and feed the existing meeting-prep summary layer instead of living in a separate calendar silo
@@ -280,7 +284,7 @@ cd web && npm run e2e
   - local verification
   - commit
   - push
-  - deploy when the affected surface is live and credentials already exist
+  - deploy only when the user explicitly asks for it
 - Use existing briefing/email mechanisms to keep the founder updated.
 - Pause only for hidden-risk, destructive, or high-ambiguity changes.
 
