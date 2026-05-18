@@ -1609,8 +1609,8 @@ export function CRMFollowUpWorkspace({
               </h2>
               <p className="mt-3 text-sm leading-6 text-slate-600">
                 Upload a CSV, XLSX, XLS, or note image, or paste a Google Sheets
-                link. Brivoly cleans up messy headers, spots what is missing,
-                and keeps only what is ready to support the next touch.
+                link. Brivoly makes sense of the rough edges, spots what is
+                missing, and keeps only what is ready to support the next touch.
               </p>
 
               <div className="mt-5 flex flex-wrap gap-3">
@@ -1673,7 +1673,7 @@ export function CRMFollowUpWorkspace({
                   <p className="mt-3 text-xs text-slate-500">
                     Supported: CSV, XLSX, XLS, PNG, JPG, JPEG, and WEBP. Helpful
                     columns include contact, company, owner, next touch, and
-                    notes.
+                    notes you would want back in memory.
                   </p>
                   {selectedFile ? (
                     <p className="mt-2 text-sm font-medium text-slate-700">
@@ -1682,8 +1682,8 @@ export function CRMFollowUpWorkspace({
                   ) : null}
                   {selectedFile && isImageFile(selectedFile.name) ? (
                     <p className="mt-2 text-xs text-slate-500">
-                      Brivoly will use your AI Intake Profile to turn this note
-                      image into relationship-ready rows.
+                      Brivoly will use your saved AI reading defaults to turn
+                      this note image into relationship-ready rows.
                     </p>
                   ) : null}
                 </section>
@@ -1709,7 +1709,8 @@ export function CRMFollowUpWorkspace({
                   />
                   <p className="mt-3 text-xs text-slate-500">
                     Use a shareable Google Sheets URL. Brivoly will pull the
-                    context in directly.
+                    context in directly and keep only what is worth carrying
+                    forward.
                   </p>
                 </section>
               )}
@@ -5755,8 +5756,8 @@ function ImportPreviewPanel({
           Nothing staged yet.
         </h3>
         <p className="mt-3 text-sm leading-6 text-slate-600">
-          Preview the sheet first to see normalized rows, duplicate detection,
-          and validation issues before importing anything.
+          Check the source first to see the cleaned-up rows, duplicates, and
+          anything Brivoly still needs before bringing it into memory.
         </p>
       </section>
     );
@@ -5779,7 +5780,7 @@ function ImportPreviewPanel({
         Preview
       </p>
       <h3 className="mt-3 text-2xl font-semibold tracking-tight">
-        {preview.source_label} import check
+        {preview.source_label} memory check
       </h3>
       <div className="mt-5 grid gap-3 md:grid-cols-2">
         <CompactMetric label="Rows" value={String(preview.total_rows)} />
@@ -5870,8 +5871,8 @@ function ImportPreviewPanel({
               Column mapping
             </p>
             <p className="mt-2 text-sm leading-6 text-slate-300">
-              Keep the suggested mapping if it looks right, or correct any
-              column here before importing.
+              Keep the suggested mapping if it looks right, or correct anything
+              here before bringing it in.
             </p>
           </div>
           {isImportMappingDirty ? (
@@ -5939,7 +5940,7 @@ function ImportMappingRow({
           Suggested:{" "}
           {item.suggested_field
             ? formatImportFieldLabel(item.suggested_field)
-            : "Ignore this column"}
+            : "Leave this out"}
         </p>
       </div>
       <label className="block">
@@ -5953,7 +5954,7 @@ function ImportMappingRow({
           }
           className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-sm text-white outline-none transition focus:border-slate-400"
         >
-          <option value="">Ignore this column</option>
+          <option value="">Leave this out</option>
           {availableFields.map((field) => (
             <option key={field} value={field}>
               {formatImportFieldLabel(field)}
