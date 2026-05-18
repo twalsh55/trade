@@ -5786,6 +5786,11 @@ function InboxActivityPanel({
                           "Send one short note that locks in the next step while the thread still feels live."}
                     </p>
                   </div>
+                  <p className="mt-3 text-xs text-slate-500">
+                    {newestThread?.needs_reply
+                      ? "Reply while the thread still feels live."
+                      : "Keep the first note short enough to answer quickly."}
+                  </p>
                   <div className="mt-4 flex flex-wrap gap-2">
                     <Button
                       type="button"
