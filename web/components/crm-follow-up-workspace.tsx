@@ -1969,6 +1969,77 @@ export function CRMFollowUpWorkspace({
                 </div>
               </div>
             ) : null}
+            {filteredFollowUps.length > 1 ? (
+              <div className="mt-5 rounded-[1.35rem] border bg-slate-50/80 px-5 py-4">
+                <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                      After that
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                      Once the first relationship is handled, these are the next
+                      touches Brivoly would keep close without turning the page
+                      into a wall of equal-weight cards.
+                    </p>
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    Let the rest stay quiet until you need them.
+                  </p>
+                </div>
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  {filteredFollowUps.slice(1, 3).map((item) => (
+                    <div
+                      key={`${item.id}-memory-next`}
+                      className="rounded-[1rem] border bg-white px-4 py-4"
+                    >
+                      <p className="text-sm font-medium text-slate-900">
+                        {item.lead_name}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {item.company_name}
+                      </p>
+                      <p className="mt-3 text-sm leading-6 text-slate-600">
+                        {getLeadCardWhyNow(item)}
+                      </p>
+                      <p className="mt-3 text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+                        Best next touch
+                      </p>
+                      <p className="mt-2 text-sm leading-6 text-slate-700">
+                        {isReconnectMoment(item)
+                          ? item.relationship_reconnect_next_move ||
+                            item.next_step
+                          : getNewestThread(item)?.open_loop ||
+                            getNewestThread(item)?.next_touch_hint ||
+                            item.next_step}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            {filteredFollowUps.length > 3 ? (
+              <div className="mt-5 rounded-[1.35rem] border bg-white px-5 py-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                  Can wait quietly
+                </p>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  These relationships are still in view, but they do not need
+                  the same urgency as the first few.
+                </p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {filteredFollowUps.slice(3, 8).map((item) => (
+                    <button
+                      key={`${item.id}-quiet-pill`}
+                      type="button"
+                      onClick={() => setSelectedLeadId(item.id)}
+                      className="rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-700 transition hover:border-slate-400 hover:bg-white hover:text-slate-950"
+                    >
+                      {item.lead_name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
             <div className="mt-6 space-y-4">
               {filteredFollowUps.map((item) => {
                 const rowPending = pendingId === item.id && isPending;
