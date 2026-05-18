@@ -5926,6 +5926,7 @@ function LeadMemoryPanel({
   const latestUploadEntry = getLatestUploadContextEntry(lead);
   const latestMeaningfulEntry = getLatestMeaningfulTimelineEntry(lead);
   const keyTimelineMoments = getKeyTimelineMoments(lead);
+  const uploadTimelineEntries = getUploadTimelineEntries(lead);
   const latestThread = selectedThread ?? getNewestThread(lead);
   const prepOpenLoop =
     latestThread?.open_loop ||
@@ -6402,6 +6403,61 @@ function LeadMemoryPanel({
           <div className="mt-4 grid gap-3 md:grid-cols-3">
             {keyTimelineMoments.map((entry) => (
               <StoryMomentCard key={`story-${entry.id}`} entry={entry} />
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {uploadTimelineEntries.length ? (
+        <section className="mt-6 rounded-[1.5rem] border bg-sky-50/50 p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-700">
+            Client-shared history
+          </p>
+          <h3 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+            Keep the client’s updates attached to the relationship story.
+          </h3>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+            Screenshots, whiteboard photos, and handoff notes stay visible here
+            so the next reply can start from what the client actually sent, not
+            from memory alone.
+          </p>
+          <div className="mt-4 space-y-3">
+            {uploadTimelineEntries.slice(0, 3).map((entry, index) => (
+              <div
+                key={`upload-story-${entry.id}`}
+                className="rounded-[1.2rem] border bg-white px-4 py-4"
+              >
+                <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">
+                      Client-shared context
+                    </p>
+                    <MiniFlag
+                      label={formatUploadHistorySource(entry)}
+                      tone="neutral"
+                    />
+                    {index === 0 ? (
+                      <MiniFlag label="Latest" tone="neutral" />
+                    ) : null}
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    {formatDateTime(entry.occurred_at)}
+                  </p>
+                </div>
+                <p className="mt-3 text-sm leading-6 text-slate-700">
+                  {entry.summary}
+                </p>
+                {index === 0 && lead.relationship_upload_follow_through_hint ? (
+                  <div className="mt-3 rounded-[1rem] border bg-sky-50/70 px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-sky-700">
+                      Use this in the next touch
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-slate-700">
+                      {lead.relationship_upload_follow_through_hint}
+                    </p>
+                  </div>
+                ) : null}
+              </div>
             ))}
           </div>
         </section>
@@ -7021,20 +7077,7 @@ function getLatestContextEntry(item: CRMLeadFollowUp) {
 }
 
 function getLatestUploadContextEntry(item: CRMLeadFollowUp) {
-  const timeline = getSortedTimelineEntries(item)
-    .filter(
-      (entry) =>
-        entry.kind === "import" ||
-        entry.channel === "magic_link" ||
-        entry.channel === "image" ||
-        entry.channel === "telegram",
-    )
-    .sort(
-      (left, right) =>
-        new Date(right.occurred_at).getTime() -
-        new Date(left.occurred_at).getTime(),
-    );
-  return timeline[0] ?? null;
+  return getUploadTimelineEntries(item)[0] ?? null;
 }
 
 function getSortedTimelineEntries(item: CRMLeadFollowUp) {
@@ -7045,6 +7088,10 @@ function getSortedTimelineEntries(item: CRMLeadFollowUp) {
       new Date(left.occurred_at).getTime(),
   );
   return timeline;
+}
+
+function getUploadTimelineEntries(item: CRMLeadFollowUp) {
+  return getSortedTimelineEntries(item).filter((entry) => isUploadTimelineEntry(entry));
 }
 
 function getLatestMeaningfulTimelineEntry(item: CRMLeadFollowUp) {
