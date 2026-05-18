@@ -3440,6 +3440,32 @@ function TodayPrioritiesPanel({
                   </p>
                 </div>
               ) : null}
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                <TimelineTileDark
+                  label="Why now"
+                  value={
+                    items.find((item) => primaryPriority.id.startsWith(item.id))
+                      ? getLeadCardWhyNow(
+                          items.find((item) =>
+                            primaryPriority.id.startsWith(item.id),
+                          )!,
+                        )
+                      : primaryPriority.body
+                  }
+                />
+                <TimelineTileDark
+                  label="Latest saved moment"
+                  value={
+                    items.find((item) => primaryPriority.id.startsWith(item.id))
+                      ? getLeadCardStory(
+                          items.find((item) =>
+                            primaryPriority.id.startsWith(item.id),
+                          )!,
+                        )
+                      : primaryPriority.meta
+                  }
+                />
+              </div>
               <p className="mt-3 text-sm leading-6 text-slate-300">
                 Take the smallest next step here first, then let Brivoly hold
                 the rest of the context in place.
@@ -3487,6 +3513,7 @@ function TodayPrioritiesPanel({
                 <p className="mt-2 text-sm leading-6 text-slate-600">
                   {item.nextMove || item.body}
                 </p>
+                <p className="mt-3 text-xs text-slate-500">{item.meta}</p>
               </div>
             ))}
           </div>
