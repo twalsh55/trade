@@ -2128,7 +2128,7 @@ export function CRMFollowUpWorkspace({
                   without more software work.
                 </li>
                 <li>
-                  The goal is continuity and follow-through, not stage
+                  The goal is continuity and follow-through, not status
                   management.
                 </li>
               </ul>
@@ -4072,7 +4072,8 @@ function PipelineBoardPanel({
               </p>
             </div>
             <p className="text-xs text-slate-500">
-              Reply pressure and quiet relationships surface before stage lanes
+              Reply pressure and quiet relationships surface before older
+              category lanes
               do.
             </p>
           </div>
@@ -4187,7 +4188,7 @@ function PipelineBoardPanel({
                     ) : null}
                     <p className="mt-3 text-xs text-slate-500">
                       {formatDateTime(item.last_meaningful_interaction_at)} ·{" "}
-                      {formatStageLabel(item.stage)}
+                      {formatRelationshipState(item.relationship_state)}
                     </p>
                   </button>
                   <div className="mt-4 flex flex-wrap gap-2">
@@ -7322,7 +7323,7 @@ function summarizePriority(item: CRMLeadFollowUp) {
   ) {
     return `${item.lead_name} needs a warmer touch`;
   }
-  return `${formatStageLabel(item.stage)} for ${item.lead_name}`;
+  return `Next touch for ${item.lead_name}`;
 }
 
 function compactPriorityCards<T>(items: (T | null)[]) {
