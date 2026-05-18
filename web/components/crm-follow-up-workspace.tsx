@@ -4166,6 +4166,9 @@ function TodayPrioritiesPanel({
                 key={`${item.id}-after`}
                 className="rounded-[1rem] border bg-white px-4 py-4"
               >
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+                  {item.eyebrow}
+                </p>
                 <p className="text-sm font-medium text-slate-900">
                   {item.title}
                 </p>
@@ -4173,6 +4176,21 @@ function TodayPrioritiesPanel({
                   {item.nextMove || item.body}
                 </p>
                 <p className="mt-3 text-xs text-slate-500">{item.meta}</p>
+                <div className="mt-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (item.onAction) {
+                        item.onAction();
+                        return;
+                      }
+                      window.location.assign(item.href);
+                    }}
+                    className="rounded-full border border-slate-300 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-700 transition hover:border-slate-500 hover:text-slate-950"
+                  >
+                    {item.actionLabel ?? "Open relationship"}
+                  </button>
+                </div>
               </div>
             ))}
           </div>
