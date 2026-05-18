@@ -4522,6 +4522,11 @@ function PipelineBoardPanel({
     .sort((left, right) => compareAttentionPriority(left, right))
     .slice(0, 4);
   const primaryFragile = needsCareFirst[0] ?? null;
+  const secondaryFragile = needsCareFirst.slice(1, 3);
+  const calmerRelationships = [...items]
+    .filter((item) => !needsCareFirst.some((priority) => priority.id === item.id))
+    .sort((left, right) => compareAttentionPriority(left, right))
+    .slice(0, 5);
   const memoryCoverageLine =
     ambientMemorySummary?.continuity_summary ||
     "Connect an inbox or calendar if you want quiet continuity to show up here with less manual work.";
@@ -4928,6 +4933,75 @@ function PipelineBoardPanel({
                 </div>
               );
             })}
+          </div>
+        </div>
+      ) : null}
+      {secondaryFragile.length ? (
+        <div className="mt-6 rounded-[1.35rem] border bg-white px-5 py-4">
+          <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                After that
+              </p>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                If you have room after the most fragile relationship, these are
+                the next threads Brivoly would protect before the day gets noisy.
+              </p>
+            </div>
+            <p className="text-xs text-slate-500">
+              Two more warm saves are enough.
+            </p>
+          </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            {secondaryFragile.map((item) => (
+              <div
+                key={`${item.id}-attention-next`}
+                className="rounded-[1rem] border bg-slate-50/70 px-4 py-4"
+              >
+                <p className="text-sm font-medium text-slate-900">
+                  {item.lead_name}
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  {item.company_name}
+                </p>
+                <p className="mt-3 text-sm leading-6 text-slate-600">
+                  {getLeadCardWhyNow(item)}
+                </p>
+                <p className="mt-3 text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+                  Best re-entry
+                </p>
+                <p className="mt-2 text-sm leading-6 text-slate-700">
+                  {item.recent_email_threads.some((thread) => thread.needs_reply)
+                    ? buildThreadReplyAngle(
+                        getReplyThread(item) ?? getNewestThread(item)!,
+                      )
+                    : item.relationship_reconnect_next_move || item.next_step}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+      {calmerRelationships.length ? (
+        <div className="mt-6 rounded-[1.35rem] border bg-slate-50/60 px-5 py-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+            Can wait a little longer
+          </p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            These relationships are still worth keeping in view, but they do not
+            need the same urgency as the first few protection moves.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {calmerRelationships.map((item) => (
+              <button
+                key={`${item.id}-attention-calm`}
+                type="button"
+                onClick={() => onSelectLead(item.id)}
+                className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-700 transition hover:border-slate-400 hover:text-slate-950"
+              >
+                {item.lead_name}
+              </button>
+            ))}
           </div>
         </div>
       ) : null}
