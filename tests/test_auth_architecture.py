@@ -489,6 +489,36 @@ def test_postgres_user_repository_get_user_by_id_maps_rows_and_none(monkeypatch)
     assert repository.get_user_by_id(UUID("11111111-1111-1111-1111-111111111111")) is None
 
 
+def test_postgres_user_repository_list_users_maps_rows(monkeypatch) -> None:
+    now = datetime(2024, 5, 6, 12, 30, tzinfo=UTC)
+    rows = [
+        {
+            "id": "11111111-1111-1111-1111-111111111111",
+            "auth_provider": "clerk",
+            "auth_issuer": "https://example.clerk.accounts.dev",
+            "auth_subject": "user_123",
+            "stripe_customer_id": "cus_123",
+            "email": "user@example.com",
+            "given_name": "Ada",
+            "family_name": "Lovelace",
+            "display_name": "Ada Lovelace",
+            "created_at": now,
+            "updated_at": now,
+            "last_login_at": now,
+        }
+    ]
+    cursor = FakeCursor()
+    cursor.fetchall = lambda: rows  # type: ignore[method-assign]
+    connection = FakeConnection(cursor)
+    monkeypatch.setattr(repo_module, "connect", lambda *args, **kwargs: connection)
+
+    repository = PostgresUserRepository("postgres://example")
+    users = repository.list_users()
+
+    assert len(users) == 1
+    assert users[0].email == "user@example.com"
+
+
 def test_postgres_user_repository_raises_if_upsert_returns_no_row(monkeypatch) -> None:
     cursor = FakeCursor(fetchone_result=None)
     connection = FakeConnection(cursor)

@@ -300,6 +300,8 @@ cd web && npm run e2e
 - If product direction is already clear, proactively implement the next high-conviction feature set.
 - Each coherent change set should include:
   - implementation
+  - `uv run pytest` immediately after the change set
+  - keep `pytest` passing before starting the next change set
   - local verification
   - commit before starting the next change set
   - push

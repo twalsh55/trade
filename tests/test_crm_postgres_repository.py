@@ -18,7 +18,7 @@ from src.adapters.crm.postgres_follow_up_repository import (
     _payload_to_follow_up,
 )
 from src.domain.auth import User
-from src.domain.crm import LeadRelationshipReminder
+from src.domain.crm import CalendarConnection, LeadRelationshipReminder, MailboxConnection
 
 
 def make_user(*, anonymous: bool = False) -> User:
@@ -215,3 +215,74 @@ def test_payload_helpers_cover_supported_and_invalid_shapes() -> None:
 
     with pytest.raises(TypeError):
         _coerce_payload(123)
+
+
+def test_postgres_lead_follow_up_repository_mailbox_and_calendar_connection_methods(monkeypatch) -> None:
+    now = datetime(2024, 5, 6, 12, 30, tzinfo=UTC)
+    user = make_user()
+    mailbox = MailboxConnection(
+        id="mailbox-gmail-test",
+        provider="gmail",
+        email_address="ada@example.com",
+        display_name="Ada Lovelace",
+        status="connected",
+        connected_at=now,
+        connection_mode="manual",
+    )
+    calendar = CalendarConnection(
+        id="calendar-google-test",
+        provider="google_calendar",
+        calendar_address="ada@example.com",
+        display_name="Ada Calendar",
+        status="connected",
+        connected_at=now,
+    )
+    list_mailboxes = FakeConnection(
+        FakeCursor(
+            fetchall_result=[{"payload": json.dumps(asdict(mailbox), default=_json_default)}]
+        )
+    )
+    clear_followups = FakeConnection(FakeCursor())
+    save_mailbox = FakeConnection(FakeCursor())
+    delete_mailbox = FakeConnection(FakeCursor(rowcount=1))
+    delete_mailbox_missing = FakeConnection(FakeCursor(rowcount=0))
+    list_calendars = FakeConnection(
+        FakeCursor(
+            fetchall_result=[{"payload": json.dumps(asdict(calendar), default=_json_default)}]
+        )
+    )
+    save_calendar = FakeConnection(FakeCursor())
+    delete_calendar = FakeConnection(FakeCursor(rowcount=1))
+    delete_calendar_missing = FakeConnection(FakeCursor(rowcount=0))
+    list_user_ids = FakeConnection(FakeCursor(fetchall_result=[(str(user.id),)]))
+    calls = [
+        list_mailboxes,
+        clear_followups,
+        save_mailbox,
+        delete_mailbox,
+        delete_mailbox_missing,
+        list_calendars,
+        save_calendar,
+        delete_calendar,
+        delete_calendar_missing,
+        list_user_ids,
+    ]
+    monkeypatch.setattr(repo_module, "connect", lambda *args, **kwargs: calls.pop(0))
+
+    repository = PostgresLeadFollowUpRepository("postgres://example", now=lambda: now)
+
+    assert repository.list_mailbox_connections(user) == [mailbox]
+    repository.clear_lead_follow_ups(user)
+    assert clear_followups.committed is True
+    assert repository.save_mailbox_connection(user, mailbox) == mailbox
+    repository.delete_mailbox_connection(user, mailbox.id)
+    with pytest.raises(KeyError):
+        repository.delete_mailbox_connection(user, mailbox.id)
+
+    assert repository.list_calendar_connections(user) == [calendar]
+    assert repository.save_calendar_connection(user, calendar) == calendar
+    repository.delete_calendar_connection(user, calendar.id)
+    with pytest.raises(KeyError):
+        repository.delete_calendar_connection(user, calendar.id)
+
+    assert repository.list_mailbox_connection_user_ids() == [user.id]

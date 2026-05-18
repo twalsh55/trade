@@ -7,6 +7,8 @@ from uuid import UUID
 import pandas as pd
 import pytest
 
+from src.application import dashboard as dashboard_module
+from src.application import dto as dto_module
 from src.application.account import UserDashboardSettings
 from src.application.crm import (
     AddLeadFollowUpNoteUseCase,
@@ -1133,3 +1135,98 @@ def test_ingest_calendar_event_use_case_promotes_upcoming_meeting() -> None:
     assert amber.relationship_upcoming_meeting_at == (now + timedelta(days=1))
     assert "Weekly rollout review" in amber.relationship_upcoming_meeting_label
     assert amber.next_step == "Prepare for Weekly rollout review."
+
+
+def test_dashboard_and_dto_helpers_cover_remaining_connection_and_locale_paths() -> None:
+    assert dashboard_module._normalize_locale("") == dashboard_module.DEFAULT_PREFERRED_LOCALE
+    assert dashboard_module._normalize_locale("-") == dashboard_module.DEFAULT_PREFERRED_LOCALE
+    naive = datetime(2024, 5, 6, 12, 30)
+    aware = datetime(2024, 5, 6, 12, 30, tzinfo=UTC)
+    assert dashboard_module._normalize_consent_granted_at(None) is None
+    assert dashboard_module._normalize_consent_granted_at(naive) == naive.replace(tzinfo=UTC)
+    assert dashboard_module._normalize_consent_granted_at(aware) == aware
+
+    mailbox_needs_reauth = replace(
+        MailboxConnection(
+            id="mailbox-gmail-test",
+            provider="gmail",
+            email_address="ada@example.com",
+            display_name="Ada Lovelace",
+            status="needs_reauth",
+            connected_at=aware,
+            connection_mode="oauth",
+            reauth_required=True,
+        ),
+        background_sync_enabled=True,
+    )
+    mailbox_attention = replace(
+        mailbox_needs_reauth,
+        status="attention_needed",
+        reauth_required=False,
+        health_note="Needs care",
+    )
+    mailbox_paused = replace(
+        mailbox_needs_reauth,
+        status="connected",
+        reauth_required=False,
+        background_sync_enabled=False,
+    )
+    mailbox_event_ready = replace(
+        mailbox_needs_reauth,
+        status="connected",
+        reauth_required=False,
+        watch_status="active",
+        last_watch_event_at=aware,
+    )
+    mailbox_quiet = replace(
+        mailbox_needs_reauth,
+        status="connected",
+        reauth_required=False,
+        last_sync_at=aware,
+    )
+    mailbox_other = replace(
+        mailbox_needs_reauth,
+        status="manual_review",
+        reauth_required=False,
+        health_note="Manual review",
+    )
+    assert dto_module._describe_mailbox_connection(mailbox_needs_reauth)[0] == "needs_reauth"
+    assert dto_module._describe_mailbox_connection(mailbox_attention)[0] == "attention_needed"
+    assert dto_module._describe_mailbox_connection(mailbox_paused)[0] == "paused"
+    assert dto_module._describe_mailbox_connection(mailbox_event_ready)[0] == "event_ready"
+    assert dto_module._describe_mailbox_connection(mailbox_quiet)[0] == "quiet"
+    assert dto_module._describe_mailbox_connection(mailbox_other)[0] == "manual_review"
+
+    calendar_other = CalendarConnection(
+        id="calendar-test",
+        provider="google_calendar",
+        calendar_address="ada@example.com",
+        display_name="Ada Calendar",
+        status="manual_review",
+        connected_at=aware,
+        health_note="Calendar needs care",
+    )
+    calendar_paused = replace(calendar_other, status="connected", background_sync_enabled=False)
+    calendar_warm = replace(
+        calendar_other,
+        status="connected",
+        last_sync_at=aware,
+        last_event_ingested_at=aware,
+    )
+    calendar_quiet = replace(
+        calendar_other,
+        status="connected",
+        last_sync_at=aware,
+        last_event_ingested_at=None,
+    )
+    calendar_connected = replace(
+        calendar_other,
+        status="connected",
+        last_sync_at=None,
+        last_event_ingested_at=None,
+    )
+    assert dto_module._describe_calendar_connection(calendar_other)[0] == "manual_review"
+    assert dto_module._describe_calendar_connection(calendar_paused)[0] == "paused"
+    assert dto_module._describe_calendar_connection(calendar_warm)[0] == "warm"
+    assert dto_module._describe_calendar_connection(calendar_quiet)[0] == "quiet"
+    assert dto_module._describe_calendar_connection(calendar_connected)[0] == "connected"
