@@ -5885,6 +5885,16 @@ function InboxThreadCard({
                 {oneRead}
               </p>
             </div>
+            {latestStory ? (
+              <div className="mt-3 rounded-[1rem] border bg-white px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+                  Latest shift
+                </p>
+                <p className="mt-2 text-sm leading-6 text-slate-700">
+                  {latestStory}
+                </p>
+              </div>
+            ) : null}
             <p className="mt-3 text-sm leading-6 text-slate-600">
               {thread.continuity_span}
             </p>
