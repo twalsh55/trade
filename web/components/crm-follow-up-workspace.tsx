@@ -1875,6 +1875,100 @@ export function CRMFollowUpWorkspace({
                 </div>
               </div>
             </div>
+            {filteredFollowUps[0] ? (
+              <div className="mt-5 rounded-[1.4rem] border border-slate-900 bg-slate-950 px-5 py-5 text-white shadow-sm">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="max-w-2xl">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">
+                      Start with this relationship
+                    </p>
+                    <p className="mt-2 text-2xl font-semibold tracking-tight">
+                      {filteredFollowUps[0].lead_name}
+                    </p>
+                    <p className="mt-1 text-sm text-slate-300">
+                      {filteredFollowUps[0].company_name}
+                    </p>
+                    <p className="mt-3 text-sm leading-6 text-slate-200">
+                      {getLeadCardWhyNow(filteredFollowUps[0])}
+                    </p>
+                    <div className="mt-4 grid gap-3 md:grid-cols-2">
+                      <TimelineTileDark
+                        label="Latest saved moment"
+                        value={getLeadCardStory(filteredFollowUps[0])}
+                      />
+                      <TimelineTileDark
+                        label="Best next touch"
+                        value={
+                          isReconnectMoment(filteredFollowUps[0])
+                            ? filteredFollowUps[0].relationship_reconnect_next_move ||
+                              filteredFollowUps[0].next_step
+                            : getNewestThread(filteredFollowUps[0])?.open_loop ||
+                              getNewestThread(filteredFollowUps[0])?.next_touch_hint ||
+                              filteredFollowUps[0].next_step
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2 lg:justify-end">
+                    <Button
+                      type="button"
+                      onClick={() => setSelectedLeadId(filteredFollowUps[0].id)}
+                      className="border border-white/20 bg-white text-slate-950 hover:bg-slate-100"
+                    >
+                      Open relationship
+                    </Button>
+                    {filteredFollowUps[0].recent_email_threads.some(
+                      (thread) => thread.needs_reply,
+                    ) ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="border-white/20 bg-transparent text-white hover:bg-white/10 hover:text-white"
+                        onClick={() =>
+                          runTodayPriorityAction(
+                            filteredFollowUps[0].id,
+                            "/clientos/follow-ups",
+                            {
+                              objective: "follow_up",
+                              tone: "warm",
+                              length: "short",
+                              status:
+                                "Drafting a reply from relationship memory...",
+                            },
+                            undefined,
+                            getReplyThread(filteredFollowUps[0])?.thread_id ??
+                              null,
+                          )
+                        }
+                      >
+                        Draft reply
+                      </Button>
+                    ) : isReconnectMoment(filteredFollowUps[0]) ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="border-white/20 bg-transparent text-white hover:bg-white/10 hover:text-white"
+                        onClick={() =>
+                          runTodayPriorityAction(
+                            filteredFollowUps[0].id,
+                            "/clientos/follow-ups",
+                            {
+                              objective: "revive",
+                              tone: "warm",
+                              length: "short",
+                              status:
+                                "Drafting a reconnect from relationship memory...",
+                            },
+                          )
+                        }
+                      >
+                        Draft reconnect
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            ) : null}
             <div className="mt-6 space-y-4">
               {filteredFollowUps.map((item) => {
                 const rowPending = pendingId === item.id && isPending;
