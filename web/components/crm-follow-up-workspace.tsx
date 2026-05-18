@@ -3741,6 +3741,50 @@ function TodayPrioritiesPanel({
         }
       : null,
   ]).slice(0, 3);
+  const freshContextHighlights = compactPriorityCards<TodayFocusMove>([
+    recentUploadLead
+      ? {
+          id: `${recentUploadLead.id}-fresh-context-highlight`,
+          label: isReconnectMoment(recentUploadLead)
+            ? "Fresh way back in"
+            : "Fresh client update",
+          title: isReconnectMoment(recentUploadLead)
+            ? `${recentUploadLead.lead_name} gave you a gentle reason to reopen the thread`
+            : `${recentUploadLead.lead_name} shared new context worth using today`,
+          body:
+            recentUploadLead.relationship_upload_follow_through_hint ||
+            recentUploadLead.relationship_recent_upload_summary ||
+            recentUploadLead.next_step,
+          actionLabel: isReconnectMoment(recentUploadLead)
+            ? "Draft reconnect"
+            : "Draft note",
+          onAction: () =>
+            onRunAction(recentUploadLead.id, "/clientos/follow-ups", {
+              objective: isReconnectMoment(recentUploadLead)
+                ? "revive"
+                : "recap",
+              tone: "warm",
+              length: "short",
+              status: isReconnectMoment(recentUploadLead)
+                ? "Drafting a reconnect from fresh client context..."
+                : "Drafting a note from fresh client context...",
+            }),
+        }
+      : null,
+    recentContextLead
+      ? {
+          id: `${recentContextLead.id}-fresh-context-note`,
+          label: "Fresh context",
+          title: `${recentContextLead.lead_name} picked up context you can use without digging`,
+          body:
+            getLatestContextEntry(recentContextLead)?.summary ||
+            recentContextLead.notes ||
+            recentContextLead.next_step,
+          actionLabel: "Open relationship",
+          onAction: () => onRunAction(recentContextLead.id, "/clientos/follow-ups"),
+        }
+      : null,
+  ]).slice(0, 2);
 
   return (
     <section className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm">
@@ -3871,6 +3915,51 @@ function TodayPrioritiesPanel({
                 className="rounded-[1rem] border bg-white px-4 py-4"
               >
                 <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+                  {item.label}
+                </p>
+                <p className="mt-2 text-sm font-medium text-slate-900">
+                  {item.title}
+                </p>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  {item.body}
+                </p>
+                <div className="mt-4">
+                  <button
+                    type="button"
+                    onClick={item.onAction}
+                    className="rounded-full border border-slate-300 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-700 transition hover:border-slate-500 hover:text-slate-950"
+                  >
+                    {item.actionLabel}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+      {freshContextHighlights.length ? (
+        <div className="mt-5 rounded-[1.35rem] border bg-sky-50/60 px-5 py-4">
+          <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">
+                Fresh context to use
+              </p>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                When clients send something new, let that context do some of the
+                work for you before the day fills up.
+              </p>
+            </div>
+            <p className="text-xs text-slate-500">
+              One short follow-through is enough.
+            </p>
+          </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            {freshContextHighlights.map((item) => (
+              <div
+                key={item.id}
+                className="rounded-[1rem] border bg-white px-4 py-4"
+              >
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-sky-700">
                   {item.label}
                 </p>
                 <p className="mt-2 text-sm font-medium text-slate-900">
