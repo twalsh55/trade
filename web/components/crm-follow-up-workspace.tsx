@@ -4810,7 +4810,7 @@ function RemoteImageCapturePanel({
   const [shareStatus, setShareStatus] = useState<string | null>(null);
   const shareLink = intakeChannel?.magic_link_url ?? "";
   const shareMessage = shareLink
-    ? `Send any screenshot, whiteboard photo, or handwritten note here whenever you have an update: ${shareLink}`
+    ? `Whenever you want to send a quick update, screenshot, or note, just use this page: ${shareLink}`
     : "";
 
   async function copyText(value: string, successMessage: string) {
@@ -4833,12 +4833,12 @@ function RemoteImageCapturePanel({
         Client dropzone
       </p>
       <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
-        Give clients an easy place to send updates.
+        Keep one low-friction handoff page ready.
       </h2>
       <p className="mt-3 text-sm leading-6 text-slate-600">
         Brivoly gives you one simple no-login page for screenshots, whiteboard
-        photos, and note images. Save the defaults once, then reuse the same
-        link whenever something changes.
+        photos, and note images. Set it once, then keep reusing the same quiet
+        page whenever a client wants to send something over.
       </p>
 
       {!advancedAiUnlocked ? (
@@ -4855,7 +4855,8 @@ function RemoteImageCapturePanel({
           </p>
           <p className="mt-2 text-sm leading-6 text-slate-700">
             Screenshot updates, whiteboard photos, handwritten notes, or other
-            quick visual context that would otherwise get lost in text threads.
+            quick visual context that would otherwise get lost in chat and
+            email.
           </p>
         </div>
         <div className="rounded-[1.3rem] border bg-slate-50 px-4 py-4">
@@ -4863,9 +4864,9 @@ function RemoteImageCapturePanel({
             What Brivoly does next
           </p>
           <p className="mt-2 text-sm leading-6 text-slate-700">
-            Brivoly attaches the update to the right relationship memory so you
-            can reopen the context later without hunting through email or
-            messages.
+            Brivoly folds the update back into relationship memory so you can
+            reopen the context later without hunting through email, chat, or
+            uploads.
           </p>
         </div>
       </div>
@@ -4876,8 +4877,8 @@ function RemoteImageCapturePanel({
         </p>
         <p className="mt-2 text-sm font-medium text-slate-900">
           {intakeChannel?.magic_link_url
-            ? "Your client link is ready."
-            : "The client link is not ready yet."}
+            ? "Your handoff link is ready."
+            : "The handoff link is not ready yet."}
         </p>
         <p className="mt-2 text-sm leading-6 text-slate-600">
           {intakeChannel?.instructions ??
@@ -4897,7 +4898,7 @@ function RemoteImageCapturePanel({
         {intakeChannel?.magic_link_url ? (
           <>
             <p className="mt-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-              Client upload link
+              Client handoff link
             </p>
             <a
               href={intakeChannel.magic_link_url}
@@ -4918,15 +4919,14 @@ function RemoteImageCapturePanel({
               <Button
                 type="button"
                 variant="outline"
-                onClick={() =>
-                  copyText(shareMessage, "Client share note copied.")
-                }
+                onClick={() => copyText(shareMessage, "Share note copied.")}
               >
                 Copy share note
               </Button>
             </div>
             <p className="mt-3 text-xs text-slate-500">
-              Share the link once, then keep reusing it. No login is required.
+              Share the link once, then keep reusing it. No login or account
+              setup is required.
             </p>
             {shareStatus ? (
               <p className="mt-2 text-sm text-slate-600">{shareStatus}</p>
@@ -4948,13 +4948,13 @@ function IntakeTaskNav({ activeTask }: { activeTask: CRMIntakeTask }) {
     {
       href: "/clientos/intake",
       title: "Overview",
-      body: "See the default flow at a glance.",
+      body: "See the calm default flow at a glance.",
       task: "hub",
     },
     {
       href: "/clientos/intake/profile",
       title: "Usual formats",
-      body: "Show what clients usually send.",
+      body: "Show what clients usually send over.",
       task: "profile",
     },
     {
@@ -4966,7 +4966,7 @@ function IntakeTaskNav({ activeTask }: { activeTask: CRMIntakeTask }) {
     {
       href: "/clientos/intake/capture",
       title: "Share link",
-      body: "Keep one phone-friendly page ready.",
+      body: "Keep one phone-friendly handoff page ready.",
       task: "capture",
     },
   ];
@@ -5023,17 +5023,17 @@ function IntakeTaskHub({
       <TaskSummaryCard
         href="/clientos/intake/profile"
         eyebrow="First"
-        title="Show the kinds of updates you usually get"
+        title="Show the kinds of updates clients usually send"
         body={
           advancedAiUnlocked
             ? "Your AI memory defaults are ready. Keep them close to what clients actually send."
-            : "Unlock the paid AI layer before relying on note images and messy files to carry client context back in."
+            : "Unlock the paid AI layer before relying on note images and messy files to bring client context back in."
         }
       />
       <TaskSummaryCard
         href="/clientos/intake/routing"
         eyebrow="Next"
-        title="Choose the easiest path"
+        title="Choose the easiest handoff path"
         body={
           normalizedChannels.length
             ? `Usual paths are ready: ${normalizedChannels.join(", ")}.`
@@ -5043,7 +5043,7 @@ function IntakeTaskHub({
       <TaskSummaryCard
         href="/clientos/intake/capture"
         eyebrow="Then"
-        title="Share the update link"
+        title="Share the handoff link"
         body={
           hasMagicLink
             ? "A signed no-login page is live and ready to reuse with clients."
@@ -5112,18 +5112,19 @@ function IntakeRoutingPanel({
       </h2>
       <p className="mt-3 text-sm leading-6 text-slate-600">
         Keep this simple: choose the usual paths for this account and leave one
-        short note so every new update lands in the right place.
+        short note so every new update lands in the right place without extra
+        explaining.
       </p>
 
       <div className="mt-5 space-y-4">
         <label className="block">
           <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-            Usual ways in
+            How updates usually arrive
           </span>
           <input
             value={channelsDraft}
             onChange={(event) => onChannelsDraftChange(event.target.value)}
-            placeholder="upload, magic_link, email"
+            placeholder="magic_link, email, whatsapp"
             className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:bg-white"
           />
         </label>
@@ -5133,7 +5134,7 @@ function IntakeRoutingPanel({
             onClick={() => {
               onChannelsDraftChange("upload, magic_link, email");
               onRoutingNotesDraftChange(
-                "Use the shared link for screenshots and quick updates. Use email when a client sends a longer file, thread, or fuller project context.",
+                "Use the shared link for screenshots and quick updates. Use email when someone sends a longer file, thread, or fuller project context.",
               );
             }}
             className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
@@ -5163,7 +5164,7 @@ function IntakeRoutingPanel({
             type="button"
             onClick={() =>
               onRoutingNotesDraftChange(
-                "Use the shared link for screenshots and quick updates. Use email when a client sends a longer file, thread, or fuller project context.",
+                "Use the shared link for screenshots and quick updates. Use email when someone sends a longer file, thread, or fuller project context.",
               )
             }
             className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
@@ -5173,7 +5174,7 @@ function IntakeRoutingPanel({
         </div>
         <label className="block">
           <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-            One short note
+            What to tell clients
           </span>
           <textarea
             value={routingNotesDraft}

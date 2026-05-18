@@ -160,6 +160,7 @@ cd web && npm run e2e
   - paid image-note intake
   - magic-link remote note capture for phone image uploads
   - client-facing upload flow with quieter `Client dropzone` language, simpler share-link language, calmer set-once defaults, and camera-friendly mobile capture
+  - Dropzones now lean further into a low-friction handoff-page feel, with calmer `handoff link` language, softer setup copy, and a more phone-friendly `send update` upload flow
   - relationship history now visually calls out client-shared upload context instead of burying it in generic activity
   - intake setup now has calmer set-once defaults for channels, handoff notes, source formats, and AI memory prompts to reduce typing and configuration
   - reconnect guidance now includes a clearer `why it can still land` read plus a starter line for reopening stale, drifting, and at-risk relationships, with gentler company-aware and saved-context fallbacks when Brivoly has thinner history and a softer sparse-context restart path when almost nothing is saved yet
