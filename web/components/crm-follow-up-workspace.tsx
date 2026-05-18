@@ -2208,6 +2208,48 @@ export function CRMFollowUpWorkspace({
                 context back into relationship memory and send notes from the
                 same account.
               </p>
+              <div className="mt-4 grid gap-3 md:grid-cols-4">
+                <CompactMetricLight
+                  label="Event-ready inboxes"
+                  value={`${mailboxConnections.filter((connection) => connection.event_ready).length} inbox${mailboxConnections.filter((connection) => connection.event_ready).length === 1 ? "" : "es"}`}
+                  tone={
+                    mailboxConnections.some((connection) => connection.event_ready)
+                      ? "positive"
+                      : "neutral"
+                  }
+                />
+                <CompactMetricLight
+                  label="Quiet inboxes"
+                  value={`${mailboxConnections.filter((connection) => isMailboxQuiet(connection)).length} inbox${mailboxConnections.filter((connection) => isMailboxQuiet(connection)).length === 1 ? "" : "es"}`}
+                  tone={
+                    mailboxConnections.some((connection) => isMailboxQuiet(connection))
+                      ? "warning"
+                      : "neutral"
+                  }
+                />
+                <CompactMetricLight
+                  label="Reconnect needed"
+                  value={`${mailboxConnections.filter((connection) => mailboxNeedsReconnect(connection)).length} inbox${mailboxConnections.filter((connection) => mailboxNeedsReconnect(connection)).length === 1 ? "" : "es"}`}
+                  tone={
+                    mailboxConnections.some(
+                      (connection) => mailboxNeedsReconnect(connection),
+                    )
+                      ? "critical"
+                      : "neutral"
+                  }
+                />
+                <CompactMetricLight
+                  label="Paused inbox memory"
+                  value={`${mailboxConnections.filter((connection) => !connection.background_sync_enabled).length} inbox${mailboxConnections.filter((connection) => !connection.background_sync_enabled).length === 1 ? "" : "es"}`}
+                  tone={
+                    mailboxConnections.some(
+                      (connection) => !connection.background_sync_enabled,
+                    )
+                      ? "warning"
+                      : "neutral"
+                  }
+                />
+              </div>
               <div className="mt-4 grid gap-3 md:grid-cols-2">
                 <button
                   type="button"
@@ -2476,6 +2518,27 @@ export function CRMFollowUpWorkspace({
                           {formatDateTime(connection.last_watch_event_at)}.
                         </p>
                       ) : null}
+                      <div className="mt-4 grid gap-3 md:grid-cols-2">
+                        <TimelineTile
+                          label="What Brivoly sees"
+                          value={
+                            connection.continuity_summary ||
+                            getMailboxConnectionStateDetail(connection)
+                          }
+                        />
+                        <TimelineTile
+                          label="Smallest useful fix"
+                          value={getMailboxConnectionFix(connection)}
+                        />
+                        <TimelineTile
+                          label="Watch coverage"
+                          value={getMailboxWatchRead(connection)}
+                        />
+                        <TimelineTile
+                          label="Continuity state"
+                          value={getMailboxConnectionStateLabel(connection)}
+                        />
+                      </div>
                       {connection.watch_expires_at ? (
                         <p className="mt-2 text-xs text-slate-500">
                           Watch coverage renews by{" "}
@@ -2531,6 +2594,48 @@ export function CRMFollowUpWorkspace({
                 then bring meetings into relationship memory so Brivoly can prep
                 the next conversation before it starts.
               </p>
+              <div className="mt-4 grid gap-3 md:grid-cols-4">
+                <CompactMetricLight
+                  label="Warm calendars"
+                  value={`${calendarConnections.filter((connection) => connection.memory_warm).length} calendar${calendarConnections.filter((connection) => connection.memory_warm).length === 1 ? "" : "s"}`}
+                  tone={
+                    calendarConnections.some((connection) => connection.memory_warm)
+                      ? "positive"
+                      : "neutral"
+                  }
+                />
+                <CompactMetricLight
+                  label="Quiet calendars"
+                  value={`${calendarConnections.filter((connection) => isCalendarQuiet(connection)).length} calendar${calendarConnections.filter((connection) => isCalendarQuiet(connection)).length === 1 ? "" : "s"}`}
+                  tone={
+                    calendarConnections.some((connection) => isCalendarQuiet(connection))
+                      ? "warning"
+                      : "neutral"
+                  }
+                />
+                <CompactMetricLight
+                  label="Needs care"
+                  value={`${calendarConnections.filter((connection) => calendarNeedsAttention(connection)).length} calendar${calendarConnections.filter((connection) => calendarNeedsAttention(connection)).length === 1 ? "" : "s"}`}
+                  tone={
+                    calendarConnections.some((connection) =>
+                      calendarNeedsAttention(connection),
+                    )
+                      ? "critical"
+                      : "neutral"
+                  }
+                />
+                <CompactMetricLight
+                  label="Paused meeting memory"
+                  value={`${calendarConnections.filter((connection) => !connection.background_sync_enabled).length} calendar${calendarConnections.filter((connection) => !connection.background_sync_enabled).length === 1 ? "" : "s"}`}
+                  tone={
+                    calendarConnections.some(
+                      (connection) => !connection.background_sync_enabled,
+                    )
+                      ? "warning"
+                      : "neutral"
+                  }
+                />
+              </div>
               <div className="mt-4 rounded-[1.2rem] border border-dashed bg-white px-4 py-4">
                 <p className="ui-eyebrow">Calendar connection</p>
                 <div className="mt-4 grid gap-3 xl:grid-cols-[0.8fr_1.2fr_1fr_auto]">
@@ -2667,6 +2772,27 @@ export function CRMFollowUpWorkspace({
                           {formatDateTime(connection.last_sync_at)}.
                         </p>
                       ) : null}
+                      <div className="mt-4 grid gap-3 md:grid-cols-2">
+                        <TimelineTile
+                          label="What Brivoly sees"
+                          value={
+                            connection.continuity_summary ||
+                            getCalendarConnectionStateDetail(connection)
+                          }
+                        />
+                        <TimelineTile
+                          label="Smallest useful fix"
+                          value={getCalendarConnectionFix(connection)}
+                        />
+                        <TimelineTile
+                          label="Latest prep signal"
+                          value={getCalendarWarmthRead(connection)}
+                        />
+                        <TimelineTile
+                          label="Continuity state"
+                          value={getCalendarConnectionStateLabel(connection)}
+                        />
+                      </div>
                       {connection.last_event_ingested_at ? (
                         <p className="mt-2 text-xs text-slate-500">
                           Latest meeting memory landed{" "}
@@ -3819,6 +3945,177 @@ function formatAmbientContinuityState(value: string): string {
     return "Warm";
   }
   return "Offline";
+}
+
+function mailboxNeedsReconnect(connection: CRMMailboxConnection) {
+  return connection.reauth_required || connection.status === "needs_reauth";
+}
+
+function isMailboxQuiet(connection: CRMMailboxConnection) {
+  return (
+    connection.background_sync_enabled &&
+    connection.status === "connected" &&
+    !mailboxNeedsReconnect(connection) &&
+    (connection.sync_stale ||
+      (connection.connection_mode === "oauth" &&
+        !connection.event_ready &&
+        connection.watch_status !== "manual"))
+  );
+}
+
+function getMailboxConnectionStateLabel(connection: CRMMailboxConnection) {
+  if (mailboxNeedsReconnect(connection)) {
+    return "Reconnect this inbox";
+  }
+  if (!connection.background_sync_enabled) {
+    return "Inbox memory paused";
+  }
+  if (connection.event_ready) {
+    return "Event-ready inbox memory";
+  }
+  if (isMailboxQuiet(connection)) {
+    return "Quiet inbox memory";
+  }
+  if (connection.connection_mode === "manual") {
+    return "Manual inbox preview";
+  }
+  return "Inbox memory on";
+}
+
+function getMailboxConnectionStateDetail(connection: CRMMailboxConnection) {
+  if (mailboxNeedsReconnect(connection)) {
+    return (
+      connection.health_note ||
+      "Brivoly cannot quietly refresh this inbox until you reconnect it."
+    );
+  }
+  if (!connection.background_sync_enabled) {
+    return "This inbox is saved, but Brivoly is not pulling fresh thread memory from it right now.";
+  }
+  if (connection.event_ready) {
+    return "This inbox is ready to warm relationship memory from new provider events as they land.";
+  }
+  if (isMailboxQuiet(connection)) {
+    return "This inbox is connected, but Brivoly is waiting for a fresh provider event or sync to warm the thread memory back up.";
+  }
+  if (connection.connection_mode === "manual") {
+    return "This inbox is still on the manual path, so Brivoly can help with continuity but cannot quietly follow live provider events yet.";
+  }
+  return (
+    connection.continuity_summary ||
+    "This inbox is connected and ready for the next thread memory update."
+  );
+}
+
+function getMailboxConnectionFix(connection: CRMMailboxConnection) {
+  if (mailboxNeedsReconnect(connection)) {
+    return "Reconnect this inbox first so Brivoly can resume quiet thread continuity.";
+  }
+  if (!connection.background_sync_enabled) {
+    return "Resume inbox memory when you want fresh thread context to start flowing back in.";
+  }
+  if (connection.connection_mode === "manual") {
+    return "Keep this as a fallback, or connect the real provider account when you want event-ready continuity.";
+  }
+  if (connection.watch_status === "manual") {
+    return "Use Sync now when you want a fresh read. Outlook still relies on sync jobs more than watch coverage here.";
+  }
+  if (!connection.event_ready) {
+    return "Refresh watch coverage or run one sync so the next live thread can warm this memory back up.";
+  }
+  return "No fix needed. Brivoly should quietly keep this inbox in the background.";
+}
+
+function getMailboxWatchRead(connection: CRMMailboxConnection) {
+  if (connection.connection_mode === "manual") {
+    return "Manual inboxes do not use provider watch coverage yet.";
+  }
+  if (mailboxNeedsReconnect(connection)) {
+    return "Watch coverage is blocked until this inbox is reconnected.";
+  }
+  if (connection.watch_status === "active") {
+    return connection.last_watch_event_at
+      ? `Active and already saw a provider event ${formatDateTime(connection.last_watch_event_at)}.`
+      : "Active and waiting for the next provider event.";
+  }
+  if (connection.watch_status === "manual") {
+    return "This inbox is still relying on scheduled sync instead of live watch events.";
+  }
+  return "Watch coverage is not warm yet. Refresh it or sync once to settle the continuity layer.";
+}
+
+function calendarNeedsAttention(connection: CRMCalendarConnection) {
+  return connection.status !== "" && connection.status !== "connected";
+}
+
+function isCalendarQuiet(connection: CRMCalendarConnection) {
+  return (
+    connection.background_sync_enabled &&
+    connection.status === "connected" &&
+    !connection.memory_warm &&
+    connection.sync_stale
+  );
+}
+
+function getCalendarConnectionStateLabel(connection: CRMCalendarConnection) {
+  if (calendarNeedsAttention(connection)) {
+    return "Check this calendar";
+  }
+  if (!connection.background_sync_enabled) {
+    return "Meeting memory paused";
+  }
+  if (connection.memory_warm) {
+    return "Meeting memory warm";
+  }
+  if (isCalendarQuiet(connection)) {
+    return "Meeting memory quiet";
+  }
+  return "Meeting memory on";
+}
+
+function getCalendarConnectionStateDetail(connection: CRMCalendarConnection) {
+  if (calendarNeedsAttention(connection)) {
+    return (
+      connection.health_note ||
+      "This calendar needs attention before Brivoly can quietly hold meeting context from it again."
+    );
+  }
+  if (!connection.background_sync_enabled) {
+    return "This calendar is saved, but Brivoly is not using it for fresh meeting prep right now.";
+  }
+  if (connection.memory_warm) {
+    return "This calendar recently fed meeting context into relationship memory, so prep moments should stay easier to trust.";
+  }
+  if (isCalendarQuiet(connection)) {
+    return "This calendar is connected, but no fresh meeting context has landed recently enough to keep prep warm.";
+  }
+  return (
+    connection.continuity_summary ||
+    "This calendar is connected and waiting for the next useful meeting context."
+  );
+}
+
+function getCalendarConnectionFix(connection: CRMCalendarConnection) {
+  if (calendarNeedsAttention(connection)) {
+    return "Check this calendar connection first so Brivoly can warm meeting prep quietly again.";
+  }
+  if (!connection.background_sync_enabled) {
+    return "Resume meeting memory when you want Brivoly to start pulling prep context back in.";
+  }
+  if (isCalendarQuiet(connection)) {
+    return "Bring one upcoming meeting in or wait for the next event so Brivoly has fresh prep context to hold.";
+  }
+  return "No fix needed. Brivoly should keep using this calendar quietly in the background.";
+}
+
+function getCalendarWarmthRead(connection: CRMCalendarConnection) {
+  if (connection.last_event_ingested_at) {
+    return `Latest meeting memory landed ${formatDateTime(connection.last_event_ingested_at)}.`;
+  }
+  if (connection.last_sync_at) {
+    return `This calendar last checked in ${formatDateTime(connection.last_sync_at)}, but no fresh meeting context has landed yet.`;
+  }
+  return "No meeting context has been saved from this calendar yet.";
 }
 
 function QuickLinkPill({
