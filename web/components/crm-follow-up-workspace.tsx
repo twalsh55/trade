@@ -6237,6 +6237,18 @@ function LeadMemoryPanel({
     lead.relationship_meeting_prep_summary ||
     lead.relationship_upload_follow_through_hint ||
     "Brivoly is holding the latest relationship context for the next conversation.";
+  const storyOpenLoop =
+    selectedThread?.open_loop ||
+    selectedThread?.unresolved_hint ||
+    latestThread?.open_loop ||
+    latestThread?.unresolved_hint ||
+    lead.next_step ||
+    "No open loop captured yet.";
+  const storyNextTouch =
+    lead.relationship_upload_follow_through_hint ||
+    lead.relationship_reconnect_next_move ||
+    latestThread?.next_touch_hint ||
+    lead.next_step;
   const memoryPanels = [
     {
       value: "overview" as const,
@@ -6320,10 +6332,71 @@ function LeadMemoryPanel({
         </p>
       ) : null}
 
+      <section className="mt-6 rounded-[1.5rem] border bg-slate-50/85 p-5">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+          What matters now
+        </p>
+        <h3 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+          Open with the relationship story, not the status.
+        </h3>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+          Brivoly keeps the latest saved moment, the open loop, and the cleanest
+          next touch together so you can step back in without piecing the story
+          together first.
+        </p>
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          <TimelineTile
+            label="Latest saved moment"
+            value={
+              latestMeaningfulEntry
+                ? `${formatTimelineEntryLabel(latestMeaningfulEntry)} · ${latestMeaningfulEntry.summary}`
+                : "No relationship history saved yet."
+            }
+          />
+          <TimelineTile label="Open loop" value={storyOpenLoop} />
+          <TimelineTile label="Best next touch" value={storyNextTouch} />
+          <TimelineTile
+            label="Latest client-shared context"
+            value={
+              latestUploadEntry
+                ? `${formatDateTime(latestUploadEntry.occurred_at)} · ${latestUploadEntry.summary}`
+                : "No recent client-shared context."
+            }
+          />
+        </div>
+        <div className="mt-4 flex flex-wrap gap-3">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setMemoryView("recent_changes")}
+          >
+            Review recent changes
+          </Button>
+          {lead.relationship_recent_upload_summary ? (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setMemoryView("recent_upload")}
+            >
+              Use client-shared context
+            </Button>
+          ) : null}
+          {lead.relationship_upcoming_meeting_at ? (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setMemoryView("meeting_prep")}
+            >
+              Prepare from continuity
+            </Button>
+          ) : null}
+        </div>
+      </section>
+
       <div className="mt-5 grid gap-3 md:grid-cols-2">
         <TimelineTile
-          label="Where it stands"
-          value={formatStageLabel(lead.stage)}
+          label="Relationship read"
+          value={`${formatRelationshipState(lead.relationship_state)} · ${formatStageLabel(lead.stage)}`}
         />
         <TimelineTile label="Best channel" value={lead.contact_channel} />
         <TimelineTile label="Point person" value={lead.owner_name} />
@@ -6341,8 +6414,8 @@ function LeadMemoryPanel({
           value={formatDateTime(lead.last_meaningful_interaction_at)}
         />
         <TimelineTile
-          label="Relationship state"
-          value={formatRelationshipState(lead.relationship_state)}
+          label="Why now"
+          value={getLeadCardWhyNow(lead)}
         />
         <TimelineTile
           label="Brivoly nudge"
@@ -6628,55 +6701,6 @@ function LeadMemoryPanel({
             </p>
           </div>
         ) : null}
-      </section>
-
-      <section className="mt-6 rounded-[1.5rem] border bg-slate-50/80 p-5">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
-          Timeline focus
-        </p>
-        <h3 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
-          See the relationship story before you draft the next move.
-        </h3>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-          Brivoly keeps the latest saved moment, the current open loop, and the
-          next touch together so you can act without rereading the full history
-          first.
-        </p>
-        <div className="mt-4 grid gap-3 md:grid-cols-2">
-          <TimelineTile
-            label="Latest saved moment"
-            value={
-              latestMeaningfulEntry
-                ? `${formatTimelineEntryLabel(latestMeaningfulEntry)} · ${latestMeaningfulEntry.summary}`
-                : "No relationship history saved yet"
-            }
-          />
-          <TimelineTile
-            label="Latest client-shared context"
-            value={
-              latestUploadEntry
-                ? `${formatDateTime(latestUploadEntry.occurred_at)} · ${latestUploadEntry.summary}`
-                : "No recent client-shared context"
-            }
-          />
-          <TimelineTile
-            label="Open loop"
-            value={
-              selectedThread?.open_loop ||
-              selectedThread?.unresolved_hint ||
-              lead.next_step ||
-              "No open loop captured yet"
-            }
-          />
-          <TimelineTile
-            label="Best next touch"
-            value={
-              lead.relationship_upload_follow_through_hint ||
-              lead.relationship_reconnect_next_move ||
-              lead.next_step
-            }
-          />
-        </div>
       </section>
 
       {keyTimelineMoments.length ? (
