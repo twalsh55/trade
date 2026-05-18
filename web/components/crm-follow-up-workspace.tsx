@@ -6166,6 +6166,12 @@ function RemoteImageCapturePanel({
   const shareTextMessage = shareLink
     ? `Quickest path: open this link on your phone and send the screenshot or note there. ${shareLink}`
     : "";
+  const emailShareHref = shareLink
+    ? `mailto:?subject=${encodeURIComponent("Quick client handoff link")}&body=${encodeURIComponent(shareMessage || shareTextMessage)}`
+    : "";
+  const smsShareHref = shareLink
+    ? `sms:?&body=${encodeURIComponent(shareTextMessage || shareMessage)}`
+    : "";
 
   async function copyText(value: string, successMessage: string) {
     if (!value) {
@@ -6332,6 +6338,16 @@ function RemoteImageCapturePanel({
               >
                 Share from this device
               </Button>
+              {emailShareHref ? (
+                <Button asChild variant="outline">
+                  <a href={emailShareHref}>Send by email</a>
+                </Button>
+              ) : null}
+              {smsShareHref ? (
+                <Button asChild variant="outline">
+                  <a href={smsShareHref}>Send by text</a>
+                </Button>
+              ) : null}
               <Button
                 type="button"
                 variant="outline"
@@ -6377,6 +6393,10 @@ function RemoteImageCapturePanel({
                 If you are already on your phone, use the system share button.
                 If you are at your desk, copy the text-friendly note and drop it
                 into iMessage, WhatsApp, Slack, or email.
+              </p>
+              <p className="mt-3 text-xs text-slate-500">
+                Brivoly can also open an email draft or text draft for the link
+                when your device supports those paths.
               </p>
             </div>
             <p className="mt-3 text-xs text-slate-500">
