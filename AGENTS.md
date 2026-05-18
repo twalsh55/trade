@@ -180,6 +180,7 @@ cd web && npm run e2e
   - the shared upload page now also supports a direct system-share path on the current device, so sending the handoff link from a phone can skip copy/paste entirely when the browser supports it
   - the shared upload page now also offers direct email and text-draft paths for the handoff link, so sharing can start from the channel already closest at hand
   - the shared upload page now also shows a simple `What the client sees` summary plus a direct `Open handoff page` path, so the handoff is easy to sanity-check before you send it
+  - the shared upload page now also surfaces a simple `Try this first` share recommendation so the fastest handoff path is obvious before the longer list of copy/share options
   - intake, handoff, and AI-format setup surfaces now lean even further into calm defaults and quieter handoff language, with less setup-heavy wording and fewer operator-ish labels
   - Dropzones now lean further into a low-friction handoff-page feel, with calmer `handoff link` language, softer setup copy, and a more phone-friendly `send update` upload flow
   - remote intake instructions and note-image import confirmations now also describe this flow as relationship memory / handoff capture instead of older CRM queue language

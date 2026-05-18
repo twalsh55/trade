@@ -6438,6 +6438,38 @@ function RemoteImageCapturePanel({
         ) : null}
         {intakeChannel?.magic_link_url ? (
           <>
+            <div className="mt-4 rounded-[1rem] border bg-white px-4 py-4">
+              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div className="max-w-2xl">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+                    Try this first
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-slate-700">
+                    Start with the fastest path for the moment: system share on
+                    your phone, text if the link needs to go out quickly, or
+                    email when you want a slightly calmer handoff note.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    onClick={shareFromDevice}
+                  >
+                    Share from this device
+                  </Button>
+                  {smsShareHref ? (
+                    <Button asChild variant="outline">
+                      <a href={smsShareHref}>Text it</a>
+                    </Button>
+                  ) : null}
+                  {emailShareHref ? (
+                    <Button asChild variant="outline">
+                      <a href={emailShareHref}>Email it</a>
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+            </div>
             <p className="mt-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
               Client handoff link
             </p>
