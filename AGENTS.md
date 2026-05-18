@@ -118,12 +118,14 @@ cd web && npm run e2e
   - connected calendar cards now also keep track of the latest meeting context they saved, surface when meeting memory has gone quiet, and help Today / Attention distinguish between truly warm calendar context and merely connected calendar coverage
   - manual mailbox connection still exists as a fallback beta path when provider credentials are not configured yet
   - inbox cards now surface backend-driven relationship pulse, open-loop memory, thread continuity cues, `what changed` hints, unresolved-thread cues, a clearer long-thread `through-line`, and a carry-forward cue for longer threads, grouped into `Needs you now` and `Still warm`
+  - inbox thread cards and the inbox-side next-move view now surface a tighter `One read` summary plus a clearer `Reply angle`, so longer threads are easier to trust and answer from the list itself
   - Inbox now also supports open-loop and long-thread filtering plus a direct `Close loop` draft path so longer conversations can move forward with less scanning
   - email-thread ingestion that can auto-create/update contacts from inbox activity
   - mailbox sync now feeds the same inbox-ingest path Brivoly already uses, so provider-synced email activity and provider watch callbacks land in relationship memory instead of a separate mailbox subsystem
   - sending a drafted note now writes the outbound message back into the same relationship timeline and thread history, including notes sent through the provider-backed mailbox path, now carries forward stored external message ids for better reply continuity, and now keeps the selected inbox thread attached all the way from Inbox / Today into the composer send path
   - provider-backed sends now also return a calmer continuity note so Brivoly can tell the user whether it truly replied inside the same Gmail / Outlook conversation or had to fall back to a fresh provider note while still keeping relationship memory attached
   - account settings now include locale defaults, retention-window defaults, an AI-processing toggle, and privacy-consent metadata as the first localization/GDPR groundwork layer
+  - account settings defaults and handoff-related validation copy now lean further into relationship memory and quieter handoff language instead of CRM setup phrasing
   - `/api/account/privacy/export` and the settings export action can now download a JSON snapshot of account settings, connected mailboxes, and stored relationship memory for GDPR-oriented export groundwork
   - `/api/account/privacy/erase` and the settings erase actions can now clear stored relationship memory or wipe memory plus connected mailbox links as an early GDPR delete/control path
   - attention view with reconnect-first guidance and direct draft actions
@@ -135,6 +137,7 @@ cd web && npm run e2e
   - relationship pages now also surface `Key moments` ahead of the full timeline so the most meaningful saved events are easier to trust at a glance before reading the full running history
   - relationship memory summaries now blend email, notes, uploads, reconnect cues, recent upload context, and upcoming meeting prep signals, with lighter `Conversation memory` and `Latest saved context` reads instead of repetitive stacked boxes
   - relationship pages now surface upcoming meeting-like moments with a direct `Prepare me` path into the meeting-prep memory view when Brivoly detects that a near-term next touch looks like a call, demo, review, or sync
+  - relationship pages now turn meeting prep into a fuller continuity view by pulling the freshest thread signal, open loop, latest saved moment, and client-shared context into one preparation surface
   - explicit calendar events now land as `meeting` timeline context, can temporarily become the next prep moment, and feed the existing meeting-prep summary layer instead of living in a separate calendar silo
   - recent client-shared context now has its own memory view, can be pulled straight into the next drafted note, generates a backend-driven follow-through hint, creates a more natural reconnect path, and now plays a bigger role in meeting prep, 30-day summaries, follow-through guidance, Today priorities, and inbox-side next moves
   - auto note designer for reconnects and follow-ups with in-app draft editing

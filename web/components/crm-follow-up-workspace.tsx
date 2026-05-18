@@ -4489,6 +4489,8 @@ function InboxThreadCard({
   ) => void;
 }) {
   const { leadId, leadName, companyName, stage, thread } = item;
+  const oneRead = buildThreadOneRead(thread);
+  const replyAngle = buildThreadReplyAngle(thread);
 
   return (
     <div
@@ -4520,16 +4522,16 @@ function InboxThreadCard({
             <p className="mt-3 text-sm font-medium text-slate-900">
               {thread.relationship_pulse}
             </p>
-            {thread.continuity_memory ? (
-              <p className="mt-2 text-sm leading-6 text-slate-700">
-                {thread.continuity_memory}
+            <div className="mt-3 rounded-[1rem] border bg-white px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+                One read
               </p>
-            ) : null}
-            <p className="mt-2 text-sm leading-6 text-slate-600">
-              {thread.continuity_span}
-            </p>
+              <p className="mt-2 text-sm leading-6 text-slate-700">
+                {oneRead}
+              </p>
+            </div>
             <p className="mt-3 text-sm leading-6 text-slate-600">
-              {thread.memory_summary}
+              {thread.continuity_span}
             </p>
             {thread.carry_forward_hint ? (
               <p className="mt-3 text-sm leading-6 text-slate-700">
@@ -4565,6 +4567,7 @@ function InboxThreadCard({
         </div>
         <div className="mt-4 grid gap-3 lg:grid-cols-2">
           <TimelineTile label="Brivoly read" value={thread.next_touch_hint} />
+          <TimelineTile label="Reply angle" value={replyAngle} />
           <TimelineTile label="Open loop" value={thread.open_loop} />
           <TimelineTile
             label="What changed"
@@ -4655,12 +4658,7 @@ function InboxNextMovePanel({
   isDrafting: boolean;
   draftStatus: string | null;
 }) {
-  const latestThread =
-    [...lead.recent_email_threads].sort(
-      (left, right) =>
-        new Date(right.last_message_at).getTime() -
-        new Date(left.last_message_at).getTime(),
-    )[0] ?? null;
+  const latestThread = getNewestThread(lead);
   const quietReconnect = latestThread
     ? isQuietThread(latestThread) && !latestThread.needs_reply
     : false;
@@ -4710,6 +4708,14 @@ function InboxNextMovePanel({
               : lead.next_step)
           }
         />
+        <TimelineTile
+          label="Reply angle"
+          value={
+            latestThread
+              ? buildThreadReplyAngle(latestThread)
+              : lead.relationship_reconnect_next_move || lead.next_step
+          }
+        />
       </div>
       {latestThread ? (
         <div className="mt-4 rounded-[1.2rem] border bg-slate-50/80 px-4 py-4">
@@ -4722,16 +4728,11 @@ function InboxNextMovePanel({
           <p className="mt-2 text-sm font-medium text-slate-900">
             {latestThread.relationship_pulse}
           </p>
-          {latestThread.continuity_memory ? (
-            <p className="mt-2 text-sm leading-6 text-slate-700">
-              {latestThread.continuity_memory}
-            </p>
-          ) : null}
-          <p className="mt-2 text-sm leading-6 text-slate-600">
-            {latestThread.continuity_span}
+          <p className="mt-2 text-sm leading-6 text-slate-700">
+            {buildThreadOneRead(latestThread)}
           </p>
           <p className="mt-2 text-sm leading-6 text-slate-600">
-            {latestThread.memory_summary}
+            {latestThread.continuity_span}
           </p>
         </div>
       ) : null}
@@ -7216,6 +7217,28 @@ function getNewestThread(item: CRMLeadFollowUp) {
         new Date(right.last_message_at).getTime() -
         new Date(left.last_message_at).getTime(),
     )[0] ?? null
+  );
+}
+
+function buildThreadOneRead(thread: CRMLeadFollowUp["recent_email_threads"][number]) {
+  const parts = [
+    thread.continuity_memory,
+    thread.recent_change_hint,
+    thread.memory_summary,
+  ].filter((value) => value.trim());
+  return parts[0] || "No conversation memory was captured yet.";
+}
+
+function buildThreadReplyAngle(
+  thread: CRMLeadFollowUp["recent_email_threads"][number],
+) {
+  return (
+    thread.open_loop ||
+    thread.unresolved_hint ||
+    thread.carry_forward_hint ||
+    thread.next_touch_hint ||
+    thread.memory_summary ||
+    "No clear reply angle was captured yet."
   );
 }
 
