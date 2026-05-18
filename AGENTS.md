@@ -119,6 +119,7 @@ cd web && npm run e2e
   - manual mailbox connection still exists as a fallback beta path when provider credentials are not configured yet
   - inbox cards now surface backend-driven relationship pulse, open-loop memory, thread continuity cues, `what changed` hints, unresolved-thread cues, a clearer long-thread `through-line`, and a carry-forward cue for longer threads, grouped into `Needs you now` and `Still warm`
   - inbox thread cards and the inbox-side next-move view now surface a tighter `One read` summary plus a clearer `Reply angle`, so longer threads are easier to trust and answer from the list itself
+  - Inbox now also lifts the most urgent thread into a `Start here` spotlight so the first reply or reconnect can happen from one high-context card instead of a long scan
   - Inbox now also supports open-loop and long-thread filtering plus a direct `Close loop` draft path so longer conversations can move forward with less scanning
   - email-thread ingestion that can auto-create/update contacts from inbox activity
   - mailbox sync now feeds the same inbox-ingest path Brivoly already uses, so provider-synced email activity and provider watch callbacks land in relationship memory instead of a separate mailbox subsystem
@@ -141,6 +142,7 @@ cd web && npm run e2e
   - relationship lists and continuity lanes now lean more on `latest saved moment`, `open loop`, and `why now` so the story leads more often than stage labels when scanning for the next touch
   - relationship pages now surface upcoming meeting-like moments with a direct `Prepare me` path into the meeting-prep memory view when Brivoly detects that a near-term next touch looks like a call, demo, review, or sync
   - relationship pages now turn meeting prep into a fuller continuity view by pulling the freshest thread signal, open loop, latest saved moment, and client-shared context into one preparation surface
+  - relationship pages now bring the full timeline ahead of drafting and note capture so the running story is easier to read before composing the next touch
   - explicit calendar events now land as `meeting` timeline context, can temporarily become the next prep moment, and feed the existing meeting-prep summary layer instead of living in a separate calendar silo
   - recent client-shared context now has its own memory view, can be pulled straight into the next drafted note, generates a backend-driven follow-through hint, creates a more natural reconnect path, and now plays a bigger role in meeting prep, 30-day summaries, follow-through guidance, Today priorities, and inbox-side next moves
   - auto note designer for reconnects and follow-ups with in-app draft editing
@@ -181,6 +183,7 @@ cd web && npm run e2e
   - auth, shell fallback, API fallback, loading, draft-composer, and client-upload surfaces now use calmer language and lighter guidance with less system-heavy phrasing
   - Today navigation and other dense summary areas are progressively flattening into lighter pills and calmer summaries instead of equal-weight cards
   - Today now leans more clearly into a daily starting point, with fewer equal-weight summary blocks, a stronger `Start here` move, and a lighter `After that` sequence for the next warm openings
+  - Today’s primary move now carries a clearer `Why now` and `Latest saved moment`, so the first daily decision has more story context without opening the full relationship immediately
   - scheduled mailbox automation now reports both watch-ready and event-ready inbox coverage so the always-on sync layer is easier to reason about than a raw thread count alone
   - Today, Inbox, Attention, and Relationships now quietly refresh from connected inbox/calendar memory while the page is open, so fresh context can surface without asking the user to manually refresh
   - Today and Attention now surface whether Brivoly is still holding context quietly in the background or whether paused / reconnect-needed inbox and calendar connections are starting to thin that memory layer out

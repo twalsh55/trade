@@ -6663,6 +6663,58 @@ function LeadMemoryPanel({
         </section>
       ) : null}
 
+      <section className="mt-6 rounded-[1.5rem] border bg-white p-5">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+          Full timeline
+        </p>
+        <h3 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+          Read the relationship story before you write the next note.
+        </h3>
+        <p className="mt-2 text-sm leading-6 text-slate-600">
+          The timeline is the running memory of what happened, what changed,
+          and what Brivoly thinks matters now.
+        </p>
+        <div className="mt-4 space-y-4">
+          {lead.timeline.map((entry) => {
+            const uploadContext = isUploadTimelineEntry(entry);
+            return (
+              <div
+                key={entry.id}
+                className={`rounded-[1.35rem] border p-4 ${
+                  uploadContext
+                    ? "border-sky-200 bg-sky-50/80"
+                    : "bg-slate-50/80"
+                }`}
+              >
+                <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p
+                      className={`text-xs font-semibold uppercase tracking-[0.2em] ${uploadContext ? "text-sky-700" : "text-slate-400"}`}
+                    >
+                      {uploadContext
+                        ? "client-shared context"
+                        : `${entry.kind.replaceAll("_", " ")} · ${entry.channel}`}
+                    </p>
+                    {uploadContext ? (
+                      <MiniFlag
+                        label={formatUploadHistorySource(entry)}
+                        tone="neutral"
+                      />
+                    ) : null}
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    {formatDateTime(entry.occurred_at)}
+                  </p>
+                </div>
+                <p className="mt-3 text-sm leading-6 text-slate-700">
+                  {entry.summary}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
       <section
         ref={composerSectionRef}
         className="mt-6 rounded-[1.5rem] border bg-white p-5"
@@ -6866,54 +6918,6 @@ function LeadMemoryPanel({
         </div>
       </section>
 
-      <section className="mt-6">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
-          Full timeline
-        </p>
-        <p className="mt-2 text-sm leading-6 text-slate-600">
-          The timeline is the running memory of what happened, what changed, and
-          what Brivoly thinks matters now.
-        </p>
-        <div className="mt-4 space-y-4">
-          {lead.timeline.map((entry) => {
-            const uploadContext = isUploadTimelineEntry(entry);
-            return (
-              <div
-                key={entry.id}
-                className={`rounded-[1.35rem] border p-4 ${
-                  uploadContext
-                    ? "border-sky-200 bg-sky-50/80"
-                    : "bg-slate-50/80"
-                }`}
-              >
-                <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p
-                      className={`text-xs font-semibold uppercase tracking-[0.2em] ${uploadContext ? "text-sky-700" : "text-slate-400"}`}
-                    >
-                      {uploadContext
-                        ? "client-shared context"
-                        : `${entry.kind.replaceAll("_", " ")} · ${entry.channel}`}
-                    </p>
-                    {uploadContext ? (
-                      <MiniFlag
-                        label={formatUploadHistorySource(entry)}
-                        tone="neutral"
-                      />
-                    ) : null}
-                  </div>
-                  <p className="text-xs text-slate-500">
-                    {formatDateTime(entry.occurred_at)}
-                  </p>
-                </div>
-                <p className="mt-3 text-sm leading-6 text-slate-700">
-                  {entry.summary}
-                </p>
-              </div>
-            );
-          })}
-        </div>
-      </section>
     </section>
   );
 }
