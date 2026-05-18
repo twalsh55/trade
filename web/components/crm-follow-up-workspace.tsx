@@ -5924,6 +5924,29 @@ function LeadMemoryPanel({
   const latestUploadEntry = getLatestUploadContextEntry(lead);
   const latestMeaningfulEntry = getLatestMeaningfulTimelineEntry(lead);
   const keyTimelineMoments = getKeyTimelineMoments(lead);
+  const latestThread = selectedThread ?? getNewestThread(lead);
+  const prepOpenLoop =
+    latestThread?.open_loop ||
+    latestThread?.unresolved_hint ||
+    lead.relationship_reconnect_next_move ||
+    lead.next_step ||
+    "No meeting carry-forward was captured yet.";
+  const prepFreshContext =
+    lead.relationship_recent_upload_summary ||
+    (latestUploadEntry
+      ? `${formatDateTime(latestUploadEntry.occurred_at)} · ${latestUploadEntry.summary}`
+      : "No recent client-shared context.");
+  const prepRecentShift =
+    latestThread?.recent_change_hint ||
+    latestThread?.continuity_memory ||
+    (latestMeaningfulEntry
+      ? `${formatTimelineEntryLabel(latestMeaningfulEntry)} · ${latestMeaningfulEntry.summary}`
+      : "No recent relationship shift was captured yet.");
+  const prepBestOpening =
+    latestThread?.next_touch_hint ||
+    lead.relationship_meeting_prep_summary ||
+    lead.relationship_upload_follow_through_hint ||
+    "Brivoly is holding the latest relationship context for the next conversation.";
   const memoryPanels = [
     {
       value: "overview" as const,
@@ -6072,6 +6095,70 @@ function LeadMemoryPanel({
         </section>
       ) : null}
 
+      {(lead.relationship_upcoming_meeting_at || memoryView === "meeting_prep") && (
+        <section className="mt-6 rounded-[1.5rem] border bg-emerald-50/40 p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">
+            Prepare from continuity
+          </p>
+          <h3 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+            Bring the thread, the latest shift, and the client context into one view.
+          </h3>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+            Brivoly keeps the upcoming meeting, the freshest conversation signal,
+            and the carry-forward context side by side so you can walk in
+            oriented without piecing the story back together.
+          </p>
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            <TimelineTile
+              label="Meeting moment"
+              value={
+                lead.relationship_upcoming_meeting_at
+                  ? `${formatDateTime(lead.relationship_upcoming_meeting_at)}${lead.relationship_upcoming_meeting_label ? ` · ${lead.relationship_upcoming_meeting_label}` : ""}`
+                  : "No upcoming meeting is scheduled yet."
+              }
+            />
+            <TimelineTile label="Freshest shift" value={prepRecentShift} />
+            <TimelineTile label="Carry into the room" value={prepOpenLoop} />
+            <TimelineTile label="Best opening" value={prepBestOpening} />
+          </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            <TimelineTile
+              label="Client-shared context"
+              value={prepFreshContext}
+            />
+            <TimelineTile
+              label="Latest saved moment"
+              value={
+                latestMeaningfulEntry
+                  ? `${formatTimelineEntryLabel(latestMeaningfulEntry)} · ${latestMeaningfulEntry.summary}`
+                  : "No saved relationship moment yet."
+              }
+            />
+          </div>
+          {latestThread ? (
+            <div className="mt-4 rounded-[1.2rem] border bg-white px-4 py-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                Thread to keep in view
+              </p>
+              <p className="mt-2 text-sm font-medium text-slate-900">
+                {latestThread.subject}
+              </p>
+              <p className="mt-2 text-sm leading-6 text-slate-700">
+                {latestThread.relationship_pulse}
+              </p>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                {latestThread.memory_summary}
+              </p>
+              {latestThread.carry_forward_hint ? (
+                <p className="mt-2 text-sm leading-6 text-slate-700">
+                  {latestThread.carry_forward_hint}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+        </section>
+      )}
+
       {isReconnectMoment(lead) ? (
         <section className="mt-6 rounded-[1.5rem] border bg-sky-50/70 p-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -6212,6 +6299,12 @@ function LeadMemoryPanel({
           <p className="mt-2 text-sm leading-6 text-slate-700">
             {activeMemoryPanel.body}
           </p>
+          {memoryView === "meeting_prep" ? (
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <TimelineTile label="Carry into the room" value={prepOpenLoop} />
+              <TimelineTile label="Freshest shift" value={prepRecentShift} />
+            </div>
+          ) : null}
         </div>
         <div className="mt-4 rounded-[1.2rem] border bg-white px-4 py-4">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
