@@ -2802,6 +2802,7 @@ export function CRMFollowUpWorkspace({
 
           <InboxActivityPanel
             items={overview.items}
+            inboxSummary={overview.inbox_summary}
             selectedLeadId={selectedLead?.id ?? null}
             onSelectLead={(leadId, threadId) => {
               focusLeadForFollowUp(leadId, threadId);
@@ -4205,6 +4206,7 @@ function PipelineBoardPanel({
 
 function InboxActivityPanel({
   items,
+  inboxSummary,
   selectedLeadId,
   onSelectLead,
   onDraftAction,
@@ -4215,6 +4217,7 @@ function InboxActivityPanel({
   effectiveInboxQuery,
 }: {
   items: CRMLeadFollowUp[];
+  inboxSummary: CRMFollowUpOverview["inbox_summary"];
   selectedLeadId: string | null;
   onSelectLead: (leadId: string, threadId?: string | null) => void;
   onDraftAction: (
@@ -4251,6 +4254,16 @@ function InboxActivityPanel({
   const filteredThreads = threads.filter((item) =>
     matchesInboxThread(item, effectiveInboxQuery, inboxFilter),
   );
+  const autoCreatedCount = inboxSummary?.auto_created_contact_count ?? 0;
+  const needsReplyCount =
+    inboxSummary?.needs_reply_count ??
+    filteredThreads.filter(({ thread }) => thread.needs_reply).length;
+  const openLoopCount = filteredThreads.filter(({ thread }) =>
+    isUnresolvedThread(thread),
+  ).length;
+  const quietCount =
+    inboxSummary?.stale_thread_count ??
+    filteredThreads.filter(({ thread }) => isQuietThread(thread)).length;
   const urgentThreads = filteredThreads.filter(
     ({ thread }) =>
       thread.needs_reply ||
@@ -4276,6 +4289,72 @@ function InboxActivityPanel({
       <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
         Recent conversations Brivoly is quietly holding together.
       </h2>
+      <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
+        Let email stay the default relationship memory source. Brivoly keeps the
+        live thread, the latest change, and the cleanest next move close enough
+        that you rarely need to reconstruct the story by hand.
+      </p>
+      <div className="mt-5 grid gap-3 xl:grid-cols-4">
+        <CompactMetricLight
+          label="Reply soon"
+          value={
+            needsReplyCount
+              ? `${needsReplyCount} thread${needsReplyCount === 1 ? "" : "s"}`
+              : "Clear"
+          }
+          tone={needsReplyCount ? "critical" : "neutral"}
+        />
+        <CompactMetricLight
+          label="Open loops"
+          value={
+            openLoopCount
+              ? `${openLoopCount} thread${openLoopCount === 1 ? "" : "s"}`
+              : "Clear"
+          }
+          tone={openLoopCount ? "warning" : "neutral"}
+        />
+        <CompactMetricLight
+          label="Quiet threads"
+          value={
+            quietCount
+              ? `${quietCount} thread${quietCount === 1 ? "" : "s"}`
+              : "Quiet"
+          }
+          tone={quietCount ? "warning" : "neutral"}
+        />
+        <CompactMetricLight
+          label="Brought in from email"
+          value={
+            autoCreatedCount
+              ? `${autoCreatedCount} relationship${autoCreatedCount === 1 ? "" : "s"}`
+              : "Waiting"
+          }
+          tone={autoCreatedCount ? "positive" : "neutral"}
+        />
+      </div>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => onInboxFilterChange("reply")}
+          className="rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-700 transition hover:border-slate-400 hover:bg-white hover:text-slate-950"
+        >
+          Start with replies
+        </button>
+        <button
+          type="button"
+          onClick={() => onInboxFilterChange("unresolved")}
+          className="rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-700 transition hover:border-slate-400 hover:bg-white hover:text-slate-950"
+        >
+          Focus open loops
+        </button>
+        <button
+          type="button"
+          onClick={() => onInboxFilterChange("long_thread")}
+          className="rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-700 transition hover:border-slate-400 hover:bg-white hover:text-slate-950"
+        >
+          Focus long threads
+        </button>
+      </div>
       <div className="mt-5 rounded-[1.35rem] border bg-slate-50/80 p-4">
         <div className="grid gap-3 lg:grid-cols-[1.2fr_auto] lg:items-center">
           <input
