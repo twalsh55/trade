@@ -4214,6 +4214,12 @@ function PipelineBoardPanel({
           const stageItems = [...(itemsByStage.get(stage.stage) ?? [])].sort(
             (left, right) => compareAttentionPriority(left, right),
           );
+          const stageLabel = formatStageLabel(stage.stage);
+          const urgentStageItems = stageItems.filter(
+            (item) =>
+              item.recent_email_threads.some((thread) => thread.needs_reply) ||
+              relationshipStateUrgency(item.relationship_state) > 0,
+          ).length;
           return (
             <section
               key={stage.stage}
@@ -4222,11 +4228,16 @@ function PipelineBoardPanel({
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                    Continuity lane
+                    Relationship group
                   </p>
                   <h3 className="mt-2 text-xl font-semibold tracking-tight text-slate-950">
-                    {stage.stage}
+                    {stageLabel}
                   </h3>
+                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                    {urgentStageItems
+                      ? `${urgentStageItems} relationship${urgentStageItems === 1 ? "" : "s"} here still need a warmer move.`
+                      : "Nothing here feels especially fragile right now."}
+                  </p>
                 </div>
                 <div className="rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-semibold text-slate-700">
                   {stage.lead_count}
@@ -4235,19 +4246,19 @@ function PipelineBoardPanel({
 
               <div className="mt-4 grid gap-2 sm:grid-cols-2">
                 <TimelineTile
-                  label="Needs a touch"
+                  label="Needs care now"
                   value={String(stage.overdue_count)}
                 />
                 <TimelineTile
-                  label="Due soon"
+                  label="Coming up soon"
                   value={String(stage.due_this_week_count)}
                 />
                 <TimelineTile
-                  label="Openings"
+                  label="Warm openings"
                   value={String(stage.high_priority_count)}
                 />
                 <TimelineTile
-                  label="Quiet"
+                  label="Quiet here"
                   value={String(stage.dormant_count)}
                 />
               </div>
@@ -4272,7 +4283,7 @@ function PipelineBoardPanel({
                             {item.lead_name}
                           </p>
                           <p className="mt-1 text-xs text-slate-500">
-                            {item.company_name}
+                            {item.company_name} · {item.contact_channel}
                           </p>
                         </div>
                         <div className="flex flex-wrap gap-2">
@@ -4314,6 +4325,9 @@ function PipelineBoardPanel({
                           {buildReconnectStarterLine(item)}
                         </p>
                       ) : null}
+                      <p className="mt-3 text-xs text-slate-500">
+                        {formatDateTime(item.next_follow_up_at)}
+                      </p>
                     </button>
                   );
                 })}
