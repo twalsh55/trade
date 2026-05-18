@@ -5556,11 +5556,15 @@ function InboxActivityPanel({
               </p>
               <div className="mt-4 grid gap-3 md:grid-cols-2">
                 <TimelineTile
-                  label="Latest saved moment"
-                  value={getLeadCardStory(primaryInboxCreatedLead)}
+                  label="What already makes this real"
+                  value={
+                    getNewestThread(primaryInboxCreatedLead)?.continuity_memory ||
+                    getNewestThread(primaryInboxCreatedLead)?.memory_summary ||
+                    getLeadCardStory(primaryInboxCreatedLead)
+                  }
                 />
                 <TimelineTile
-                  label="First move Brivoly would make"
+                  label="Next thing to lock in"
                   value={
                     getNewestThread(primaryInboxCreatedLead)?.next_touch_hint ||
                     getNewestThread(primaryInboxCreatedLead)?.open_loop ||
@@ -5652,11 +5656,13 @@ function InboxActivityPanel({
                   </div>
                   <div className="mt-3 grid gap-3 md:grid-cols-2">
                     <TimelineTile
-                      label="Latest thread"
+                      label="What already makes this real"
                       value={
                         newestThread
-                          ? `${newestThread.subject} · ${formatDateTime(newestThread.last_message_at)}`
-                          : "No synced thread yet."
+                          ? newestThread.continuity_memory ||
+                            newestThread.memory_summary ||
+                            `${newestThread.subject} · ${formatDateTime(newestThread.last_message_at)}`
+                          : getLeadCardStory(lead)
                       }
                     />
                     <TimelineTile
@@ -5664,7 +5670,7 @@ function InboxActivityPanel({
                       value={getLeadCardWhyNow(lead)}
                     />
                     <TimelineTile
-                      label="Best next move"
+                      label="Next thing to lock in"
                       value={
                         newestThread
                           ? newestThread.next_touch_hint || newestThread.open_loop || lead.next_step
@@ -5672,8 +5678,12 @@ function InboxActivityPanel({
                       }
                     />
                     <TimelineTile
-                      label="Latest saved moment"
-                      value={getLeadCardStory(lead)}
+                      label="Latest thread"
+                      value={
+                        newestThread
+                          ? `${newestThread.subject} · ${formatDateTime(newestThread.last_message_at)}`
+                          : "No synced thread yet."
+                      }
                     />
                   </div>
                   <div className="mt-4 flex flex-wrap gap-2">
