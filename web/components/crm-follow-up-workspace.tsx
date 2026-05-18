@@ -78,6 +78,12 @@ type TodayFocusMove = {
   actionLabel: string;
   onAction: () => void;
 };
+type TodayRhythmStep = {
+  id: string;
+  label: string;
+  title: string;
+  body: string;
+};
 
 export function CRMFollowUpWorkspace({
   initialOverview,
@@ -3531,6 +3537,45 @@ function TodayPrioritiesPanel({
         }
       : null,
   ]).slice(0, 4);
+  const laterLead =
+    [...items]
+      .filter(
+        (item) =>
+          !item.recent_email_threads.some((thread) => thread.needs_reply) &&
+          !isReconnectMoment(item) &&
+          !isProposalFollowThrough(item) &&
+          !hasRecentUploadContext(item),
+      )
+      .sort((left, right) => compareSoonestFollowUp(left, right))[0] ?? null;
+  const quickRhythm = compactPriorityCards<TodayRhythmStep>([
+    primaryPriority
+      ? {
+          id: `${primaryPriority.id}-rhythm-first`,
+          label: "First few minutes",
+          title: primaryPriority.title,
+          body: primaryPriority.nextMove || primaryPriority.body,
+        }
+      : null,
+    secondaryPriorities[0]
+      ? {
+          id: `${secondaryPriorities[0].id}-rhythm-next`,
+          label: "If you have a little more time",
+          title: secondaryPriorities[0].title,
+          body: secondaryPriorities[0].nextMove || secondaryPriorities[0].body,
+        }
+      : null,
+    laterLead
+      ? {
+          id: `${laterLead.id}-rhythm-later`,
+          label: "What can wait",
+          title: `${laterLead.lead_name} can stay warm quietly`,
+          body:
+            laterLead.relationship_timing_nudge ||
+            laterLead.next_step ||
+            "Brivoly can keep holding this until you have more room.",
+        }
+      : null,
+  ]).slice(0, 3);
 
   return (
     <section className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm">
@@ -3678,6 +3723,42 @@ function TodayPrioritiesPanel({
                     {item.actionLabel}
                   </button>
                 </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+      {quickRhythm.length ? (
+        <div className="mt-5 rounded-[1.35rem] border bg-white px-5 py-4">
+          <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                A calm rhythm for today
+              </p>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                If you only have a short window, move through the day in this
+                order and let Brivoly hold the rest.
+              </p>
+            </div>
+            <p className="text-xs text-slate-500">
+              One move is enough to make the day feel lighter.
+            </p>
+          </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-3">
+            {quickRhythm.map((step) => (
+              <div
+                key={step.id}
+                className="rounded-[1rem] border bg-slate-50/70 px-4 py-4"
+              >
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+                  {step.label}
+                </p>
+                <p className="mt-2 text-sm font-medium text-slate-900">
+                  {step.title}
+                </p>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  {step.body}
+                </p>
               </div>
             ))}
           </div>
