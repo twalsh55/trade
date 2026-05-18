@@ -4221,18 +4221,26 @@ function TodayPrioritiesPanel({
             </p>
           ) : null}
           <div className="mt-4 grid gap-3 md:grid-cols-2">
-            {visibleSecondaryPriorities.map((item) => (
-              <PriorityCard
-                key={item.id}
-                href={item.href}
-                eyebrow={item.eyebrow}
-                title={item.title}
-                body={item.body}
-                meta={item.meta}
-                nextMove={item.nextMove}
-                actionLabel={item.actionLabel}
-                onAction={item.onAction}
-              />
+            {visibleSecondaryPriorities.map((item, index) => (
+              <div key={item.id} className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+                  {index === 0
+                    ? "Closest next"
+                    : index === 1
+                      ? "Right after that"
+                      : "Keep warm after that"}
+                </p>
+                <PriorityCard
+                  href={item.href}
+                  eyebrow={item.eyebrow}
+                  title={item.title}
+                  body={item.body}
+                  meta={item.meta}
+                  nextMove={item.nextMove}
+                  actionLabel={item.actionLabel}
+                  onAction={item.onAction}
+                />
+              </div>
             ))}
           </div>
         </div>
