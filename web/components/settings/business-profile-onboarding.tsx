@@ -19,15 +19,23 @@ type BusinessProfileOnboardingProps = {
 export function BusinessProfileOnboarding({
   initialSettings,
   title = "Before we automate outreach, tell Brivoly the obvious basics.",
-  description = "Set the business name, logo, and sender name Brivoly should use in automatic emails and account-facing CRM moments. Or skip it for now and add it later in settings.",
+  description = "Set the business name, logo, and sender name Brivoly should use in automatic emails and account-facing relationship moments. Or skip it for now and add it later in settings.",
   accent = "amber",
   onSettingsUpdated,
 }: BusinessProfileOnboardingProps) {
   const [settings, setSettings] = useState(initialSettings);
-  const [businessName, setBusinessName] = useState(initialSettings?.business_name ?? "");
-  const [businessWebsite, setBusinessWebsite] = useState(initialSettings?.business_website ?? "");
-  const [senderName, setSenderName] = useState(initialSettings?.outbound_sender_name ?? "");
-  const [logoDataUrl, setLogoDataUrl] = useState(initialSettings?.business_logo_data_url ?? "");
+  const [businessName, setBusinessName] = useState(
+    initialSettings?.business_name ?? "",
+  );
+  const [businessWebsite, setBusinessWebsite] = useState(
+    initialSettings?.business_website ?? "",
+  );
+  const [senderName, setSenderName] = useState(
+    initialSettings?.outbound_sender_name ?? "",
+  );
+  const [logoDataUrl, setLogoDataUrl] = useState(
+    initialSettings?.business_logo_data_url ?? "",
+  );
   const [status, setStatus] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -52,15 +60,30 @@ export function BusinessProfileOnboarding({
       setLogoDataUrl(customEvent.detail.business_logo_data_url);
     }
 
-    window.addEventListener("brivoly:settings-saved", handleSavedSettings as EventListener);
-    window.addEventListener("trade:settings-saved", handleSavedSettings as EventListener);
+    window.addEventListener(
+      "brivoly:settings-saved",
+      handleSavedSettings as EventListener,
+    );
+    window.addEventListener(
+      "trade:settings-saved",
+      handleSavedSettings as EventListener,
+    );
     return () => {
-      window.removeEventListener("brivoly:settings-saved", handleSavedSettings as EventListener);
-      window.removeEventListener("trade:settings-saved", handleSavedSettings as EventListener);
+      window.removeEventListener(
+        "brivoly:settings-saved",
+        handleSavedSettings as EventListener,
+      );
+      window.removeEventListener(
+        "trade:settings-saved",
+        handleSavedSettings as EventListener,
+      );
     };
   }, []);
 
-  const visible = useMemo(() => shouldPromptForBusinessProfile(settings), [settings]);
+  const visible = useMemo(
+    () => shouldPromptForBusinessProfile(settings),
+    [settings],
+  );
 
   if (!settings || !visible) {
     return null;
@@ -74,8 +97,12 @@ export function BusinessProfileOnboarding({
   function dispatchSavedSettings(saved: AccountSettings) {
     setSettings(saved);
     onSettingsUpdated?.(saved);
-    window.dispatchEvent(new CustomEvent("brivoly:settings-saved", { detail: saved }));
-    window.dispatchEvent(new CustomEvent("trade:settings-saved", { detail: saved }));
+    window.dispatchEvent(
+      new CustomEvent("brivoly:settings-saved", { detail: saved }),
+    );
+    window.dispatchEvent(
+      new CustomEvent("trade:settings-saved", { detail: saved }),
+    );
   }
 
   function buildPayload(overrides?: Partial<AccountSettings>): AccountSettings {
@@ -88,12 +115,17 @@ export function BusinessProfileOnboarding({
       business_website: businessWebsite.trim(),
       outbound_sender_name: senderName.trim(),
       business_logo_data_url: logoDataUrl.trim(),
-      onboarding_profile_deferred: overrides?.onboarding_profile_deferred ?? false,
+      onboarding_profile_deferred:
+        overrides?.onboarding_profile_deferred ?? false,
     };
   }
 
   function saveProfile(overrides?: Partial<AccountSettings>) {
-    setStatus(overrides?.onboarding_profile_deferred ? "Okay, we will remind you less aggressively." : "Saving business profile...");
+    setStatus(
+      overrides?.onboarding_profile_deferred
+        ? "Okay, we will remind you less aggressively."
+        : "Saving business profile...",
+    );
     startTransition(async () => {
       try {
         const response = await fetch("/api/account/settings", {
@@ -101,18 +133,28 @@ export function BusinessProfileOnboarding({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(buildPayload(overrides)),
         });
-        const body = (await response.json().catch(() => null)) as AccountSettings | { error?: string } | null;
+        const body = (await response.json().catch(() => null)) as
+          | AccountSettings
+          | { error?: string }
+          | null;
         if (!response.ok || !body || !("benchmark" in body)) {
-          throw new Error((body && "error" in body && body.error) || "Unable to save the business profile.");
+          throw new Error(
+            (body && "error" in body && body.error) ||
+              "Unable to save the business profile.",
+          );
         }
         dispatchSavedSettings(body);
         setStatus(
           body.onboarding_profile_deferred
             ? "You can fill in the rest later from settings."
-            : "Business profile saved. Brivoly can use this for branded CRM moments and automatic emails.",
+            : "Business profile saved. Brivoly can use this for branded relationship moments and automatic emails.",
         );
       } catch (error) {
-        setStatus(error instanceof Error ? error.message : "Unable to save the business profile.");
+        setStatus(
+          error instanceof Error
+            ? error.message
+            : "Unable to save the business profile.",
+        );
       }
     });
   }
@@ -127,7 +169,11 @@ export function BusinessProfileOnboarding({
       setLogoDataUrl(nextLogo);
       setStatus(`Loaded logo preview from ${file.name}.`);
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Unable to load the business logo.");
+      setStatus(
+        error instanceof Error
+          ? error.message
+          : "Unable to load the business logo.",
+      );
     } finally {
       event.target.value = "";
     }
@@ -137,15 +183,22 @@ export function BusinessProfileOnboarding({
     <section className={`rounded-[1.75rem] border p-6 shadow-sm ${toneClass}`}>
       <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
         <div className="max-w-2xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] opacity-75">First Login Setup</p>
-          <h2 className="mt-3 text-3xl font-semibold tracking-tight">{title}</h2>
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] opacity-75">
+            First Login Setup
+          </p>
+          <h2 className="mt-3 text-3xl font-semibold tracking-tight">
+            {title}
+          </h2>
           <p className="mt-3 text-sm leading-6 opacity-90">{description}</p>
         </div>
         <div className="rounded-[1.4rem] border border-white/70 bg-white/70 px-4 py-4 text-sm text-slate-700 xl:max-w-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Why this matters</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+            Why this matters
+          </p>
           <p className="mt-2 leading-6">
-            Business identity, sender naming, and a recognizable logo make CRM emails, imports, and follow-up touches
-            feel intentional instead of generic.
+            Business identity, sender naming, and a recognizable logo make
+            automatic emails, imports, and follow-up touches feel intentional
+            instead of generic.
           </p>
         </div>
       </div>
@@ -183,11 +236,17 @@ export function BusinessProfileOnboarding({
               className="block w-full text-sm text-slate-700"
               onChange={handleLogoChange}
             />
-            <p className="mt-2 text-xs text-slate-500">Use a small square or horizontal logo. Max 500 KB.</p>
+            <p className="mt-2 text-xs text-slate-500">
+              Use a small square or horizontal logo. Max 500 KB.
+            </p>
             {logoDataUrl ? (
               <div className="mt-3 flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={logoDataUrl} alt="Business logo preview" className="h-12 w-12 rounded-xl object-cover" />
+                <img
+                  src={logoDataUrl}
+                  alt="Business logo preview"
+                  className="h-12 w-12 rounded-xl object-cover"
+                />
                 <button
                   type="button"
                   className="text-sm font-medium text-slate-700 underline underline-offset-4"
@@ -209,7 +268,12 @@ export function BusinessProfileOnboarding({
         >
           {isPending ? "Saving..." : "Save and continue"}
         </Button>
-        <Button type="button" variant="outline" disabled={isPending} onClick={() => saveProfile({ onboarding_profile_deferred: true })}>
+        <Button
+          type="button"
+          variant="outline"
+          disabled={isPending}
+          onClick={() => saveProfile({ onboarding_profile_deferred: true })}
+        >
           Add later
         </Button>
         {status ? <p className="text-sm text-slate-600">{status}</p> : null}
@@ -221,7 +285,9 @@ export function BusinessProfileOnboarding({
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="block space-y-2">
-      <span className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{label}</span>
+      <span className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+        {label}
+      </span>
       {children}
     </label>
   );
