@@ -3582,6 +3582,8 @@ function TodayPrioritiesPanel({
   ).slice(0, 4);
   const primaryPriority = visiblePriorities[0] ?? null;
   const secondaryPriorities = visiblePriorities.slice(1);
+  const visibleSecondaryPriorities = secondaryPriorities.slice(0, 3);
+  const hiddenSecondaryCount = Math.max(0, secondaryPriorities.length - visibleSecondaryPriorities.length);
 
   const replyCount = inboxSummary?.needs_reply_count ?? 0;
   const atRiskCount = items.filter(
@@ -4212,8 +4214,14 @@ function TodayPrioritiesPanel({
               Keep this list short. One move at a time is enough.
             </p>
           </div>
+          {hiddenSecondaryCount ? (
+            <p className="mt-3 text-xs text-slate-500">
+              Brivoly is quietly holding {hiddenSecondaryCount} more warm opening
+              {hiddenSecondaryCount === 1 ? "" : "s"} behind these.
+            </p>
+          ) : null}
           <div className="mt-4 grid gap-3 md:grid-cols-2">
-            {secondaryPriorities.map((item) => (
+            {visibleSecondaryPriorities.map((item) => (
               <PriorityCard
                 key={item.id}
                 href={item.href}
