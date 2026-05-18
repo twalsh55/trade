@@ -4047,6 +4047,12 @@ function PipelineBoardPanel({
                         <p className="mt-2 text-sm leading-6 text-slate-700">
                           {buildReconnectStarterLine(item)}
                         </p>
+                        <p className="mt-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+                          If it stays quiet
+                        </p>
+                        <p className="mt-2 text-sm leading-6 text-slate-700">
+                          {buildReconnectFallbackStep(item)}
+                        </p>
                       </div>
                     ) : null}
                     <p className="mt-3 text-xs text-slate-500">
@@ -6038,6 +6044,28 @@ function LeadMemoryPanel({
               label="Starter line"
               value={buildReconnectStarterLine(lead)}
             />
+            <TimelineTile
+              label="If it stays quiet"
+              value={buildReconnectFallbackStep(lead)}
+            />
+          </div>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setMemoryView("recent_changes")}
+            >
+              Review recent changes
+            </Button>
+            {lead.relationship_recent_upload_summary ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setMemoryView("recent_upload")}
+              >
+                Use client-shared context
+              </Button>
+            ) : null}
           </div>
         </section>
       ) : null}
@@ -7448,6 +7476,26 @@ function buildReconnectStarterLine(lead: CRMLeadFollowUp) {
     return "Wanted to check back in and make the next step easy from here.";
   }
   return "Wanted to reconnect and see if this is worth picking back up.";
+}
+
+function buildReconnectFallbackStep(lead: CRMLeadFollowUp) {
+  if (lead.referral_source_name) {
+    return `If this lands softly but does not reopen, come back through ${lead.referral_source_name} instead of forcing a colder follow-up.`;
+  }
+  if (lead.relationship_recent_upload_summary) {
+    return "If they stay quiet, follow up by anchoring on the client-shared context instead of sending a generic bump.";
+  }
+  if (lead.relationship_reminders[0]?.message) {
+    return "If this does not reopen the thread yet, wait for the personal or company moment to give you a warmer second reason to reach out.";
+  }
+  if (
+    lead.recent_email_threads.some(
+      (thread) => thread.open_loop.trim() || thread.unresolved_hint.trim(),
+    )
+  ) {
+    return "If they stay quiet, close the loop on the last open thread instead of starting over with a brand-new ask.";
+  }
+  return "If this does not reopen the thread, give it space and let Brivoly hold it until a warmer reason to reach out appears.";
 }
 
 function formatReminderKind(value: string) {
