@@ -105,6 +105,7 @@ cd web && npm run e2e
   - CRM relationship memory now persists in Postgres when `DATABASE_URL` is configured, including imported follow-ups, notes, timeline history, and inbox-ingested thread state
   - anonymous guest mode now bootstraps the sample relationship set once into durable CRM storage instead of rebuilding it from process memory on every restart
   - Today priorities now collapse into one obvious `Start here` move, lighter `Needs care now` and `Freshest opening` summaries, direct draft/review actions, stronger upload-aware next-touch framing, a lightweight `Prepare now` path for upcoming meeting-like moments, and a clearer `Next move` cue on each priority so the daily home asks for less scanning
+  - Today now also surfaces a tighter triage read for reply pressure, at-risk relationships, reopening moments, and fresh context so the default home makes fragile relationships more obvious before anything else
   - follow-up queue
   - inbox-native relationship page for auto-logging email threads and reconnect-aware next moves
   - mailbox beta now includes real Gmail / Outlook OAuth-ready connection start/complete routes, provider-backed sync for OAuth-linked accounts, provider-watch event callbacks, and provider-backed sending through Gmail API / Microsoft Graph when those accounts are connected
@@ -115,6 +116,7 @@ cd web && npm run e2e
   - connected calendar cards now also keep track of the latest meeting context they saved, surface when meeting memory has gone quiet, and help Today / Attention distinguish between truly warm calendar context and merely connected calendar coverage
   - manual mailbox connection still exists as a fallback beta path when provider credentials are not configured yet
   - inbox cards now surface backend-driven relationship pulse, open-loop memory, thread continuity cues, `what changed` hints, unresolved-thread cues, a clearer long-thread `through-line`, and a carry-forward cue for longer threads, grouped into `Needs you now` and `Still warm`
+  - Inbox now also supports open-loop and long-thread filtering plus a direct `Close loop` draft path so longer conversations can move forward with less scanning
   - email-thread ingestion that can auto-create/update contacts from inbox activity
   - mailbox sync now feeds the same inbox-ingest path Brivoly already uses, so provider-synced email activity and provider watch callbacks land in relationship memory instead of a separate mailbox subsystem
   - sending a drafted note now writes the outbound message back into the same relationship timeline and thread history, including notes sent through the provider-backed mailbox path, now carries forward stored external message ids for better reply continuity, and now keeps the selected inbox thread attached all the way from Inbox / Today into the composer send path
@@ -123,8 +125,10 @@ cd web && npm run e2e
   - `/api/account/privacy/export` and the settings export action can now download a JSON snapshot of account settings, connected mailboxes, and stored relationship memory for GDPR-oriented export groundwork
   - `/api/account/privacy/erase` and the settings erase actions can now clear stored relationship memory or wipe memory plus connected mailbox links as an early GDPR delete/control path
   - attention view with reconnect-first guidance and direct draft actions
+  - Attention now puts reply pressure, at-risk relationships, reopening moments, and warm openings ahead of the older stage lanes so the page reads more like continuity protection than pipeline tracking
   - complete and snooze actions
   - relationship history + internal notes
+  - relationship pages now open with a `Timeline focus` read that pulls the latest saved moment, client-shared context, current open loop, and best next touch together before the full history log
   - relationship memory summaries now blend email, notes, uploads, reconnect cues, recent upload context, and upcoming meeting prep signals, with lighter `Conversation memory` and `Latest saved context` reads instead of repetitive stacked boxes
   - relationship pages now surface upcoming meeting-like moments with a direct `Prepare me` path into the meeting-prep memory view when Brivoly detects that a near-term next touch looks like a call, demo, review, or sync
   - explicit calendar events now land as `meeting` timeline context, can temporarily become the next prep moment, and feed the existing meeting-prep summary layer instead of living in a separate calendar silo

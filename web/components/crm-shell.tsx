@@ -2,7 +2,10 @@
 
 import { usePathname } from "next/navigation";
 
-import { CRMFollowUpWorkspace, type CRMWorkspaceView } from "@/components/crm-follow-up-workspace";
+import {
+  CRMFollowUpWorkspace,
+  type CRMWorkspaceView,
+} from "@/components/crm-follow-up-workspace";
 import type { CRMPageData } from "@/lib/crm-page-data";
 
 export function CRMShell({ data }: { data: CRMPageData }) {
@@ -25,11 +28,17 @@ export function CRMShell({ data }: { data: CRMPageData }) {
     <>
       <section className="mt-6 rounded-[1.75rem] border border-amber-200 bg-amber-50 p-6 shadow-sm">
         <p className="ui-eyebrow-strong text-amber-700">Just a moment</p>
-        <h2 className="mt-3 text-3xl font-semibold tracking-tight text-amber-950">Brivoly could not reopen this relationship view yet.</h2>
+        <h2 className="mt-3 text-3xl font-semibold tracking-tight text-amber-950">
+          Brivoly could not reopen this relationship view yet.
+        </h2>
         <p className="mt-3 max-w-2xl text-sm leading-7 text-amber-900">
           {describeLoadFailure(data)}
         </p>
-        {data.userLabel ? <p className="mt-4 text-sm font-medium text-amber-950">Signed in as {data.userLabel}</p> : null}
+        {data.userLabel ? (
+          <p className="mt-4 text-sm font-medium text-amber-950">
+            Signed in as {data.userLabel}
+          </p>
+        ) : null}
         {data.loadErrors.length ? (
           <div className="mt-4 rounded-[1.25rem] border border-amber-200/80 bg-white/70 px-4 py-4 text-sm leading-6 text-amber-950">
             <p className="ui-eyebrow-strong text-amber-700">Latest detail</p>
@@ -48,7 +57,8 @@ export function CRMShell({ data }: { data: CRMPageData }) {
       </section>
       <section className="mt-4 rounded-[1.3rem] border bg-white/85 p-4 shadow-sm">
         <p className="text-sm leading-6 text-slate-600">
-          When this opens normally, Brivoly brings back Today, relationship memory, inbox continuity, and your saved next touches in one calm view.
+          When this opens normally, Brivoly brings back Today, relationship
+          memory, inbox continuity, and your next warm touches in one calm view.
         </p>
       </section>
     </>

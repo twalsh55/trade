@@ -1,7 +1,13 @@
 "use client";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState, useTransition } from "react";
+import {
+  useDeferredValue,
+  useEffect,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 
 import { BusinessProfileOnboarding } from "@/components/settings/business-profile-onboarding";
 import { Button } from "@/components/ui/button";
@@ -22,10 +28,22 @@ import type {
   CRMRemoteIntakeChannel,
 } from "@/lib/types";
 
-export type CRMWorkspaceView = "overview" | "followups" | "inbox" | "pipeline" | "import" | "intake";
+export type CRMWorkspaceView =
+  | "overview"
+  | "followups"
+  | "inbox"
+  | "pipeline"
+  | "import"
+  | "intake";
 type CRMIntakeTask = "hub" | "profile" | "routing" | "capture";
 type RelationshipFilter = "all" | "due" | "stale" | "at_risk";
-type InboxFilter = "all" | "reply" | "waiting" | "quiet";
+type InboxFilter =
+  | "all"
+  | "reply"
+  | "waiting"
+  | "quiet"
+  | "unresolved"
+  | "long_thread";
 type TodayDraftPreset = {
   objective: CRMEmailDraft["objective"];
   tone: CRMEmailDraft["tone"];
@@ -65,52 +83,89 @@ export function CRMFollowUpWorkspace({
   const mailboxSectionRef = useRef<HTMLElement | null>(null);
   const calendarSectionRef = useRef<HTMLElement | null>(null);
   const [overview, setOverview] = useState(initialOverview);
-  const [settings, setSettings] = useState<AccountSettings | null>(initialSettings);
-  const [selectedLeadId, setSelectedLeadId] = useState(initialOverview.items[0]?.id ?? null);
+  const [settings, setSettings] = useState<AccountSettings | null>(
+    initialSettings,
+  );
+  const [selectedLeadId, setSelectedLeadId] = useState(
+    initialOverview.items[0]?.id ?? null,
+  );
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [noteDraft, setNoteDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [relationshipQuery, setRelationshipQuery] = useState("");
-  const [relationshipFilter, setRelationshipFilter] = useState<RelationshipFilter>("all");
-  const [sourceType, setSourceType] = useState<"file_upload" | "google_sheets">("file_upload");
+  const [relationshipFilter, setRelationshipFilter] =
+    useState<RelationshipFilter>("all");
+  const [sourceType, setSourceType] = useState<"file_upload" | "google_sheets">(
+    "file_upload",
+  );
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [sheetUrl, setSheetUrl] = useState("");
-  const [importPreview, setImportPreview] = useState<CRMImportPreview | null>(null);
-  const [importFieldMapping, setImportFieldMapping] = useState<Record<string, string>>({});
-  const [clarificationAnswers, setClarificationAnswers] = useState<Record<string, string>>({});
-  const [rowOverrides, setRowOverrides] = useState<Record<string, Record<string, string>>>({});
+  const [importPreview, setImportPreview] = useState<CRMImportPreview | null>(
+    null,
+  );
+  const [importFieldMapping, setImportFieldMapping] = useState<
+    Record<string, string>
+  >({});
+  const [clarificationAnswers, setClarificationAnswers] = useState<
+    Record<string, string>
+  >({});
+  const [rowOverrides, setRowOverrides] = useState<
+    Record<string, Record<string, string>>
+  >({});
   const [isImportMappingDirty, setIsImportMappingDirty] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [importStatus, setImportStatus] = useState<string | null>(null);
-  const [aiPromptDraft, setAiPromptDraft] = useState(initialSettings?.crm_ai_prompt ?? "");
-  const [aiFormatsDraft, setAiFormatsDraft] = useState((initialSettings?.crm_preferred_import_formats ?? []).join(", "));
+  const [aiPromptDraft, setAiPromptDraft] = useState(
+    initialSettings?.crm_ai_prompt ?? "",
+  );
+  const [aiFormatsDraft, setAiFormatsDraft] = useState(
+    (initialSettings?.crm_preferred_import_formats ?? []).join(", "),
+  );
   const [aiSettingsStatus, setAiSettingsStatus] = useState<string | null>(null);
-  const [routingChannelsDraft, setRoutingChannelsDraft] = useState((initialSettings?.crm_image_intake_channels ?? []).join(", "));
-  const [routingNotesDraft, setRoutingNotesDraft] = useState(initialSettings?.crm_image_intake_notes ?? "");
-  const [routingSettingsStatus, setRoutingSettingsStatus] = useState<string | null>(null);
-  const [emailObjective, setEmailObjective] = useState<CRMEmailDraft["objective"]>("follow_up");
+  const [routingChannelsDraft, setRoutingChannelsDraft] = useState(
+    (initialSettings?.crm_image_intake_channels ?? []).join(", "),
+  );
+  const [routingNotesDraft, setRoutingNotesDraft] = useState(
+    initialSettings?.crm_image_intake_notes ?? "",
+  );
+  const [routingSettingsStatus, setRoutingSettingsStatus] = useState<
+    string | null
+  >(null);
+  const [emailObjective, setEmailObjective] =
+    useState<CRMEmailDraft["objective"]>("follow_up");
   const [emailTone, setEmailTone] = useState<CRMEmailDraft["tone"]>("warm");
-  const [emailLength, setEmailLength] = useState<CRMEmailDraft["length"]>("short");
+  const [emailLength, setEmailLength] =
+    useState<CRMEmailDraft["length"]>("short");
   const [emailDraft, setEmailDraft] = useState<CRMEmailDraft | null>(null);
   const [emailSubjectDraft, setEmailSubjectDraft] = useState("");
   const [emailBodyDraft, setEmailBodyDraft] = useState("");
   const [emailStatus, setEmailStatus] = useState<string | null>(null);
   const [inboxThreadId, setInboxThreadId] = useState("");
   const [inboxSource, setInboxSource] = useState("gmail");
-  const [inboxDirection, setInboxDirection] = useState<"inbound" | "outbound">("inbound");
+  const [inboxDirection, setInboxDirection] = useState<"inbound" | "outbound">(
+    "inbound",
+  );
   const [inboxCounterpartName, setInboxCounterpartName] = useState("");
   const [inboxCounterpartEmail, setInboxCounterpartEmail] = useState("");
   const [inboxSubject, setInboxSubject] = useState("");
   const [inboxMessageBody, setInboxMessageBody] = useState("");
   const [inboxStatus, setInboxStatus] = useState<string | null>(null);
-  const [mailboxConnections, setMailboxConnections] = useState<CRMMailboxConnection[]>([]);
-  const [calendarConnections, setCalendarConnections] = useState<CRMCalendarConnection[]>([]);
-  const [mailboxProvider, setMailboxProvider] = useState<"gmail" | "outlook">("gmail");
+  const [mailboxConnections, setMailboxConnections] = useState<
+    CRMMailboxConnection[]
+  >([]);
+  const [calendarConnections, setCalendarConnections] = useState<
+    CRMCalendarConnection[]
+  >([]);
+  const [mailboxProvider, setMailboxProvider] = useState<"gmail" | "outlook">(
+    "gmail",
+  );
   const [mailboxEmail, setMailboxEmail] = useState("");
   const [mailboxDisplayName, setMailboxDisplayName] = useState("");
   const [mailboxStatus, setMailboxStatus] = useState<string | null>(null);
-  const [calendarProvider, setCalendarProvider] = useState<"google_calendar" | "outlook_calendar">("google_calendar");
+  const [calendarProvider, setCalendarProvider] = useState<
+    "google_calendar" | "outlook_calendar"
+  >("google_calendar");
   const [calendarAddress, setCalendarAddress] = useState("");
   const [calendarDisplayName, setCalendarDisplayName] = useState("");
   const [calendarStatus, setCalendarStatus] = useState<string | null>(null);
@@ -127,8 +182,13 @@ export function CRMFollowUpWorkspace({
   const [isInboxPending, startInboxTransition] = useTransition();
   const [isMailboxPending, startMailboxTransition] = useTransition();
   const [isCalendarPending, startCalendarTransition] = useTransition();
-  const [queuedTodayDraft, setQueuedTodayDraft] = useState<{ leadId: string; preset: TodayDraftPreset } | null>(null);
+  const [queuedTodayDraft, setQueuedTodayDraft] = useState<{
+    leadId: string;
+    preset: TodayDraftPreset;
+  } | null>(null);
   const [draftFocusToken, setDraftFocusToken] = useState(0);
+  const deferredRelationshipQuery = useDeferredValue(relationshipQuery);
+  const deferredInboxQuery = useDeferredValue(inboxQuery);
 
   useEffect(() => {
     if (!selectedLeadId && initialOverview.items[0]) {
@@ -146,14 +206,30 @@ export function CRMFollowUpWorkspace({
     setEmailLength("short");
   }, [selectedLeadId]);
 
-  const filteredFollowUps = overview.items.filter((item) => matchesRelationshipQuery(item, relationshipQuery) && matchesRelationshipFilter(item, relationshipFilter));
-  const selectedLead = filteredFollowUps.find((item) => item.id === selectedLeadId) ?? filteredFollowUps[0] ?? null;
-  const selectedThread = selectedLead?.recent_email_threads.find((thread) => thread.thread_id === selectedThreadId) ?? null;
+  const filteredFollowUps = overview.items.filter(
+    (item) =>
+      matchesRelationshipQuery(item, deferredRelationshipQuery) &&
+      matchesRelationshipFilter(item, relationshipFilter),
+  );
+  const selectedLead =
+    filteredFollowUps.find((item) => item.id === selectedLeadId) ??
+    filteredFollowUps[0] ??
+    null;
+  const selectedThread =
+    selectedLead?.recent_email_threads.find(
+      (thread) => thread.thread_id === selectedThreadId,
+    ) ?? null;
   const preferredMailboxConnection =
     (selectedThread
-      ? mailboxConnections.find((connection) => connection.status === "connected" && connection.provider === selectedThread.source)
+      ? mailboxConnections.find(
+          (connection) =>
+            connection.status === "connected" &&
+            connection.provider === selectedThread.source,
+        )
       : null) ??
-    mailboxConnections.find((connection) => connection.status === "connected") ??
+    mailboxConnections.find(
+      (connection) => connection.status === "connected",
+    ) ??
     null;
   const advancedAiUnlocked = hasAdvancedAiAccess(initialBilling);
   const showingOverview = view === "overview";
@@ -164,14 +240,21 @@ export function CRMFollowUpWorkspace({
   const showingIntake = view === "intake";
   const intakeTask = resolveIntakeTask(pathname ?? "/clientos/intake");
   const requestedLeadId = searchParams?.get("lead");
-  const requestedMemoryView = searchParams?.get("memory") === "meeting_prep" ? "meeting_prep" : null;
+  const requestedMemoryView =
+    searchParams?.get("memory") === "meeting_prep" ? "meeting_prep" : null;
   const requestedConnectionFocus = searchParams?.get("connections");
-  const ambientConnectionFocus = overview.ambient_memory_summary?.suggested_action_focus || "";
-  const ambientActionKind = overview.ambient_memory_summary?.suggested_action_kind || "";
+  const ambientConnectionFocus =
+    overview.ambient_memory_summary?.suggested_action_focus || "";
+  const ambientActionKind =
+    overview.ambient_memory_summary?.suggested_action_kind || "";
   const connectionFocus =
-    requestedConnectionFocus === "mailbox" || requestedConnectionFocus === "calendar" || requestedConnectionFocus === "all"
+    requestedConnectionFocus === "mailbox" ||
+    requestedConnectionFocus === "calendar" ||
+    requestedConnectionFocus === "all"
       ? requestedConnectionFocus
-      : ambientConnectionFocus === "mailbox" || ambientConnectionFocus === "calendar" || ambientConnectionFocus === "all"
+      : ambientConnectionFocus === "mailbox" ||
+          ambientConnectionFocus === "calendar" ||
+          ambientConnectionFocus === "all"
         ? ambientConnectionFocus
         : null;
 
@@ -179,7 +262,12 @@ export function CRMFollowUpWorkspace({
     "border-slate-900 bg-slate-950 text-white hover:bg-slate-800 hover:text-white";
 
   useEffect(() => {
-    if (view !== "followups" || !queuedTodayDraft || !selectedLead || selectedLead.id !== queuedTodayDraft.leadId) {
+    if (
+      view !== "followups" ||
+      !queuedTodayDraft ||
+      !selectedLead ||
+      selectedLead.id !== queuedTodayDraft.leadId
+    ) {
       return;
     }
     generateEmailDraftForLead(selectedLead, queuedTodayDraft.preset);
@@ -188,8 +276,12 @@ export function CRMFollowUpWorkspace({
 
   useEffect(() => {
     setAiPromptDraft(initialSettings?.crm_ai_prompt ?? "");
-    setAiFormatsDraft((initialSettings?.crm_preferred_import_formats ?? []).join(", "));
-    setRoutingChannelsDraft((initialSettings?.crm_image_intake_channels ?? []).join(", "));
+    setAiFormatsDraft(
+      (initialSettings?.crm_preferred_import_formats ?? []).join(", "),
+    );
+    setRoutingChannelsDraft(
+      (initialSettings?.crm_image_intake_channels ?? []).join(", "),
+    );
     setRoutingNotesDraft(initialSettings?.crm_image_intake_notes ?? "");
   }, [initialSettings]);
 
@@ -204,10 +296,17 @@ export function CRMFollowUpWorkspace({
       setSelectedThreadId(null);
       return;
     }
-    if (selectedThreadId && selectedLead.recent_email_threads.some((thread) => thread.thread_id === selectedThreadId)) {
+    if (
+      selectedThreadId &&
+      selectedLead.recent_email_threads.some(
+        (thread) => thread.thread_id === selectedThreadId,
+      )
+    ) {
       return;
     }
-    setSelectedThreadId(selectedLead.recent_email_threads[0]?.thread_id ?? null);
+    setSelectedThreadId(
+      selectedLead.recent_email_threads[0]?.thread_id ?? null,
+    );
   }, [selectedLead, selectedThreadId]);
 
   useEffect(() => {
@@ -224,8 +323,13 @@ export function CRMFollowUpWorkspace({
 
     async function loadMailboxConnections() {
       try {
-        const response = await fetch("/api/crm/inbox/mailboxes", { cache: "no-store" });
-        const body = (await response.json().catch(() => null)) as { items?: CRMMailboxConnection[]; error?: string } | null;
+        const response = await fetch("/api/crm/inbox/mailboxes", {
+          cache: "no-store",
+        });
+        const body = (await response.json().catch(() => null)) as {
+          items?: CRMMailboxConnection[];
+          error?: string;
+        } | null;
         if (!response.ok || !body?.items) {
           throw new Error(body?.error || "Unable to load mailbox connections.");
         }
@@ -234,7 +338,11 @@ export function CRMFollowUpWorkspace({
         }
       } catch (mailboxError) {
         if (!cancelled) {
-          setMailboxStatus(mailboxError instanceof Error ? mailboxError.message : "Unable to load mailbox connections.");
+          setMailboxStatus(
+            mailboxError instanceof Error
+              ? mailboxError.message
+              : "Unable to load mailbox connections.",
+          );
         }
       }
     }
@@ -250,17 +358,28 @@ export function CRMFollowUpWorkspace({
 
     async function loadCalendarConnections() {
       try {
-        const response = await fetch("/api/crm/calendars", { cache: "no-store" });
-        const body = (await response.json().catch(() => null)) as { items?: CRMCalendarConnection[]; error?: string } | null;
+        const response = await fetch("/api/crm/calendars", {
+          cache: "no-store",
+        });
+        const body = (await response.json().catch(() => null)) as {
+          items?: CRMCalendarConnection[];
+          error?: string;
+        } | null;
         if (!response.ok || !body?.items) {
-          throw new Error(body?.error || "Unable to load calendar connections.");
+          throw new Error(
+            body?.error || "Unable to load calendar connections.",
+          );
         }
         if (!cancelled) {
           setCalendarConnections(body.items);
         }
       } catch (calendarError) {
         if (!cancelled) {
-          setCalendarStatus(calendarError instanceof Error ? calendarError.message : "Unable to load calendar connections.");
+          setCalendarStatus(
+            calendarError instanceof Error
+              ? calendarError.message
+              : "Unable to load calendar connections.",
+          );
         }
       }
     }
@@ -273,8 +392,12 @@ export function CRMFollowUpWorkspace({
 
   useEffect(() => {
     if (searchParams?.get("mailbox") === "connected") {
-      setMailboxStatus("Mailbox connected. Brivoly can now keep relationship memory fresh from that inbox.");
-      router.replace(view === "inbox" ? "/clientos/inbox" : pathname ?? "/clientos/inbox");
+      setMailboxStatus(
+        "Mailbox connected. Brivoly can now keep relationship memory fresh from that inbox.",
+      );
+      router.replace(
+        view === "inbox" ? "/clientos/inbox" : (pathname ?? "/clientos/inbox"),
+      );
     }
   }, [pathname, router, searchParams, view]);
 
@@ -283,34 +406,64 @@ export function CRMFollowUpWorkspace({
       return;
     }
     if (connectionFocus === "mailbox") {
-      setMailboxStatus((current) => current ?? "This is the inbox connection area Brivoly wants you to check next.");
-      mailboxSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      setMailboxStatus(
+        (current) =>
+          current ??
+          "This is the inbox connection area Brivoly wants you to check next.",
+      );
+      mailboxSectionRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
       return;
     }
     if (connectionFocus === "calendar") {
-      setCalendarStatus((current) => current ?? "This is the calendar memory area Brivoly wants you to check next.");
-      calendarSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      setCalendarStatus(
+        (current) =>
+          current ??
+          "This is the calendar memory area Brivoly wants you to check next.",
+      );
+      calendarSectionRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
       return;
     }
     if (connectionFocus === "all") {
-      mailboxSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      mailboxSectionRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
     }
   }, [connectionFocus, view]);
 
   async function refreshAmbientMemory() {
-    const [overviewResponse, mailboxResponse, calendarResponse] = await Promise.all([
-      fetch("/api/crm/followups", { cache: "no-store" }),
-      fetch("/api/crm/inbox/mailboxes", { cache: "no-store" }),
-      fetch("/api/crm/calendars", { cache: "no-store" }),
-    ]);
+    const [overviewResponse, mailboxResponse, calendarResponse] =
+      await Promise.all([
+        fetch("/api/crm/followups", { cache: "no-store" }),
+        fetch("/api/crm/inbox/mailboxes", { cache: "no-store" }),
+        fetch("/api/crm/calendars", { cache: "no-store" }),
+      ]);
 
-    const overviewBody = (await overviewResponse.json().catch(() => null)) as CRMFollowUpOverview | { error?: string } | null;
-    const mailboxBody = (await mailboxResponse.json().catch(() => null)) as { items?: CRMMailboxConnection[]; error?: string } | null;
-    const calendarBody = (await calendarResponse.json().catch(() => null)) as { items?: CRMCalendarConnection[]; error?: string } | null;
+    const overviewBody = (await overviewResponse.json().catch(() => null)) as
+      | CRMFollowUpOverview
+      | { error?: string }
+      | null;
+    const mailboxBody = (await mailboxResponse.json().catch(() => null)) as {
+      items?: CRMMailboxConnection[];
+      error?: string;
+    } | null;
+    const calendarBody = (await calendarResponse.json().catch(() => null)) as {
+      items?: CRMCalendarConnection[];
+      error?: string;
+    } | null;
 
     if (overviewResponse.ok && overviewBody && "items" in overviewBody) {
       setOverview(overviewBody);
-      if (selectedLeadId && !overviewBody.items.some((item) => item.id === selectedLeadId)) {
+      if (
+        selectedLeadId &&
+        !overviewBody.items.some((item) => item.id === selectedLeadId)
+      ) {
         setSelectedLeadId(overviewBody.items[0]?.id ?? null);
       }
     }
@@ -323,10 +476,19 @@ export function CRMFollowUpWorkspace({
   }
 
   useEffect(() => {
-    const shouldRefreshInBackground = showingOverview || showingInbox || showingPipeline || showingFollowups;
+    const shouldRefreshInBackground =
+      showingOverview || showingInbox || showingPipeline || showingFollowups;
     const hasActiveBackgroundMemory =
-      mailboxConnections.some((connection) => connection.background_sync_enabled && connection.status === "connected") ||
-      calendarConnections.some((connection) => connection.background_sync_enabled && connection.status === "connected");
+      mailboxConnections.some(
+        (connection) =>
+          connection.background_sync_enabled &&
+          connection.status === "connected",
+      ) ||
+      calendarConnections.some(
+        (connection) =>
+          connection.background_sync_enabled &&
+          connection.status === "connected",
+      );
     if (!shouldRefreshInBackground || !hasActiveBackgroundMemory) {
       return;
     }
@@ -373,7 +535,11 @@ export function CRMFollowUpWorkspace({
 
   function runAction(
     followUpId: string,
-    payload: { action: "complete" | "snooze" | "note"; snooze_hours?: number; note_body?: string },
+    payload: {
+      action: "complete" | "snooze" | "note";
+      snooze_hours?: number;
+      note_body?: string;
+    },
     afterSuccess?: () => void,
   ) {
     setPendingId(followUpId);
@@ -386,19 +552,32 @@ export function CRMFollowUpWorkspace({
           body: JSON.stringify(payload),
         });
 
-        const data = (await response.json().catch(() => null)) as CRMFollowUpOverview | { error?: string } | null;
+        const data = (await response.json().catch(() => null)) as
+          | CRMFollowUpOverview
+          | { error?: string }
+          | null;
         if (!response.ok || !data || !("items" in data)) {
-          throw new Error((data && "error" in data && data.error) || "Unable to update follow-up.");
+          throw new Error(
+            (data && "error" in data && data.error) ||
+              "Unable to update follow-up.",
+          );
         }
 
         setOverview(data);
-        if (followUpId === selectedLeadId && !data.items.some((item) => item.id === followUpId)) {
+        if (
+          followUpId === selectedLeadId &&
+          !data.items.some((item) => item.id === followUpId)
+        ) {
           setSelectedLeadId(data.items[0]?.id ?? null);
         }
         afterSuccess?.();
         router.refresh();
       } catch (actionError) {
-        setError(actionError instanceof Error ? actionError.message : "Unable to update follow-up.");
+        setError(
+          actionError instanceof Error
+            ? actionError.message
+            : "Unable to update follow-up.",
+        );
       } finally {
         setPendingId(null);
       }
@@ -409,10 +588,8 @@ export function CRMFollowUpWorkspace({
     if (!selectedLead) {
       return;
     }
-    runAction(
-      selectedLead.id,
-      { action: "note", note_body: noteDraft },
-      () => setNoteDraft(""),
+    runAction(selectedLead.id, { action: "note", note_body: noteDraft }, () =>
+      setNoteDraft(""),
     );
   }
 
@@ -427,9 +604,13 @@ export function CRMFollowUpWorkspace({
     if (Object.keys(effectiveFieldMapping).length) {
       formData.set("field_mapping", JSON.stringify(effectiveFieldMapping));
     }
-    const effectiveClarificationAnswers = answersOverride ?? clarificationAnswers;
+    const effectiveClarificationAnswers =
+      answersOverride ?? clarificationAnswers;
     if (Object.keys(effectiveClarificationAnswers).length) {
-      formData.set("clarification_answers", JSON.stringify(effectiveClarificationAnswers));
+      formData.set(
+        "clarification_answers",
+        JSON.stringify(effectiveClarificationAnswers),
+      );
     }
     const effectiveRowOverrides = rowOverridesOverride ?? rowOverrides;
     if (Object.keys(effectiveRowOverrides).length) {
@@ -440,7 +621,9 @@ export function CRMFollowUpWorkspace({
         throw new Error("Choose a spreadsheet file first.");
       }
       if (isImageFile(selectedFile.name) && !advancedAiUnlocked) {
-        throw new Error("AI note image intake is available on active or trialing paid plans.");
+        throw new Error(
+          "AI note image intake is available on active or trialing paid plans.",
+        );
       }
       formData.set("file", selectedFile);
       return formData;
@@ -462,30 +645,43 @@ export function CRMFollowUpWorkspace({
     startImportTransition(async () => {
       try {
         const data = await requestImportPreviewWithBestEffort(() =>
-          buildImportFormData(answersOverride, mappingOverride, rowOverridesOverride),
+          buildImportFormData(
+            answersOverride,
+            mappingOverride,
+            rowOverridesOverride,
+          ),
         );
         setImportPreview(data);
         setImportFieldMapping(
           Object.fromEntries(
             data.header_mappings
               .filter((item) => item.mapped_field)
-              .map((item) => [item.original_header, item.mapped_field as string]),
+              .map((item) => [
+                item.original_header,
+                item.mapped_field as string,
+              ]),
           ),
         );
         setClarificationAnswers((current) => {
-          const activeQuestionIds = new Set((data.clarification?.questions ?? []).map((item) => item.id));
+          const activeQuestionIds = new Set(
+            (data.clarification?.questions ?? []).map((item) => item.id),
+          );
           if (!activeQuestionIds.size) {
             return {};
           }
           const nextAnswers = answersOverride ?? current;
           return Object.fromEntries(
-            Object.entries(nextAnswers).filter(([key]) => activeQuestionIds.has(key)),
+            Object.entries(nextAnswers).filter(([key]) =>
+              activeQuestionIds.has(key),
+            ),
           );
         });
         setRowOverrides((current) =>
           Object.fromEntries(
-            Object.entries(rowOverridesOverride ?? current).filter(([rowNumber, fields]) =>
-              data.rows.some((row) => String(row.row_number) === rowNumber) && Object.keys(fields).length > 0,
+            Object.entries(rowOverridesOverride ?? current).filter(
+              ([rowNumber, fields]) =>
+                data.rows.some((row) => String(row.row_number) === rowNumber) &&
+                Object.keys(fields).length > 0,
             ),
           ),
         );
@@ -516,11 +712,19 @@ export function CRMFollowUpWorkspace({
           body: buildImportFormData(),
         });
         const data = (await response.json().catch(() => null)) as
-          | { imported_count: number; skipped_duplicates: number; skipped_invalid: number; overview: CRMFollowUpOverview }
+          | {
+              imported_count: number;
+              skipped_duplicates: number;
+              skipped_invalid: number;
+              overview: CRMFollowUpOverview;
+            }
           | { error?: string }
           | null;
         if (!response.ok || !data || !("overview" in data)) {
-          throw new Error((data && "error" in data && data.error) || "Unable to import spreadsheet rows.");
+          throw new Error(
+            (data && "error" in data && data.error) ||
+              "Unable to import spreadsheet rows.",
+          );
         }
         setOverview(data.overview);
         setSelectedLeadId(data.overview.items[0]?.id ?? null);
@@ -539,7 +743,11 @@ export function CRMFollowUpWorkspace({
         }
         router.refresh();
       } catch (commitError) {
-        setImportError(commitError instanceof Error ? commitError.message : "Unable to import spreadsheet rows.");
+        setImportError(
+          commitError instanceof Error
+            ? commitError.message
+            : "Unable to import spreadsheet rows.",
+        );
       }
     });
   }
@@ -550,7 +758,9 @@ export function CRMFollowUpWorkspace({
       [header]: field,
     };
     setImportFieldMapping(nextMapping);
-    setImportStatus("Re-checking the preview with your updated column mapping...");
+    setImportStatus(
+      "Re-checking the preview with your updated column mapping...",
+    );
     setIsImportMappingDirty(false);
     requestImportPreview(undefined, nextMapping);
   }
@@ -567,7 +777,11 @@ export function CRMFollowUpWorkspace({
     requestImportPreview(nextAnswers);
   }
 
-  function updateRowOverride(rowNumber: number, fieldName: string, value: string) {
+  function updateRowOverride(
+    rowNumber: number,
+    fieldName: string,
+    value: string,
+  ) {
     setRowOverrides((current) => ({
       ...current,
       [String(rowNumber)]: {
@@ -587,7 +801,9 @@ export function CRMFollowUpWorkspace({
       },
     };
     if (!nextOverrides[String(rowNumber)]?.next_follow_up_at?.trim()) {
-      setImportError("Enter a next follow-up date before asking Brivoly to re-check that row.");
+      setImportError(
+        "Enter a next follow-up date before asking Brivoly to re-check that row.",
+      );
       return;
     }
     setImportStatus("Re-checking the preview with your in-app row fix...");
@@ -595,22 +811,34 @@ export function CRMFollowUpWorkspace({
     requestImportPreview(undefined, undefined, nextOverrides);
   }
 
-  async function requestImportPreviewWithBestEffort(buildFormData: () => FormData) {
-    let lastMessage = "Brivoly could not build the preview this time, but it kept the import staged so you can try again.";
+  async function requestImportPreviewWithBestEffort(
+    buildFormData: () => FormData,
+  ) {
+    let lastMessage =
+      "Brivoly could not build the preview this time, but it kept the import staged so you can try again.";
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const response = await fetch("/api/crm/import/preview", {
         method: "POST",
         body: buildFormData(),
       });
-      const data = (await response.json().catch(() => null)) as CRMImportPreview | { error?: string } | null;
+      const data = (await response.json().catch(() => null)) as
+        | CRMImportPreview
+        | { error?: string }
+        | null;
       if (response.ok && data && "rows" in data) {
         return data;
       }
 
-      if (data && "error" in data && typeof data.error === "string" && data.error.trim()) {
+      if (
+        data &&
+        "error" in data &&
+        typeof data.error === "string" &&
+        data.error.trim()
+      ) {
         lastMessage = data.error.trim();
       } else if (!response.ok && attempt === 0 && response.status >= 500) {
-        lastMessage = "Brivoly hit an import hiccup, so it retried the preview automatically. Please try once more if the sheet is still not visible.";
+        lastMessage =
+          "Brivoly hit an import hiccup, so it retried the preview automatically. Please try once more if the sheet is still not visible.";
       }
     }
     throw new Error(lastMessage);
@@ -636,16 +864,26 @@ export function CRMFollowUpWorkspace({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
-        const body = (await response.json().catch(() => null)) as AccountSettings | { error?: string } | null;
+        const body = (await response.json().catch(() => null)) as
+          | AccountSettings
+          | { error?: string }
+          | null;
         if (!response.ok || !body || !("benchmark" in body)) {
-          throw new Error((body && "error" in body && body.error) || "Unable to save AI intake settings.");
+          throw new Error(
+            (body && "error" in body && body.error) ||
+              "Unable to save AI intake settings.",
+          );
         }
         setSettings(body);
         setAiPromptDraft(body.crm_ai_prompt);
         setAiFormatsDraft(body.crm_preferred_import_formats.join(", "));
         setAiSettingsStatus("AI intake preferences saved.");
       } catch (saveError) {
-        setAiSettingsStatus(saveError instanceof Error ? saveError.message : "Unable to save AI intake settings.");
+        setAiSettingsStatus(
+          saveError instanceof Error
+            ? saveError.message
+            : "Unable to save AI intake settings.",
+        );
       }
     });
   }
@@ -670,16 +908,26 @@ export function CRMFollowUpWorkspace({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
-        const body = (await response.json().catch(() => null)) as AccountSettings | { error?: string } | null;
+        const body = (await response.json().catch(() => null)) as
+          | AccountSettings
+          | { error?: string }
+          | null;
         if (!response.ok || !body || !("benchmark" in body)) {
-          throw new Error((body && "error" in body && body.error) || "Unable to save intake routing settings.");
+          throw new Error(
+            (body && "error" in body && body.error) ||
+              "Unable to save intake routing settings.",
+          );
         }
         setSettings(body);
         setRoutingChannelsDraft(body.crm_image_intake_channels.join(", "));
         setRoutingNotesDraft(body.crm_image_intake_notes);
         setRoutingSettingsStatus("Intake routing preferences saved.");
       } catch (saveError) {
-        setRoutingSettingsStatus(saveError instanceof Error ? saveError.message : "Unable to save intake routing settings.");
+        setRoutingSettingsStatus(
+          saveError instanceof Error
+            ? saveError.message
+            : "Unable to save intake routing settings.",
+        );
       }
     });
   }
@@ -702,25 +950,38 @@ export function CRMFollowUpWorkspace({
     setEmailStatus(overrides?.status ?? "Drafting the next note...");
     startEmailTransition(async () => {
       try {
-        const response = await fetch(`/api/crm/followups/email-draft/${lead.id}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            objective,
-            tone,
-            length,
-          }),
-        });
-        const body = (await response.json().catch(() => null)) as CRMEmailDraft | { error?: string } | null;
+        const response = await fetch(
+          `/api/crm/followups/email-draft/${lead.id}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              objective,
+              tone,
+              length,
+            }),
+          },
+        );
+        const body = (await response.json().catch(() => null)) as
+          | CRMEmailDraft
+          | { error?: string }
+          | null;
         if (!response.ok || !body || !("subject" in body)) {
-          throw new Error((body && "error" in body && body.error) || "Unable to generate an email draft.");
+          throw new Error(
+            (body && "error" in body && body.error) ||
+              "Unable to generate an email draft.",
+          );
         }
         setEmailDraft(body);
         setEmailSubjectDraft(body.subject);
         setEmailBodyDraft(body.body);
         setEmailStatus("Draft ready. Tweak anything before sending.");
       } catch (draftError) {
-        setEmailStatus(draftError instanceof Error ? draftError.message : "Unable to generate an email draft.");
+        setEmailStatus(
+          draftError instanceof Error
+            ? draftError.message
+            : "Unable to generate an email draft.",
+        );
       }
     });
   }
@@ -749,15 +1010,22 @@ export function CRMFollowUpWorkspace({
     setDraftFocusToken((value) => value + 1);
   }
 
-  function runTodayPriorityAction(leadId: string, route: string, preset?: TodayDraftPreset, memoryView?: "meeting_prep", threadId?: string | null) {
+  function runTodayPriorityAction(
+    leadId: string,
+    route: string,
+    preset?: TodayDraftPreset,
+    memoryView?: "meeting_prep",
+    threadId?: string | null,
+  ) {
     focusLeadForFollowUp(leadId, threadId);
     if (preset) {
       requestDraftFocus();
       setQueuedTodayDraft({ leadId, preset });
     }
-    const nextRoute = route === "/clientos/follow-ups" && memoryView
-      ? `${route}?lead=${encodeURIComponent(leadId)}&memory=${encodeURIComponent(memoryView)}`
-      : route;
+    const nextRoute =
+      route === "/clientos/follow-ups" && memoryView
+        ? `${route}?lead=${encodeURIComponent(leadId)}&memory=${encodeURIComponent(memoryView)}`
+        : route;
     router.push(nextRoute);
   }
 
@@ -792,7 +1060,9 @@ export function CRMFollowUpWorkspace({
                 from_name:
                   inboxDirection === "inbound"
                     ? inboxCounterpartName.trim()
-                    : settings?.outbound_sender_name || settings?.business_name || "Brivoly",
+                    : settings?.outbound_sender_name ||
+                      settings?.business_name ||
+                      "Brivoly",
                 to_emails:
                   inboxDirection === "inbound"
                     ? ["owner@brivoly.local"]
@@ -804,13 +1074,21 @@ export function CRMFollowUpWorkspace({
             ],
           }),
         });
-        const body = (await response.json().catch(() => null)) as CRMFollowUpOverview | { error?: string } | null;
+        const body = (await response.json().catch(() => null)) as
+          | CRMFollowUpOverview
+          | { error?: string }
+          | null;
         if (!response.ok || !body || !("items" in body)) {
-          throw new Error((body && "error" in body && body.error) || "Unable to sync the inbox thread.");
+          throw new Error(
+            (body && "error" in body && body.error) ||
+              "Unable to sync the inbox thread.",
+          );
         }
         setOverview(body);
         setSelectedLeadId(body.items[0]?.id ?? null);
-        setInboxStatus("Thread synced. Brivoly updated the relationship memory and follow-up queue.");
+        setInboxStatus(
+          "Thread synced. Brivoly updated the relationship memory and follow-up queue.",
+        );
         setInboxThreadId("");
         setInboxCounterpartName("");
         setInboxCounterpartEmail("");
@@ -818,7 +1096,11 @@ export function CRMFollowUpWorkspace({
         setInboxMessageBody("");
         router.refresh();
       } catch (syncError) {
-        setInboxStatus(syncError instanceof Error ? syncError.message : "Unable to sync the inbox thread.");
+        setInboxStatus(
+          syncError instanceof Error
+            ? syncError.message
+            : "Unable to sync the inbox thread.",
+        );
       }
     });
   }
@@ -843,22 +1125,36 @@ export function CRMFollowUpWorkspace({
             display_name: mailboxDisplayName.trim(),
           }),
         });
-        const body = (await response.json().catch(() => null)) as CRMMailboxConnection | { error?: string } | null;
+        const body = (await response.json().catch(() => null)) as
+          | CRMMailboxConnection
+          | { error?: string }
+          | null;
         if (!response.ok || !body || !("id" in body)) {
-          throw new Error((body && "error" in body && body.error) || "Unable to connect the mailbox right now.");
+          throw new Error(
+            (body && "error" in body && body.error) ||
+              "Unable to connect the mailbox right now.",
+          );
         }
         upsertMailboxConnection(body);
-        setMailboxStatus(`${body.provider === "gmail" ? "Gmail" : "Outlook"} is now connected as ${body.email_address}.`);
+        setMailboxStatus(
+          `${body.provider === "gmail" ? "Gmail" : "Outlook"} is now connected as ${body.email_address}.`,
+        );
         setMailboxEmail("");
         setMailboxDisplayName("");
       } catch (mailboxError) {
-        setMailboxStatus(mailboxError instanceof Error ? mailboxError.message : "Unable to connect the mailbox right now.");
+        setMailboxStatus(
+          mailboxError instanceof Error
+            ? mailboxError.message
+            : "Unable to connect the mailbox right now.",
+        );
       }
     });
   }
 
   function startMailboxOAuth(provider: "gmail" | "outlook") {
-    setMailboxStatus(`Opening ${provider === "gmail" ? "Gmail" : "Outlook"} so you can connect the real mailbox...`);
+    setMailboxStatus(
+      `Opening ${provider === "gmail" ? "Gmail" : "Outlook"} so you can connect the real mailbox...`,
+    );
     startMailboxTransition(async () => {
       try {
         const response = await fetch("/api/crm/inbox/mailboxes/oauth/start", {
@@ -866,13 +1162,22 @@ export function CRMFollowUpWorkspace({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ provider }),
         });
-        const body = (await response.json().catch(() => null)) as { authorization_url?: string; error?: string } | null;
+        const body = (await response.json().catch(() => null)) as {
+          authorization_url?: string;
+          error?: string;
+        } | null;
         if (!response.ok || !body?.authorization_url) {
-          throw new Error(body?.error || "Unable to begin the mailbox connection right now.");
+          throw new Error(
+            body?.error || "Unable to begin the mailbox connection right now.",
+          );
         }
         window.location.assign(body.authorization_url);
       } catch (mailboxError) {
-        setMailboxStatus(mailboxError instanceof Error ? mailboxError.message : "Unable to begin the mailbox connection right now.");
+        setMailboxStatus(
+          mailboxError instanceof Error
+            ? mailboxError.message
+            : "Unable to begin the mailbox connection right now.",
+        );
       }
     });
   }
@@ -881,35 +1186,64 @@ export function CRMFollowUpWorkspace({
     setMailboxStatus("Pulling recent mailbox activity into Brivoly...");
     startMailboxTransition(async () => {
       try {
-        const response = await fetch(`/api/crm/inbox/mailboxes/${connectionId}/sync`, { method: "POST" });
+        const response = await fetch(
+          `/api/crm/inbox/mailboxes/${connectionId}/sync`,
+          { method: "POST" },
+        );
         const body = (await response.json().catch(() => null)) as
-          | { connection: CRMMailboxConnection; overview: CRMFollowUpOverview; synced_threads: number; created_contacts: number; updated_relationships: number }
+          | {
+              connection: CRMMailboxConnection;
+              overview: CRMFollowUpOverview;
+              synced_threads: number;
+              created_contacts: number;
+              updated_relationships: number;
+            }
           | { error?: string }
           | null;
         if (!response.ok || !body || !("connection" in body)) {
-          throw new Error((body && "error" in body && body.error) || "Unable to sync the mailbox right now.");
+          throw new Error(
+            (body && "error" in body && body.error) ||
+              "Unable to sync the mailbox right now.",
+          );
         }
         setOverview(body.overview);
         upsertMailboxConnection(body.connection);
-        setSelectedLeadId((current) => current ?? body.overview.items[0]?.id ?? null);
+        setSelectedLeadId(
+          (current) => current ?? body.overview.items[0]?.id ?? null,
+        );
         setMailboxStatus(
           `Mailbox synced. ${body.synced_threads} thread${body.synced_threads === 1 ? "" : "s"} refreshed, ${body.created_contacts} relationship${body.created_contacts === 1 ? "" : "s"} created, and ${body.updated_relationships} updated.`,
         );
         router.refresh();
       } catch (mailboxError) {
-        setMailboxStatus(mailboxError instanceof Error ? mailboxError.message : "Unable to sync the mailbox right now.");
+        setMailboxStatus(
+          mailboxError instanceof Error
+            ? mailboxError.message
+            : "Unable to sync the mailbox right now.",
+        );
       }
     });
   }
 
   function renewMailboxWatch(connection: CRMMailboxConnection) {
-    setMailboxStatus(`Refreshing provider watch coverage for ${connection.email_address}...`);
+    setMailboxStatus(
+      `Refreshing provider watch coverage for ${connection.email_address}...`,
+    );
     startMailboxTransition(async () => {
       try {
-        const response = await fetch(`/api/crm/inbox/mailboxes/${connection.id}/watch`, { method: "POST" });
-        const body = (await response.json().catch(() => null)) as CRMMailboxConnection | { error?: string } | null;
+        const response = await fetch(
+          `/api/crm/inbox/mailboxes/${connection.id}/watch`,
+          { method: "POST" },
+        );
+        const body = (await response.json().catch(() => null)) as
+          | CRMMailboxConnection
+          | { error?: string }
+          | null;
         if (!response.ok || !body || !("id" in body)) {
-          throw new Error((body && "error" in body && body.error) || "Unable to refresh mailbox watch coverage right now.");
+          throw new Error(
+            (body && "error" in body && body.error) ||
+              "Unable to refresh mailbox watch coverage right now.",
+          );
         }
         upsertMailboxConnection(body);
         setMailboxStatus(
@@ -918,29 +1252,54 @@ export function CRMFollowUpWorkspace({
             : body.health_note || "Mailbox watch coverage was refreshed.",
         );
       } catch (mailboxError) {
-        setMailboxStatus(mailboxError instanceof Error ? mailboxError.message : "Unable to refresh mailbox watch coverage right now.");
+        setMailboxStatus(
+          mailboxError instanceof Error
+            ? mailboxError.message
+            : "Unable to refresh mailbox watch coverage right now.",
+        );
       }
     });
   }
 
   function toggleMailboxBackgroundSync(connection: CRMMailboxConnection) {
     const nextEnabled = !connection.background_sync_enabled;
-    setMailboxStatus(nextEnabled ? "Turning background sync back on..." : "Pausing background sync for this mailbox...");
+    setMailboxStatus(
+      nextEnabled
+        ? "Turning background sync back on..."
+        : "Pausing background sync for this mailbox...",
+    );
     startMailboxTransition(async () => {
       try {
-        const response = await fetch(`/api/crm/inbox/mailboxes/${connection.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ background_sync_enabled: nextEnabled }),
-        });
-        const body = (await response.json().catch(() => null)) as CRMMailboxConnection | { error?: string } | null;
+        const response = await fetch(
+          `/api/crm/inbox/mailboxes/${connection.id}`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ background_sync_enabled: nextEnabled }),
+          },
+        );
+        const body = (await response.json().catch(() => null)) as
+          | CRMMailboxConnection
+          | { error?: string }
+          | null;
         if (!response.ok || !body || !("id" in body)) {
-          throw new Error((body && "error" in body && body.error) || "Unable to update mailbox sync right now.");
+          throw new Error(
+            (body && "error" in body && body.error) ||
+              "Unable to update mailbox sync right now.",
+          );
         }
         upsertMailboxConnection(body);
-        setMailboxStatus(nextEnabled ? "Background sync is back on for this mailbox." : "Background sync is paused for this mailbox.");
+        setMailboxStatus(
+          nextEnabled
+            ? "Background sync is back on for this mailbox."
+            : "Background sync is paused for this mailbox.",
+        );
       } catch (mailboxError) {
-        setMailboxStatus(mailboxError instanceof Error ? mailboxError.message : "Unable to update mailbox sync right now.");
+        setMailboxStatus(
+          mailboxError instanceof Error
+            ? mailboxError.message
+            : "Unable to update mailbox sync right now.",
+        );
       }
     });
   }
@@ -949,15 +1308,32 @@ export function CRMFollowUpWorkspace({
     setMailboxStatus(`Disconnecting ${connection.email_address}...`);
     startMailboxTransition(async () => {
       try {
-        const response = await fetch(`/api/crm/inbox/mailboxes/${connection.id}`, { method: "DELETE" });
-        const body = (await response.json().catch(() => null)) as { deleted?: boolean; error?: string } | null;
+        const response = await fetch(
+          `/api/crm/inbox/mailboxes/${connection.id}`,
+          { method: "DELETE" },
+        );
+        const body = (await response.json().catch(() => null)) as {
+          deleted?: boolean;
+          error?: string;
+        } | null;
         if (!response.ok || !body?.deleted) {
-          throw new Error((body && "error" in body && body.error) || "Unable to disconnect the mailbox right now.");
+          throw new Error(
+            (body && "error" in body && body.error) ||
+              "Unable to disconnect the mailbox right now.",
+          );
         }
-        setMailboxConnections((current) => current.filter((item) => item.id !== connection.id));
-        setMailboxStatus(`${connection.email_address} was disconnected from Brivoly.`);
+        setMailboxConnections((current) =>
+          current.filter((item) => item.id !== connection.id),
+        );
+        setMailboxStatus(
+          `${connection.email_address} was disconnected from Brivoly.`,
+        );
       } catch (mailboxError) {
-        setMailboxStatus(mailboxError instanceof Error ? mailboxError.message : "Unable to disconnect the mailbox right now.");
+        setMailboxStatus(
+          mailboxError instanceof Error
+            ? mailboxError.message
+            : "Unable to disconnect the mailbox right now.",
+        );
       }
     });
   }
@@ -982,16 +1358,28 @@ export function CRMFollowUpWorkspace({
             display_name: calendarDisplayName.trim(),
           }),
         });
-        const body = (await response.json().catch(() => null)) as CRMCalendarConnection | { error?: string } | null;
+        const body = (await response.json().catch(() => null)) as
+          | CRMCalendarConnection
+          | { error?: string }
+          | null;
         if (!response.ok || !body || !("id" in body)) {
-          throw new Error((body && "error" in body && body.error) || "Unable to connect the calendar right now.");
+          throw new Error(
+            (body && "error" in body && body.error) ||
+              "Unable to connect the calendar right now.",
+          );
         }
         upsertCalendarConnection(body);
-        setCalendarStatus(`${body.provider === "google_calendar" ? "Google Calendar" : "Outlook Calendar"} is now connected as ${body.calendar_address}.`);
+        setCalendarStatus(
+          `${body.provider === "google_calendar" ? "Google Calendar" : "Outlook Calendar"} is now connected as ${body.calendar_address}.`,
+        );
         setCalendarAddress("");
         setCalendarDisplayName("");
       } catch (calendarError) {
-        setCalendarStatus(calendarError instanceof Error ? calendarError.message : "Unable to connect the calendar right now.");
+        setCalendarStatus(
+          calendarError instanceof Error
+            ? calendarError.message
+            : "Unable to connect the calendar right now.",
+        );
       }
     });
   }
@@ -1000,22 +1388,42 @@ export function CRMFollowUpWorkspace({
     setCalendarStatus(`Disconnecting ${connection.calendar_address}...`);
     startCalendarTransition(async () => {
       try {
-        const response = await fetch(`/api/crm/calendars/${connection.id}`, { method: "DELETE" });
-        const body = (await response.json().catch(() => null)) as { deleted?: boolean; error?: string } | null;
+        const response = await fetch(`/api/crm/calendars/${connection.id}`, {
+          method: "DELETE",
+        });
+        const body = (await response.json().catch(() => null)) as {
+          deleted?: boolean;
+          error?: string;
+        } | null;
         if (!response.ok || !body?.deleted) {
-          throw new Error((body && "error" in body && body.error) || "Unable to disconnect the calendar right now.");
+          throw new Error(
+            (body && "error" in body && body.error) ||
+              "Unable to disconnect the calendar right now.",
+          );
         }
-        setCalendarConnections((current) => current.filter((item) => item.id !== connection.id));
-        setCalendarStatus(`${connection.calendar_address} was disconnected from Brivoly.`);
+        setCalendarConnections((current) =>
+          current.filter((item) => item.id !== connection.id),
+        );
+        setCalendarStatus(
+          `${connection.calendar_address} was disconnected from Brivoly.`,
+        );
       } catch (calendarError) {
-        setCalendarStatus(calendarError instanceof Error ? calendarError.message : "Unable to disconnect the calendar right now.");
+        setCalendarStatus(
+          calendarError instanceof Error
+            ? calendarError.message
+            : "Unable to disconnect the calendar right now.",
+        );
       }
     });
   }
 
   function toggleCalendarBackgroundSync(connection: CRMCalendarConnection) {
     const nextEnabled = !connection.background_sync_enabled;
-    setCalendarStatus(nextEnabled ? "Turning meeting memory back on..." : "Pausing background meeting memory for this calendar...");
+    setCalendarStatus(
+      nextEnabled
+        ? "Turning meeting memory back on..."
+        : "Pausing background meeting memory for this calendar...",
+    );
     startCalendarTransition(async () => {
       try {
         const response = await fetch(`/api/crm/calendars/${connection.id}`, {
@@ -1023,14 +1431,28 @@ export function CRMFollowUpWorkspace({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ background_sync_enabled: nextEnabled }),
         });
-        const body = (await response.json().catch(() => null)) as CRMCalendarConnection | { error?: string } | null;
+        const body = (await response.json().catch(() => null)) as
+          | CRMCalendarConnection
+          | { error?: string }
+          | null;
         if (!response.ok || !body || !("id" in body)) {
-          throw new Error((body && "error" in body && body.error) || "Unable to update the calendar right now.");
+          throw new Error(
+            (body && "error" in body && body.error) ||
+              "Unable to update the calendar right now.",
+          );
         }
         upsertCalendarConnection(body);
-        setCalendarStatus(nextEnabled ? "Brivoly can use this calendar for meeting memory again." : "Meeting memory is paused for this calendar.");
+        setCalendarStatus(
+          nextEnabled
+            ? "Brivoly can use this calendar for meeting memory again."
+            : "Meeting memory is paused for this calendar.",
+        );
       } catch (calendarError) {
-        setCalendarStatus(calendarError instanceof Error ? calendarError.message : "Unable to update the calendar right now.");
+        setCalendarStatus(
+          calendarError instanceof Error
+            ? calendarError.message
+            : "Unable to update the calendar right now.",
+        );
       }
     });
   }
@@ -1056,26 +1478,42 @@ export function CRMFollowUpWorkspace({
             notes: calendarEventNotes.trim(),
           }),
         });
-        const body = (await response.json().catch(() => null)) as CRMFollowUpOverview | { error?: string } | null;
+        const body = (await response.json().catch(() => null)) as
+          | CRMFollowUpOverview
+          | { error?: string }
+          | null;
         if (!response.ok || !body || !("items" in body)) {
-          throw new Error((body && "error" in body && body.error) || "Unable to bring this meeting into Brivoly right now.");
+          throw new Error(
+            (body && "error" in body && body.error) ||
+              "Unable to bring this meeting into Brivoly right now.",
+          );
         }
         setOverview(body);
         const matchedLead = attendeeEmails.length
-          ? body.items.find((item) => attendeeEmails.includes(item.email_address.trim().toLowerCase()))
+          ? body.items.find((item) =>
+              attendeeEmails.includes(item.email_address.trim().toLowerCase()),
+            )
           : body.items[0];
         if (matchedLead) {
           setSelectedLeadId(matchedLead.id);
-          setSelectedThreadId(matchedLead.recent_email_threads[0]?.thread_id ?? null);
+          setSelectedThreadId(
+            matchedLead.recent_email_threads[0]?.thread_id ?? null,
+          );
         }
-        setCalendarStatus("Meeting context saved. Brivoly can now use it in Today and meeting prep.");
+        setCalendarStatus(
+          "Meeting context saved. Brivoly can now use it in Today and meeting prep.",
+        );
         setCalendarEventTitle("");
         setCalendarEventStartsAt("");
         setCalendarAttendeeEmails("");
         setCalendarEventNotes("");
         router.refresh();
       } catch (calendarError) {
-        setCalendarStatus(calendarError instanceof Error ? calendarError.message : "Unable to bring this meeting into Brivoly right now.");
+        setCalendarStatus(
+          calendarError instanceof Error
+            ? calendarError.message
+            : "Unable to bring this meeting into Brivoly right now.",
+        );
       }
     });
   }
@@ -1087,22 +1525,33 @@ export function CRMFollowUpWorkspace({
     setEmailStatus("Sending this note through the connected mailbox...");
     startEmailTransition(async () => {
       try {
-        const response = await fetch(`/api/crm/followups/send/${selectedLead.id}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            connection_id: preferredMailboxConnection?.id ?? null,
-            thread_id: selectedThreadId,
-            subject: emailSubjectDraft,
-            body: emailBodyDraft,
-          }),
-        });
+        const response = await fetch(
+          `/api/crm/followups/send/${selectedLead.id}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              connection_id: preferredMailboxConnection?.id ?? null,
+              thread_id: selectedThreadId,
+              subject: emailSubjectDraft,
+              body: emailBodyDraft,
+            }),
+          },
+        );
         const body = (await response.json().catch(() => null)) as
-          | { connection: CRMMailboxConnection; overview: CRMFollowUpOverview; sent_at: string; continuity_note: string }
+          | {
+              connection: CRMMailboxConnection;
+              overview: CRMFollowUpOverview;
+              sent_at: string;
+              continuity_note: string;
+            }
           | { error?: string }
           | null;
         if (!response.ok || !body || !("connection" in body)) {
-          throw new Error((body && "error" in body && body.error) || "Unable to send this note right now.");
+          throw new Error(
+            (body && "error" in body && body.error) ||
+              "Unable to send this note right now.",
+          );
         }
         setOverview(body.overview);
         upsertMailboxConnection(body.connection);
@@ -1113,7 +1562,11 @@ export function CRMFollowUpWorkspace({
         );
         router.refresh();
       } catch (sendError) {
-        setEmailStatus(sendError instanceof Error ? sendError.message : "Unable to send this note right now.");
+        setEmailStatus(
+          sendError instanceof Error
+            ? sendError.message
+            : "Unable to send this note right now.",
+        );
       }
     });
   }
@@ -1138,141 +1591,179 @@ export function CRMFollowUpWorkspace({
       ) : null}
 
       {showingImport ? (
-      <section className="mt-6 rounded-[1.75rem] border bg-white/85 p-6 shadow-sm">
-        <div className="grid gap-6 xl:grid-cols-[0.92fr_1.08fr]">
-          <section>
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Bring context back in</p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Bring relationship context in without retyping it.</h2>
-            <p className="mt-3 text-sm leading-6 text-slate-600">
-              Upload a CSV, XLSX, XLS, or note image, or paste a Google Sheets link. Brivoly cleans up messy headers, spots what is missing, and keeps only what is ready to support the next touch.
-            </p>
-
-            <div className="mt-5 flex flex-wrap gap-3">
-              <Button
-                variant={sourceType === "file_upload" ? "default" : "outline"}
-                onClick={() => {
-                  setSourceType("file_upload");
-                  setImportPreview(null);
-                  setImportFieldMapping({});
-                  setClarificationAnswers({});
-                  setRowOverrides({});
-                  setIsImportMappingDirty(false);
-                  setImportStatus(null);
-                  setImportError(null);
-                }}
-              >
-                Spreadsheet or file
-              </Button>
-              <Button
-                variant={sourceType === "google_sheets" ? "default" : "outline"}
-                onClick={() => {
-                  setSourceType("google_sheets");
-                  setImportPreview(null);
-                  setImportFieldMapping({});
-                  setClarificationAnswers({});
-                  setRowOverrides({});
-                  setIsImportMappingDirty(false);
-                  setImportStatus(null);
-                  setImportError(null);
-                }}
-              >
-                Sheet link
-              </Button>
-            </div>
-
-            {sourceType === "file_upload" ? (
-              <section className="mt-5 rounded-[1.4rem] border bg-slate-50/80 p-5">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">File or note</p>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  data-testid="crm-import-file-input"
-                  accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.xls,application/vnd.ms-excel,.png,image/png,.jpg,image/jpeg,.jpeg,image/jpeg,.webp,image/webp"
-                  className="mt-3 block w-full rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-5 text-sm text-slate-600"
-                  onChange={(event) => {
-                    setSelectedFile(event.target.files?.[0] ?? null);
-                    setImportPreview(null);
-                    setImportFieldMapping({});
-                    setClarificationAnswers({});
-                    setRowOverrides({});
-                    setIsImportMappingDirty(false);
-                    setImportStatus(null);
-                    setImportError(null);
-                  }}
-                />
-                <p className="mt-3 text-xs text-slate-500">
-                  Supported: CSV, XLSX, XLS, PNG, JPG, JPEG, and WEBP. Helpful columns include contact, company, owner, next touch, and notes.
-                </p>
-                {selectedFile ? <p className="mt-2 text-sm font-medium text-slate-700">{selectedFile.name}</p> : null}
-                {selectedFile && isImageFile(selectedFile.name) ? (
-                  <p className="mt-2 text-xs text-slate-500">
-                    Brivoly will use your AI Intake Profile to turn this note image into relationship-ready rows.
-                  </p>
-                ) : null}
-              </section>
-            ) : (
-              <section className="mt-5 rounded-[1.4rem] border bg-slate-50/80 p-5">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Sheet link</p>
-                <input
-                  value={sheetUrl}
-                  onChange={(event) => {
-                    setSheetUrl(event.target.value);
-                    setImportPreview(null);
-                    setImportFieldMapping({});
-                    setClarificationAnswers({});
-                    setRowOverrides({});
-                    setIsImportMappingDirty(false);
-                    setImportStatus(null);
-                    setImportError(null);
-                  }}
-                  placeholder="https://docs.google.com/spreadsheets/d/..."
-                  className="mt-3 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400"
-                />
-                <p className="mt-3 text-xs text-slate-500">Use a shareable Google Sheets URL. Brivoly will pull the context in directly.</p>
-              </section>
-            )}
-
-            <div className="mt-5 flex flex-wrap gap-3">
-              <Button disabled={isImportPending} onClick={() => requestImportPreview()}>
-                  {isImportPending ? "Checking..." : importPreview ? "Re-check context" : "Check context"}
-              </Button>
-              <Button
-                variant="outline"
-                disabled={
-                  isImportPending ||
-                  !importPreview ||
-                  importPreview.importable_rows === 0 ||
-                  isImportMappingDirty ||
-                  Boolean(importPreview.clarification?.required)
-                }
-                onClick={commitImport}
-              >
-                {isImportPending ? "Importing..." : "Bring this in"}
-              </Button>
-            </div>
-
-            {importError ? <p className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{importError}</p> : null}
-            {importStatus ? <p className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{importStatus}</p> : null}
-            {isImportMappingDirty ? (
-              <p className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                Column mappings changed. Re-check the preview so Brivoly can validate the updated layout before bringing this in.
+        <section className="mt-6 rounded-[1.75rem] border bg-white/85 p-6 shadow-sm">
+          <div className="grid gap-6 xl:grid-cols-[0.92fr_1.08fr]">
+            <section>
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                Bring context back in
               </p>
-            ) : null}
-          </section>
+              <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
+                Bring relationship context in without retyping it.
+              </h2>
+              <p className="mt-3 text-sm leading-6 text-slate-600">
+                Upload a CSV, XLSX, XLS, or note image, or paste a Google Sheets
+                link. Brivoly cleans up messy headers, spots what is missing,
+                and keeps only what is ready to support the next touch.
+              </p>
 
-        <ImportPreviewPanel
-          preview={importPreview}
-          importFieldMapping={importFieldMapping}
-          clarificationAnswers={clarificationAnswers}
-          rowOverrides={rowOverrides}
-          isImportMappingDirty={isImportMappingDirty}
-          onFieldMappingChange={updateImportFieldMapping}
-          onClarificationAnswer={answerClarificationQuestion}
-          onRowOverrideChange={updateRowOverride}
-          onApplyRowFix={applyRowFix}
-        />
-        </div>
-      </section>
+              <div className="mt-5 flex flex-wrap gap-3">
+                <Button
+                  variant={sourceType === "file_upload" ? "default" : "outline"}
+                  onClick={() => {
+                    setSourceType("file_upload");
+                    setImportPreview(null);
+                    setImportFieldMapping({});
+                    setClarificationAnswers({});
+                    setRowOverrides({});
+                    setIsImportMappingDirty(false);
+                    setImportStatus(null);
+                    setImportError(null);
+                  }}
+                >
+                  Spreadsheet or file
+                </Button>
+                <Button
+                  variant={
+                    sourceType === "google_sheets" ? "default" : "outline"
+                  }
+                  onClick={() => {
+                    setSourceType("google_sheets");
+                    setImportPreview(null);
+                    setImportFieldMapping({});
+                    setClarificationAnswers({});
+                    setRowOverrides({});
+                    setIsImportMappingDirty(false);
+                    setImportStatus(null);
+                    setImportError(null);
+                  }}
+                >
+                  Sheet link
+                </Button>
+              </div>
+
+              {sourceType === "file_upload" ? (
+                <section className="mt-5 rounded-[1.4rem] border bg-slate-50/80 p-5">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                    File or note
+                  </p>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    data-testid="crm-import-file-input"
+                    accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.xls,application/vnd.ms-excel,.png,image/png,.jpg,image/jpeg,.jpeg,image/jpeg,.webp,image/webp"
+                    className="mt-3 block w-full rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-5 text-sm text-slate-600"
+                    onChange={(event) => {
+                      setSelectedFile(event.target.files?.[0] ?? null);
+                      setImportPreview(null);
+                      setImportFieldMapping({});
+                      setClarificationAnswers({});
+                      setRowOverrides({});
+                      setIsImportMappingDirty(false);
+                      setImportStatus(null);
+                      setImportError(null);
+                    }}
+                  />
+                  <p className="mt-3 text-xs text-slate-500">
+                    Supported: CSV, XLSX, XLS, PNG, JPG, JPEG, and WEBP. Helpful
+                    columns include contact, company, owner, next touch, and
+                    notes.
+                  </p>
+                  {selectedFile ? (
+                    <p className="mt-2 text-sm font-medium text-slate-700">
+                      {selectedFile.name}
+                    </p>
+                  ) : null}
+                  {selectedFile && isImageFile(selectedFile.name) ? (
+                    <p className="mt-2 text-xs text-slate-500">
+                      Brivoly will use your AI Intake Profile to turn this note
+                      image into relationship-ready rows.
+                    </p>
+                  ) : null}
+                </section>
+              ) : (
+                <section className="mt-5 rounded-[1.4rem] border bg-slate-50/80 p-5">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                    Sheet link
+                  </p>
+                  <input
+                    value={sheetUrl}
+                    onChange={(event) => {
+                      setSheetUrl(event.target.value);
+                      setImportPreview(null);
+                      setImportFieldMapping({});
+                      setClarificationAnswers({});
+                      setRowOverrides({});
+                      setIsImportMappingDirty(false);
+                      setImportStatus(null);
+                      setImportError(null);
+                    }}
+                    placeholder="https://docs.google.com/spreadsheets/d/..."
+                    className="mt-3 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400"
+                  />
+                  <p className="mt-3 text-xs text-slate-500">
+                    Use a shareable Google Sheets URL. Brivoly will pull the
+                    context in directly.
+                  </p>
+                </section>
+              )}
+
+              <div className="mt-5 flex flex-wrap gap-3">
+                <Button
+                  disabled={isImportPending}
+                  onClick={() => requestImportPreview()}
+                >
+                  {isImportPending
+                    ? "Checking..."
+                    : importPreview
+                      ? "Re-check context"
+                      : "Check context"}
+                </Button>
+                <Button
+                  variant="outline"
+                  disabled={
+                    isImportPending ||
+                    !importPreview ||
+                    importPreview.importable_rows === 0 ||
+                    isImportMappingDirty ||
+                    Boolean(importPreview.clarification?.required)
+                  }
+                  onClick={commitImport}
+                >
+                  {isImportPending ? "Importing..." : "Bring this in"}
+                </Button>
+              </div>
+
+              {importError ? (
+                <p className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                  {importError}
+                </p>
+              ) : null}
+              {importStatus ? (
+                <p className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                  {importStatus}
+                </p>
+              ) : null}
+              {isImportMappingDirty ? (
+                <p className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                  Column mappings changed. Re-check the preview so Brivoly can
+                  validate the updated layout before bringing this in.
+                </p>
+              ) : null}
+            </section>
+
+            <ImportPreviewPanel
+              preview={importPreview}
+              importFieldMapping={importFieldMapping}
+              clarificationAnswers={clarificationAnswers}
+              rowOverrides={rowOverrides}
+              isImportMappingDirty={isImportMappingDirty}
+              onFieldMappingChange={updateImportFieldMapping}
+              onClarificationAnswer={answerClarificationQuestion}
+              onRowOverrideChange={updateRowOverride}
+              onApplyRowFix={applyRowFix}
+            />
+          </div>
+        </section>
       ) : null}
 
       {showingPipeline && overview.pipeline_summary?.stage_summaries?.length ? (
@@ -1290,170 +1781,259 @@ export function CRMFollowUpWorkspace({
       ) : null}
 
       {showingFollowups ? (
-      <section className="mt-6 grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
-        <section className="rounded-[1.75rem] border bg-white/80 p-6 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Relationship memory</p>
-          <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Keep context close to the next touch.</h2>
-          <p className="mt-3 text-sm leading-6 text-slate-600">
-            Search fast, spot quiet relationships, and move the next touch forward without losing the last meaningful interaction.
-          </p>
-          {error ? <p className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p> : null}
-          <div className="mt-5 rounded-[1.4rem] border bg-slate-50/80 p-4">
-            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
-              <input
-                value={relationshipQuery}
-                onChange={(event) => setRelationshipQuery(event.target.value)}
-                placeholder="Search client, company, notes, owner, or next step"
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400"
-              />
-              <div className="flex flex-wrap gap-2">
-                {[
-                  { value: "all", label: "All" },
-                  { value: "due", label: "Today" },
-                  { value: "stale", label: "Reconnect" },
-                  { value: "at_risk", label: "At risk" },
-                ].map((item) => (
-                  <button
-                    key={item.value}
-                    type="button"
-                    onClick={() => setRelationshipFilter(item.value as RelationshipFilter)}
-                    className={`rounded-full border px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] transition ${
-                      relationshipFilter === item.value
-                        ? "border-slate-900 bg-slate-950 text-white"
-                        : "border-slate-200 bg-white text-slate-600 hover:border-slate-400 hover:text-slate-900"
-                    }`}
-                  >
-                    {item.label}
-                  </button>
-                ))}
+        <section className="mt-6 grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
+          <section className="rounded-[1.75rem] border bg-white/80 p-6 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+              Relationship memory
+            </p>
+            <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
+              Keep context close to the next touch.
+            </h2>
+            <p className="mt-3 text-sm leading-6 text-slate-600">
+              Search fast, spot quiet relationships, and move the next touch
+              forward without losing the last meaningful interaction.
+            </p>
+            {error ? (
+              <p className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                {error}
+              </p>
+            ) : null}
+            <div className="mt-5 rounded-[1.4rem] border bg-slate-50/80 p-4">
+              <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+                <input
+                  value={relationshipQuery}
+                  onChange={(event) => setRelationshipQuery(event.target.value)}
+                  placeholder="Search client, company, notes, owner, or next step"
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400"
+                />
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { value: "all", label: "All" },
+                    { value: "due", label: "Today" },
+                    { value: "stale", label: "Reconnect" },
+                    { value: "at_risk", label: "At risk" },
+                  ].map((item) => (
+                    <button
+                      key={item.value}
+                      type="button"
+                      onClick={() =>
+                        setRelationshipFilter(item.value as RelationshipFilter)
+                      }
+                      className={`rounded-full border px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] transition ${
+                        relationshipFilter === item.value
+                          ? "border-slate-900 bg-slate-950 text-white"
+                          : "border-slate-200 bg-white text-slate-600 hover:border-slate-400 hover:text-slate-900"
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
-          <div className="mt-6 space-y-4">
-            {filteredFollowUps.map((item) => {
-              const rowPending = pendingId === item.id && isPending;
-              const selected = item.id === selectedLead?.id;
-              return (
-                <article
-                  key={item.id}
-                  className={`rounded-[1.5rem] border p-5 transition ${selected ? "border-slate-900 bg-white shadow-sm" : "bg-slate-50/80"}`}
-                >
-                  <button type="button" className="w-full text-left" onClick={() => setSelectedLeadId(item.id)}>
-                    <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-                          {item.stage} · {item.contact_channel}
-                        </p>
-                        <h3 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">{item.lead_name}</h3>
-                        <p className="mt-1 text-sm text-slate-600">{item.company_name}</p>
-                        <p className="mt-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Owner · {item.owner_name}</p>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        {item.relationship_state === "stale" ? <MiniFlag tone="warning" label="Stale" /> : null}
-                        {item.relationship_state === "drifting" ? <MiniFlag tone="warning" label="Drifting" /> : null}
-                        {item.relationship_state === "at_risk" ? <MiniFlag tone="critical" label="At risk" /> : null}
-                        <PriorityBadge priority={item.priority} />
-                      </div>
-                    </div>
-                    <p className="mt-4 text-sm font-medium text-slate-700">Next touch</p>
-                    <p className="mt-1 text-sm leading-6 text-slate-600">{item.next_step}</p>
-                    <div className="mt-5 grid gap-3 md:grid-cols-2">
-                      <TimelineTile label="Last touch" value={formatDateTime(item.last_contacted_at)} />
-                      <TimelineTile label="Next reminder" value={formatDateTime(item.next_follow_up_at)} />
-                    </div>
-                  </button>
-                  <div className="mt-5 flex flex-wrap gap-3">
-                    <Button disabled={rowPending} onClick={() => runAction(item.id, { action: "complete" })}>
-                      {rowPending ? "Updating..." : "Done"}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      disabled={rowPending}
-                      onClick={() => runAction(item.id, { action: "snooze", snooze_hours: 24 })}
+            <div className="mt-6 space-y-4">
+              {filteredFollowUps.map((item) => {
+                const rowPending = pendingId === item.id && isPending;
+                const selected = item.id === selectedLead?.id;
+                return (
+                  <article
+                    key={item.id}
+                    className={`rounded-[1.5rem] border p-5 transition ${selected ? "border-slate-900 bg-white shadow-sm" : "bg-slate-50/80"}`}
+                  >
+                    <button
+                      type="button"
+                      className="w-full text-left"
+                      onClick={() => setSelectedLeadId(item.id)}
                     >
-                      Tomorrow
-                    </Button>
-                    <Button
-                      variant="outline"
-                      disabled={rowPending}
-                      onClick={() => runAction(item.id, { action: "snooze", snooze_hours: 72 })}
-                    >
-                      Later this week
-                    </Button>
-                  </div>
-                </article>
-              );
-            })}
-            {!filteredFollowUps.length ? (
-              <div className="rounded-[1.5rem] border border-dashed bg-slate-50/70 p-6 text-sm leading-6 text-slate-600">
-                No relationships match this search yet. Try a different keyword or filter.
-              </div>
-            ) : null}
-          </div>
-        </section>
+                      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                            {item.stage} · {item.contact_channel}
+                          </p>
+                          <h3 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+                            {item.lead_name}
+                          </h3>
+                          <p className="mt-1 text-sm text-slate-600">
+                            {item.company_name}
+                          </p>
+                          <p className="mt-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                            Owner · {item.owner_name}
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          {item.relationship_state === "stale" ? (
+                            <MiniFlag tone="warning" label="Stale" />
+                          ) : null}
+                          {item.relationship_state === "drifting" ? (
+                            <MiniFlag tone="warning" label="Drifting" />
+                          ) : null}
+                          {item.relationship_state === "at_risk" ? (
+                            <MiniFlag tone="critical" label="At risk" />
+                          ) : null}
+                          <PriorityBadge priority={item.priority} />
+                        </div>
+                      </div>
+                      <p className="mt-4 text-sm font-medium text-slate-700">
+                        Next touch
+                      </p>
+                      <p className="mt-1 text-sm leading-6 text-slate-600">
+                        {item.next_step}
+                      </p>
+                      <div className="mt-5 grid gap-3 md:grid-cols-2">
+                        <TimelineTile
+                          label="Last touch"
+                          value={formatDateTime(item.last_contacted_at)}
+                        />
+                        <TimelineTile
+                          label="Next reminder"
+                          value={formatDateTime(item.next_follow_up_at)}
+                        />
+                      </div>
+                    </button>
+                    <div className="mt-5 flex flex-wrap gap-3">
+                      <Button
+                        disabled={rowPending}
+                        onClick={() =>
+                          runAction(item.id, { action: "complete" })
+                        }
+                      >
+                        {rowPending ? "Updating..." : "Done"}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        disabled={rowPending}
+                        onClick={() =>
+                          runAction(item.id, {
+                            action: "snooze",
+                            snooze_hours: 24,
+                          })
+                        }
+                      >
+                        Tomorrow
+                      </Button>
+                      <Button
+                        variant="outline"
+                        disabled={rowPending}
+                        onClick={() =>
+                          runAction(item.id, {
+                            action: "snooze",
+                            snooze_hours: 72,
+                          })
+                        }
+                      >
+                        Later this week
+                      </Button>
+                    </div>
+                  </article>
+                );
+              })}
+              {!filteredFollowUps.length ? (
+                <div className="rounded-[1.5rem] border border-dashed bg-slate-50/70 p-6 text-sm leading-6 text-slate-600">
+                  No relationships match this search yet. Try a different
+                  keyword or filter.
+                </div>
+              ) : null}
+            </div>
+          </section>
 
-        <section className="space-y-6">
-          {selectedLead ? (
-            <LeadMemoryPanel
-              lead={selectedLead}
-              settings={settings}
-              noteDraft={noteDraft}
-              onNoteDraftChange={setNoteDraft}
-              onSaveNote={saveNote}
-              isSavingNote={pendingId === selectedLead.id && isPending}
-              emailObjective={emailObjective}
-              emailTone={emailTone}
-              emailLength={emailLength}
-              emailDraft={emailDraft}
-              emailSubjectDraft={emailSubjectDraft}
-              emailBodyDraft={emailBodyDraft}
-              emailStatus={emailStatus}
-              isGeneratingEmail={isEmailPending}
-              canSendFromMailbox={mailboxConnections.length > 0}
-              selectedThread={selectedThread}
-              preferredMailboxConnection={preferredMailboxConnection}
-              draftFocusToken={draftFocusToken}
-              onEmailObjectiveChange={setEmailObjective}
-              onEmailToneChange={setEmailTone}
-              onEmailLengthChange={setEmailLength}
-              onEmailSubjectDraftChange={setEmailSubjectDraft}
-              onEmailBodyDraftChange={setEmailBodyDraft}
-              onGenerateEmailDraft={generateEmailDraft}
-              onSendDraftToMailbox={sendCurrentDraftToMailbox}
-              initialMemoryView={requestedMemoryView}
-            />
-          ) : null}
-          <section className="rounded-[1.75rem] border bg-slate-950 p-6 text-slate-50 shadow-[0_24px_90px_-55px_rgba(15,23,42,0.9)]">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300">Why Brivoly feels lighter</p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight">Brivoly remembers relationships so freelancers do not have to.</h2>
-            <ul className="mt-5 space-y-3 text-sm leading-6 text-slate-300">
-              <li>Every note, reminder, and suggested message should lower mental overhead instead of adding admin.</li>
-              <li>Brivoly should help you stay warm, responsive, and top-of-mind without more software work.</li>
-              <li>The goal is continuity and follow-through, not stage management.</li>
-            </ul>
+          <section className="space-y-6">
+            {selectedLead ? (
+              <LeadMemoryPanel
+                lead={selectedLead}
+                settings={settings}
+                noteDraft={noteDraft}
+                onNoteDraftChange={setNoteDraft}
+                onSaveNote={saveNote}
+                isSavingNote={pendingId === selectedLead.id && isPending}
+                emailObjective={emailObjective}
+                emailTone={emailTone}
+                emailLength={emailLength}
+                emailDraft={emailDraft}
+                emailSubjectDraft={emailSubjectDraft}
+                emailBodyDraft={emailBodyDraft}
+                emailStatus={emailStatus}
+                isGeneratingEmail={isEmailPending}
+                canSendFromMailbox={mailboxConnections.length > 0}
+                selectedThread={selectedThread}
+                preferredMailboxConnection={preferredMailboxConnection}
+                draftFocusToken={draftFocusToken}
+                onEmailObjectiveChange={setEmailObjective}
+                onEmailToneChange={setEmailTone}
+                onEmailLengthChange={setEmailLength}
+                onEmailSubjectDraftChange={setEmailSubjectDraft}
+                onEmailBodyDraftChange={setEmailBodyDraft}
+                onGenerateEmailDraft={generateEmailDraft}
+                onSendDraftToMailbox={sendCurrentDraftToMailbox}
+                initialMemoryView={requestedMemoryView}
+              />
+            ) : null}
+            <section className="rounded-[1.75rem] border bg-slate-950 p-6 text-slate-50 shadow-[0_24px_90px_-55px_rgba(15,23,42,0.9)]">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300">
+                Why Brivoly feels lighter
+              </p>
+              <h2 className="mt-3 text-3xl font-semibold tracking-tight">
+                Brivoly remembers relationships so freelancers do not have to.
+              </h2>
+              <ul className="mt-5 space-y-3 text-sm leading-6 text-slate-300">
+                <li>
+                  Every note, reminder, and suggested message should lower
+                  mental overhead instead of adding admin.
+                </li>
+                <li>
+                  Brivoly should help you stay warm, responsive, and top-of-mind
+                  without more software work.
+                </li>
+                <li>
+                  The goal is continuity and follow-through, not stage
+                  management.
+                </li>
+              </ul>
+            </section>
           </section>
         </section>
-      </section>
       ) : null}
 
       {showingInbox ? (
         <section className="mt-6 grid gap-6 xl:grid-cols-[0.92fr_1.08fr]">
           <section className="rounded-[1.75rem] border bg-white/85 p-6 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Inbox memory</p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Let Brivoly keep relationship context current from email.</h2>
-            <p className="mt-3 text-sm leading-6 text-slate-600">
-              Brivoly turns email activity into living relationship memory: it matches contacts by email, creates missing contacts automatically, and keeps the right conversation attached to the right person.
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+              Inbox memory
             </p>
-            {connectionFocus && overview.ambient_memory_summary?.suggested_action_note ? (
+            <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
+              Let Brivoly keep relationship context current from email.
+            </h2>
+            <p className="mt-3 text-sm leading-6 text-slate-600">
+              Brivoly turns email activity into living relationship memory: it
+              matches contacts by email, creates missing contacts automatically,
+              and keeps the right conversation attached to the right person.
+            </p>
+            {connectionFocus &&
+            overview.ambient_memory_summary?.suggested_action_note ? (
               <div className="mt-4 rounded-[1.2rem] border border-slate-200 bg-slate-50/80 px-4 py-4">
-                <p className="text-sm leading-6 text-slate-700">{overview.ambient_memory_summary.suggested_action_note}</p>
+                <p className="text-sm leading-6 text-slate-700">
+                  {overview.ambient_memory_summary.suggested_action_note}
+                </p>
               </div>
             ) : null}
 
             <div className="mt-6 grid gap-4 md:grid-cols-2">
-              <CompactMetricLight label="Reply soon" value={String(overview.inbox_summary?.needs_reply_count ?? 0)} tone="critical" />
-              <CompactMetricLight label="Waiting on them" value={String(overview.inbox_summary?.waiting_on_contact_count ?? 0)} tone="warning" />
-              <CompactMetricLight label="Quiet threads" value={String(overview.inbox_summary?.stale_thread_count ?? 0)} tone="neutral" />
+              <CompactMetricLight
+                label="Reply soon"
+                value={String(overview.inbox_summary?.needs_reply_count ?? 0)}
+                tone="critical"
+              />
+              <CompactMetricLight
+                label="Waiting on them"
+                value={String(
+                  overview.inbox_summary?.waiting_on_contact_count ?? 0,
+                )}
+                tone="warning"
+              />
+              <CompactMetricLight
+                label="Quiet threads"
+                value={String(overview.inbox_summary?.stale_thread_count ?? 0)}
+                tone="neutral"
+              />
             </div>
 
             <section
@@ -1464,9 +2044,13 @@ export function CRMFollowUpWorkspace({
                   : ""
               }`}
             >
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Connected mailboxes</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                Connected mailboxes
+              </p>
               <p className="mt-2 text-sm leading-6 text-slate-600">
-                Connect Gmail or Outlook once, then let Brivoly pull thread context back into relationship memory and send notes from the same account.
+                Connect Gmail or Outlook once, then let Brivoly pull thread
+                context back into relationship memory and send notes from the
+                same account.
               </p>
               <div className="mt-4 grid gap-3 md:grid-cols-2">
                 <button
@@ -1474,41 +2058,59 @@ export function CRMFollowUpWorkspace({
                   disabled={isMailboxPending}
                   onClick={() => startMailboxOAuth("gmail")}
                   className={`rounded-[1.2rem] border bg-white px-4 py-4 text-left transition hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-70 ${
-                    ambientActionKind === "connect" && (connectionFocus === "mailbox" || connectionFocus === "all")
+                    ambientActionKind === "connect" &&
+                    (connectionFocus === "mailbox" || connectionFocus === "all")
                       ? "border-slate-400 bg-slate-50"
                       : ""
                   }`}
                 >
                   <p className="ui-eyebrow">Gmail</p>
-                  <p className="mt-2 text-base font-semibold text-slate-950">Connect the real Gmail account</p>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">Use Google consent, keep the inbox in sync, and send notes through the same mailbox.</p>
+                  <p className="mt-2 text-base font-semibold text-slate-950">
+                    Connect the real Gmail account
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                    Use Google consent, keep the inbox in sync, and send notes
+                    through the same mailbox.
+                  </p>
                 </button>
                 <button
                   type="button"
                   disabled={isMailboxPending}
                   onClick={() => startMailboxOAuth("outlook")}
                   className={`rounded-[1.2rem] border bg-white px-4 py-4 text-left transition hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-70 ${
-                    ambientActionKind === "connect" && (connectionFocus === "mailbox" || connectionFocus === "all")
+                    ambientActionKind === "connect" &&
+                    (connectionFocus === "mailbox" || connectionFocus === "all")
                       ? "border-slate-400 bg-slate-50"
                       : ""
                   }`}
                 >
                   <p className="ui-eyebrow">Outlook</p>
-                  <p className="mt-2 text-base font-semibold text-slate-950">Connect the real Outlook account</p>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">Use Microsoft consent, keep the inbox in sync, and send notes through the same mailbox.</p>
+                  <p className="mt-2 text-base font-semibold text-slate-950">
+                    Connect the real Outlook account
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                    Use Microsoft consent, keep the inbox in sync, and send
+                    notes through the same mailbox.
+                  </p>
                 </button>
               </div>
               <div className="mt-5 rounded-[1.2rem] border border-dashed bg-white px-4 py-4">
                 <p className="ui-eyebrow">Fallback path</p>
                 <p className="mt-2 text-sm leading-6 text-slate-600">
-                  If provider credentials are not configured yet, you can still add a manual mailbox connection below and keep using sync preview mode.
+                  If provider credentials are not configured yet, you can still
+                  add a manual mailbox connection below and keep using sync
+                  preview mode.
                 </p>
                 <div className="mt-4 grid gap-3 xl:grid-cols-[0.8fr_1.2fr_1fr_auto]">
                   <label className="block">
                     <span className="ui-eyebrow">Provider</span>
                     <select
                       value={mailboxProvider}
-                      onChange={(event) => setMailboxProvider(event.target.value as "gmail" | "outlook")}
+                      onChange={(event) =>
+                        setMailboxProvider(
+                          event.target.value as "gmail" | "outlook",
+                        )
+                      }
                       className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400"
                     >
                       <option value="gmail">Gmail</option>
@@ -1528,7 +2130,9 @@ export function CRMFollowUpWorkspace({
                     <span className="ui-eyebrow">Name on the mailbox</span>
                     <input
                       value={mailboxDisplayName}
-                      onChange={(event) => setMailboxDisplayName(event.target.value)}
+                      onChange={(event) =>
+                        setMailboxDisplayName(event.target.value)
+                      }
                       placeholder="Ada from Northstar"
                       className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400"
                     />
@@ -1537,9 +2141,17 @@ export function CRMFollowUpWorkspace({
                     <Button
                       disabled={isMailboxPending}
                       onClick={connectMailbox}
-                      className={ambientActionKind === "connect" && (connectionFocus === "mailbox" || connectionFocus === "all") ? emphasizedActionClass : undefined}
+                      className={
+                        ambientActionKind === "connect" &&
+                        (connectionFocus === "mailbox" ||
+                          connectionFocus === "all")
+                          ? emphasizedActionClass
+                          : undefined
+                      }
                     >
-                      {isMailboxPending ? "Connecting..." : "Add manual connection"}
+                      {isMailboxPending
+                        ? "Connecting..."
+                        : "Add manual connection"}
                     </Button>
                   </div>
                 </div>
@@ -1547,32 +2159,94 @@ export function CRMFollowUpWorkspace({
               <div className="mt-4 space-y-3">
                 {mailboxConnections.length ? (
                   mailboxConnections.map((connection) => (
-                    <div key={connection.id} className="rounded-[1.2rem] border bg-white px-4 py-4">
+                    <div
+                      key={connection.id}
+                      className="rounded-[1.2rem] border bg-white px-4 py-4"
+                    >
                       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                         <div>
                           <p className="text-sm font-semibold text-slate-950">
-                            {connection.provider === "gmail" ? "Gmail" : "Outlook"} · {connection.email_address}
+                            {connection.provider === "gmail"
+                              ? "Gmail"
+                              : "Outlook"}{" "}
+                            · {connection.email_address}
                           </p>
                           <p className="mt-1 text-sm text-slate-600">
-                            {connection.display_name || "Mailbox account"} · {connection.connection_mode === "oauth" ? "provider-linked" : "manual beta"} · {connection.last_sync_at ? `last synced ${formatDateTime(connection.last_sync_at)}` : "not synced yet"}
+                            {connection.display_name || "Mailbox account"} ·{" "}
+                            {connection.connection_mode === "oauth"
+                              ? "provider-linked"
+                              : "manual beta"}{" "}
+                            ·{" "}
+                            {connection.last_sync_at
+                              ? `last synced ${formatDateTime(connection.last_sync_at)}`
+                              : "not synced yet"}
                           </p>
                         </div>
                         <div className="flex flex-wrap gap-2">
-                          <MiniFlag label={`${connection.sent_message_count} sent`} tone="neutral" />
-                          <MiniFlag label={`${connection.last_synced_thread_count} synced`} tone="warning" />
-                          <MiniFlag label={connection.background_sync_enabled ? "background sync on" : "background sync paused"} tone={connection.background_sync_enabled ? "neutral" : "warning"} />
-                          <MiniFlag label={`${connection.watch_event_count} watch event${connection.watch_event_count === 1 ? "" : "s"}`} tone="neutral" />
-                          <MiniFlag label={`watch ${connection.watch_status || "inactive"}`} tone={connection.watch_status === "active" ? "neutral" : connection.watch_status === "manual" ? "warning" : "warning"} />
-                          {connection.sync_stale ? <MiniFlag label="sync stale" tone="warning" /> : null}
-                          {isMailboxTokenExpiringSoon(connection) ? <MiniFlag label="token soon" tone="warning" /> : null}
-                          {connection.reauth_required ? <MiniFlag label="reauth needed" tone="warning" /> : null}
-                          {connection.connection_mode === "oauth" && (connection.reauth_required || connection.status === "needs_reauth") ? (
+                          <MiniFlag
+                            label={`${connection.sent_message_count} sent`}
+                            tone="neutral"
+                          />
+                          <MiniFlag
+                            label={`${connection.last_synced_thread_count} synced`}
+                            tone="warning"
+                          />
+                          <MiniFlag
+                            label={
+                              connection.background_sync_enabled
+                                ? "background sync on"
+                                : "background sync paused"
+                            }
+                            tone={
+                              connection.background_sync_enabled
+                                ? "neutral"
+                                : "warning"
+                            }
+                          />
+                          <MiniFlag
+                            label={`${connection.watch_event_count} watch event${connection.watch_event_count === 1 ? "" : "s"}`}
+                            tone="neutral"
+                          />
+                          <MiniFlag
+                            label={`watch ${connection.watch_status || "inactive"}`}
+                            tone={
+                              connection.watch_status === "active"
+                                ? "neutral"
+                                : connection.watch_status === "manual"
+                                  ? "warning"
+                                  : "warning"
+                            }
+                          />
+                          {connection.sync_stale ? (
+                            <MiniFlag label="sync stale" tone="warning" />
+                          ) : null}
+                          {isMailboxTokenExpiringSoon(connection) ? (
+                            <MiniFlag label="token soon" tone="warning" />
+                          ) : null}
+                          {connection.reauth_required ? (
+                            <MiniFlag label="reauth needed" tone="warning" />
+                          ) : null}
+                          {connection.connection_mode === "oauth" &&
+                          (connection.reauth_required ||
+                            connection.status === "needs_reauth") ? (
                             <Button
                               type="button"
                               variant="outline"
                               disabled={isMailboxPending}
-                              onClick={() => startMailboxOAuth(connection.provider === "gmail" ? "gmail" : "outlook")}
-                              className={ambientActionKind === "reconnect" && (connectionFocus === "mailbox" || connectionFocus === "all") ? emphasizedActionClass : undefined}
+                              onClick={() =>
+                                startMailboxOAuth(
+                                  connection.provider === "gmail"
+                                    ? "gmail"
+                                    : "outlook",
+                                )
+                              }
+                              className={
+                                ambientActionKind === "reconnect" &&
+                                (connectionFocus === "mailbox" ||
+                                  connectionFocus === "all")
+                                  ? emphasizedActionClass
+                                  : undefined
+                              }
                             >
                               Reconnect
                             </Button>
@@ -1581,52 +2255,108 @@ export function CRMFollowUpWorkspace({
                             type="button"
                             variant="outline"
                             disabled={isMailboxPending}
-                            onClick={() => toggleMailboxBackgroundSync(connection)}
-                            className={ambientActionKind === "resume" && !connection.background_sync_enabled && (connectionFocus === "mailbox" || connectionFocus === "all") ? emphasizedActionClass : undefined}
+                            onClick={() =>
+                              toggleMailboxBackgroundSync(connection)
+                            }
+                            className={
+                              ambientActionKind === "resume" &&
+                              !connection.background_sync_enabled &&
+                              (connectionFocus === "mailbox" ||
+                                connectionFocus === "all")
+                                ? emphasizedActionClass
+                                : undefined
+                            }
                           >
-                            {connection.background_sync_enabled ? "Pause sync" : "Resume sync"}
-                          </Button>
-                          <Button type="button" variant="outline" disabled={isMailboxPending || connection.connection_mode !== "oauth" || connection.reauth_required} onClick={() => renewMailboxWatch(connection)}>
-                            {isMailboxPending ? "Refreshing..." : "Refresh watch"}
+                            {connection.background_sync_enabled
+                              ? "Pause sync"
+                              : "Resume sync"}
                           </Button>
                           <Button
                             type="button"
                             variant="outline"
-                            disabled={isMailboxPending || connection.reauth_required}
+                            disabled={
+                              isMailboxPending ||
+                              connection.connection_mode !== "oauth" ||
+                              connection.reauth_required
+                            }
+                            onClick={() => renewMailboxWatch(connection)}
+                          >
+                            {isMailboxPending
+                              ? "Refreshing..."
+                              : "Refresh watch"}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            disabled={
+                              isMailboxPending || connection.reauth_required
+                            }
                             onClick={() => syncMailboxConnection(connection.id)}
-                            className={ambientActionKind === "sync" && connection.background_sync_enabled && !connection.reauth_required && (connectionFocus === "mailbox" || connectionFocus === "all") ? emphasizedActionClass : undefined}
+                            className={
+                              ambientActionKind === "sync" &&
+                              connection.background_sync_enabled &&
+                              !connection.reauth_required &&
+                              (connectionFocus === "mailbox" ||
+                                connectionFocus === "all")
+                                ? emphasizedActionClass
+                                : undefined
+                            }
                           >
                             {isMailboxPending ? "Syncing..." : "Sync now"}
                           </Button>
-                          <Button type="button" variant="outline" disabled={isMailboxPending} onClick={() => disconnectMailbox(connection)}>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            disabled={isMailboxPending}
+                            onClick={() => disconnectMailbox(connection)}
+                          >
                             Disconnect
                           </Button>
                         </div>
                       </div>
                       {connection.last_watch_event_at ? (
-                        <p className="mt-3 text-xs text-slate-500">Last watch-triggered sync {formatDateTime(connection.last_watch_event_at)}.</p>
+                        <p className="mt-3 text-xs text-slate-500">
+                          Last watch-triggered sync{" "}
+                          {formatDateTime(connection.last_watch_event_at)}.
+                        </p>
                       ) : null}
                       {connection.watch_expires_at ? (
-                        <p className="mt-2 text-xs text-slate-500">Watch coverage renews by {formatDateTime(connection.watch_expires_at)}.</p>
+                        <p className="mt-2 text-xs text-slate-500">
+                          Watch coverage renews by{" "}
+                          {formatDateTime(connection.watch_expires_at)}.
+                        </p>
                       ) : null}
                       {connection.continuity_summary ? (
-                        <p className="mt-2 text-xs text-slate-500">{connection.continuity_summary}</p>
+                        <p className="mt-2 text-xs text-slate-500">
+                          {connection.continuity_summary}
+                        </p>
                       ) : null}
                       {connection.last_sent_at ? (
-                        <p className="mt-2 text-xs text-slate-500">Last provider-backed note sent {formatDateTime(connection.last_sent_at)}.</p>
+                        <p className="mt-2 text-xs text-slate-500">
+                          Last provider-backed note sent{" "}
+                          {formatDateTime(connection.last_sent_at)}.
+                        </p>
                       ) : null}
                       {connection.health_note ? (
-                        <p className="mt-2 text-xs text-amber-700">{connection.health_note}</p>
+                        <p className="mt-2 text-xs text-amber-700">
+                          {connection.health_note}
+                        </p>
                       ) : null}
                     </div>
                   ))
                 ) : (
                   <div className="rounded-[1.2rem] border border-dashed bg-white px-4 py-4 text-sm leading-6 text-slate-600">
-                    No mailbox is connected yet. Add Gmail or Outlook above so Brivoly can start syncing conversation context instead of relying on manual thread previews.
+                    No mailbox is connected yet. Add Gmail or Outlook above so
+                    Brivoly can start syncing conversation context instead of
+                    relying on manual thread previews.
                   </div>
                 )}
               </div>
-              {mailboxStatus ? <p className="mt-4 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">{mailboxStatus}</p> : null}
+              {mailboxStatus ? (
+                <p className="mt-4 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                  {mailboxStatus}
+                </p>
+              ) : null}
             </section>
 
             <section
@@ -1637,9 +2367,13 @@ export function CRMFollowUpWorkspace({
                   : ""
               }`}
             >
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Connected calendars</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                Connected calendars
+              </p>
               <p className="mt-2 text-sm leading-6 text-slate-600">
-                Calendar beta: connect the address you usually schedule from, then bring meetings into relationship memory so Brivoly can prep the next conversation before it starts.
+                Calendar beta: connect the address you usually schedule from,
+                then bring meetings into relationship memory so Brivoly can prep
+                the next conversation before it starts.
               </p>
               <div className="mt-4 rounded-[1.2rem] border border-dashed bg-white px-4 py-4">
                 <p className="ui-eyebrow">Calendar connection</p>
@@ -1648,7 +2382,13 @@ export function CRMFollowUpWorkspace({
                     <span className="ui-eyebrow">Provider</span>
                     <select
                       value={calendarProvider}
-                      onChange={(event) => setCalendarProvider(event.target.value as "google_calendar" | "outlook_calendar")}
+                      onChange={(event) =>
+                        setCalendarProvider(
+                          event.target.value as
+                            | "google_calendar"
+                            | "outlook_calendar",
+                        )
+                      }
                       className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400"
                     >
                       <option value="google_calendar">Google Calendar</option>
@@ -1659,7 +2399,9 @@ export function CRMFollowUpWorkspace({
                     <span className="ui-eyebrow">Calendar address</span>
                     <input
                       value={calendarAddress}
-                      onChange={(event) => setCalendarAddress(event.target.value)}
+                      onChange={(event) =>
+                        setCalendarAddress(event.target.value)
+                      }
                       placeholder="you@yourstudio.com"
                       className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400"
                     />
@@ -1668,7 +2410,9 @@ export function CRMFollowUpWorkspace({
                     <span className="ui-eyebrow">Name on the calendar</span>
                     <input
                       value={calendarDisplayName}
-                      onChange={(event) => setCalendarDisplayName(event.target.value)}
+                      onChange={(event) =>
+                        setCalendarDisplayName(event.target.value)
+                      }
                       placeholder="Northstar schedule"
                       className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400"
                     />
@@ -1677,7 +2421,13 @@ export function CRMFollowUpWorkspace({
                     <Button
                       disabled={isCalendarPending}
                       onClick={connectCalendar}
-                      className={ambientActionKind === "connect" && (connectionFocus === "calendar" || connectionFocus === "all") ? emphasizedActionClass : undefined}
+                      className={
+                        ambientActionKind === "connect" &&
+                        (connectionFocus === "calendar" ||
+                          connectionFocus === "all")
+                          ? emphasizedActionClass
+                          : undefined
+                      }
                     >
                       {isCalendarPending ? "Connecting..." : "Add calendar"}
                     </Button>
@@ -1687,76 +2437,138 @@ export function CRMFollowUpWorkspace({
               <div className="mt-4 space-y-3">
                 {calendarConnections.length ? (
                   calendarConnections.map((connection) => (
-                    <div key={connection.id} className="rounded-[1.2rem] border bg-white px-4 py-4">
+                    <div
+                      key={connection.id}
+                      className="rounded-[1.2rem] border bg-white px-4 py-4"
+                    >
                       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                         <div>
                           <p className="text-sm font-semibold text-slate-950">
-                            {connection.provider === "google_calendar" ? "Google Calendar" : "Outlook Calendar"} · {connection.calendar_address}
+                            {connection.provider === "google_calendar"
+                              ? "Google Calendar"
+                              : "Outlook Calendar"}{" "}
+                            · {connection.calendar_address}
                           </p>
                           <p className="mt-1 text-sm text-slate-600">
-                            {connection.display_name || "Calendar account"} · {connection.last_sync_at ? `last event saved ${formatDateTime(connection.last_sync_at)}` : "no meeting context saved yet"}
+                            {connection.display_name || "Calendar account"} ·{" "}
+                            {connection.last_sync_at
+                              ? `last event saved ${formatDateTime(connection.last_sync_at)}`
+                              : "no meeting context saved yet"}
                           </p>
                         </div>
                         <div className="flex flex-wrap gap-2">
-                          <MiniFlag label={connection.background_sync_enabled ? "memory on" : "memory paused"} tone={connection.background_sync_enabled ? "neutral" : "warning"} />
-                          {connection.memory_warm ? <MiniFlag label="context warm" tone="neutral" /> : null}
-                          {connection.sync_stale ? <MiniFlag label="context quiet" tone="warning" /> : null}
+                          <MiniFlag
+                            label={
+                              connection.background_sync_enabled
+                                ? "memory on"
+                                : "memory paused"
+                            }
+                            tone={
+                              connection.background_sync_enabled
+                                ? "neutral"
+                                : "warning"
+                            }
+                          />
+                          {connection.memory_warm ? (
+                            <MiniFlag label="context warm" tone="neutral" />
+                          ) : null}
+                          {connection.sync_stale ? (
+                            <MiniFlag label="context quiet" tone="warning" />
+                          ) : null}
                           <Button
                             type="button"
                             variant="outline"
                             disabled={isCalendarPending}
-                            onClick={() => toggleCalendarBackgroundSync(connection)}
-                            className={ambientActionKind === "resume" && !connection.background_sync_enabled && (connectionFocus === "calendar" || connectionFocus === "all") ? emphasizedActionClass : undefined}
+                            onClick={() =>
+                              toggleCalendarBackgroundSync(connection)
+                            }
+                            className={
+                              ambientActionKind === "resume" &&
+                              !connection.background_sync_enabled &&
+                              (connectionFocus === "calendar" ||
+                                connectionFocus === "all")
+                                ? emphasizedActionClass
+                                : undefined
+                            }
                           >
-                            {connection.background_sync_enabled ? "Pause memory" : "Resume memory"}
+                            {connection.background_sync_enabled
+                              ? "Pause memory"
+                              : "Resume memory"}
                           </Button>
-                          <Button type="button" variant="outline" disabled={isCalendarPending} onClick={() => disconnectCalendar(connection)}>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            disabled={isCalendarPending}
+                            onClick={() => disconnectCalendar(connection)}
+                          >
                             Disconnect
                           </Button>
                         </div>
                       </div>
                       {connection.last_sync_at ? (
-                        <p className="mt-2 text-xs text-slate-500">Last meeting context saved {formatDateTime(connection.last_sync_at)}.</p>
+                        <p className="mt-2 text-xs text-slate-500">
+                          Last meeting context saved{" "}
+                          {formatDateTime(connection.last_sync_at)}.
+                        </p>
                       ) : null}
                       {connection.last_event_ingested_at ? (
-                        <p className="mt-2 text-xs text-slate-500">Latest meeting memory landed {formatDateTime(connection.last_event_ingested_at)}.</p>
+                        <p className="mt-2 text-xs text-slate-500">
+                          Latest meeting memory landed{" "}
+                          {formatDateTime(connection.last_event_ingested_at)}.
+                        </p>
                       ) : null}
-                      {connection.continuity_summary ? <p className="mt-2 text-xs text-slate-500">{connection.continuity_summary}</p> : null}
+                      {connection.continuity_summary ? (
+                        <p className="mt-2 text-xs text-slate-500">
+                          {connection.continuity_summary}
+                        </p>
+                      ) : null}
                     </div>
                   ))
                 ) : (
                   <div className="rounded-[1.2rem] border border-dashed bg-white px-4 py-4 text-sm leading-6 text-slate-600">
-                    No calendar is connected yet. Add one above, then bring the next meeting in so Brivoly can prep the conversation from saved context.
+                    No calendar is connected yet. Add one above, then bring the
+                    next meeting in so Brivoly can prep the conversation from
+                    saved context.
                   </div>
                 )}
               </div>
               <div className="mt-5 rounded-[1.2rem] border bg-white px-4 py-4">
                 <p className="ui-eyebrow">Bring one meeting in</p>
                 <p className="mt-2 text-sm leading-6 text-slate-600">
-                  Use this beta path to attach an upcoming meeting to the right relationship now. Brivoly will fold it into Today, meeting prep, and the relationship timeline.
+                  Use this beta path to attach an upcoming meeting to the right
+                  relationship now. Brivoly will fold it into Today, meeting
+                  prep, and the relationship timeline.
                 </p>
                 <div className="mt-4 grid gap-3 xl:grid-cols-2">
                   <input
                     value={calendarEventTitle}
-                    onChange={(event) => setCalendarEventTitle(event.target.value)}
+                    onChange={(event) =>
+                      setCalendarEventTitle(event.target.value)
+                    }
                     placeholder="Weekly rollout review"
                     className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400"
                   />
                   <input
                     value={calendarEventStartsAt}
-                    onChange={(event) => setCalendarEventStartsAt(event.target.value)}
+                    onChange={(event) =>
+                      setCalendarEventStartsAt(event.target.value)
+                    }
                     type="datetime-local"
                     className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400"
                   />
                   <input
                     value={calendarAttendeeEmails}
-                    onChange={(event) => setCalendarAttendeeEmails(event.target.value)}
+                    onChange={(event) =>
+                      setCalendarAttendeeEmails(event.target.value)
+                    }
                     placeholder="amber@northstarstudio.com, ops@client.com"
                     className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400 xl:col-span-2"
                   />
                   <textarea
                     value={calendarEventNotes}
-                    onChange={(event) => setCalendarEventNotes(event.target.value)}
+                    onChange={(event) =>
+                      setCalendarEventNotes(event.target.value)
+                    }
                     placeholder="Optional notes or agenda from the invite"
                     className="min-h-[120px] w-full rounded-[1.4rem] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-800 outline-none transition focus:border-slate-400 xl:col-span-2"
                   />
@@ -1765,26 +2577,68 @@ export function CRMFollowUpWorkspace({
                   <Button
                     disabled={isCalendarPending}
                     onClick={ingestCalendarEvent}
-                    className={ambientActionKind === "ingest" && (connectionFocus === "calendar" || connectionFocus === "all") ? emphasizedActionClass : undefined}
+                    className={
+                      ambientActionKind === "ingest" &&
+                      (connectionFocus === "calendar" ||
+                        connectionFocus === "all")
+                        ? emphasizedActionClass
+                        : undefined
+                    }
                   >
                     {isCalendarPending ? "Saving..." : "Save meeting context"}
                   </Button>
                 </div>
               </div>
-              {calendarStatus ? <p className="mt-4 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">{calendarStatus}</p> : null}
+              {calendarStatus ? (
+                <p className="mt-4 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                  {calendarStatus}
+                </p>
+              ) : null}
             </section>
 
             <section className="mt-6 rounded-[1.4rem] border bg-slate-50/80 p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Manual thread sync</p>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
-                Use this when you want to bring one thread in by hand or test relationship memory against a specific message.
-            </p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                Manual thread sync
+              </p>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Use this when you want to bring one thread in by hand or test
+                relationship memory against a specific message.
+              </p>
               <div className="mt-4 grid gap-3 md:grid-cols-2">
-                <input value={inboxThreadId} onChange={(event) => setInboxThreadId(event.target.value)} placeholder="Thread ID (optional)" className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400" />
-                <input value={inboxSource} onChange={(event) => setInboxSource(event.target.value)} placeholder="Source (gmail, outlook, api)" className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400" />
-                <input value={inboxCounterpartName} onChange={(event) => setInboxCounterpartName(event.target.value)} placeholder="Contact name" className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400" />
-                <input value={inboxCounterpartEmail} onChange={(event) => setInboxCounterpartEmail(event.target.value)} placeholder="contact@client.com" className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400" />
-                <input value={inboxSubject} onChange={(event) => setInboxSubject(event.target.value)} placeholder="Thread subject" className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400 md:col-span-2" />
+                <input
+                  value={inboxThreadId}
+                  onChange={(event) => setInboxThreadId(event.target.value)}
+                  placeholder="Thread ID (optional)"
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400"
+                />
+                <input
+                  value={inboxSource}
+                  onChange={(event) => setInboxSource(event.target.value)}
+                  placeholder="Source (gmail, outlook, api)"
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400"
+                />
+                <input
+                  value={inboxCounterpartName}
+                  onChange={(event) =>
+                    setInboxCounterpartName(event.target.value)
+                  }
+                  placeholder="Contact name"
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400"
+                />
+                <input
+                  value={inboxCounterpartEmail}
+                  onChange={(event) =>
+                    setInboxCounterpartEmail(event.target.value)
+                  }
+                  placeholder="contact@client.com"
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400"
+                />
+                <input
+                  value={inboxSubject}
+                  onChange={(event) => setInboxSubject(event.target.value)}
+                  placeholder="Thread subject"
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400 md:col-span-2"
+                />
                 <div className="flex flex-wrap gap-2 md:col-span-2">
                   {(["inbound", "outbound"] as const).map((item) => (
                     <button
@@ -1797,25 +2651,40 @@ export function CRMFollowUpWorkspace({
                           : "border-slate-200 bg-white text-slate-600 hover:border-slate-400 hover:text-slate-900"
                       }`}
                     >
-                      {item === "inbound" ? "Inbound to you" : "Outbound from you"}
+                      {item === "inbound"
+                        ? "Inbound to you"
+                        : "Outbound from you"}
                     </button>
                   ))}
                 </div>
-                <textarea value={inboxMessageBody} onChange={(event) => setInboxMessageBody(event.target.value)} placeholder="Latest email body or key snippet" className="min-h-[150px] w-full rounded-[1.4rem] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-800 outline-none transition focus:border-slate-400 md:col-span-2" />
+                <textarea
+                  value={inboxMessageBody}
+                  onChange={(event) => setInboxMessageBody(event.target.value)}
+                  placeholder="Latest email body or key snippet"
+                  className="min-h-[150px] w-full rounded-[1.4rem] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-800 outline-none transition focus:border-slate-400 md:col-span-2"
+                />
               </div>
               <div className="mt-4 flex flex-wrap gap-3">
                 <Button disabled={isInboxPending} onClick={syncInboxThread}>
                   {isInboxPending ? "Syncing..." : "Sync thread"}
                 </Button>
               </div>
-              {inboxStatus ? <p className="mt-4 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">{inboxStatus}</p> : null}
+              {inboxStatus ? (
+                <p className="mt-4 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                  {inboxStatus}
+                </p>
+              ) : null}
             </section>
 
             {selectedLead ? (
               <InboxNextMovePanel
                 lead={selectedLead}
                 onDraftAction={(draft, threadId) => {
-                  setSelectedThreadId(threadId ?? selectedLead.recent_email_threads[0]?.thread_id ?? null);
+                  setSelectedThreadId(
+                    threadId ??
+                      selectedLead.recent_email_threads[0]?.thread_id ??
+                      null,
+                  );
                   generateEmailDraft(draft);
                 }}
                 isDrafting={isEmailPending}
@@ -1840,6 +2709,7 @@ export function CRMFollowUpWorkspace({
             inboxFilter={inboxFilter}
             onInboxQueryChange={setInboxQuery}
             onInboxFilterChange={setInboxFilter}
+            effectiveInboxQuery={deferredInboxQuery}
           />
         </section>
       ) : null}
@@ -1900,7 +2770,11 @@ export function CRMFollowUpWorkspace({
             ambientMemorySummary={overview.ambient_memory_summary}
             onOpenAmbientMemoryAction={openAmbientMemoryAction}
           />
-          {overview.relationship_summary ? <RelationshipContinuityPanel summary={overview.relationship_summary} /> : null}
+          {overview.relationship_summary ? (
+            <RelationshipContinuityPanel
+              summary={overview.relationship_summary}
+            />
+          ) : null}
         </section>
       ) : null}
     </div>
@@ -1916,8 +2790,8 @@ function CRMViewHeader({ view }: { view: CRMWorkspaceView }) {
     },
     followups: {
       eyebrow: "Relationship memory",
-      title: "Never lose track of where a relationship stands.",
-      body: "Keep notes, context, and the next touch together so client continuity does not depend on your memory alone.",
+      title: "Keep the story, the next touch, and the latest context together.",
+      body: "Keep notes, recent changes, and the next move in one place so continuity does not depend on your memory alone.",
     },
     inbox: {
       eyebrow: "Inbox memory",
@@ -1926,12 +2800,13 @@ function CRMViewHeader({ view }: { view: CRMWorkspaceView }) {
     },
     pipeline: {
       eyebrow: "Attention",
-      title: "See who is slipping before the relationship cools.",
-      body: "Use this page to spot quiet relationships, reopening moments, and where a gentle reconnect is due.",
+      title: "Protect the relationships that are easiest to lose.",
+      body: "Use this page to spot reply pressure, quiet threads, and gentle reopening moments before the relationship cools.",
     },
     import: {
       eyebrow: "Bring context back in",
-      title: "Bring older client context back into memory without extra cleanup.",
+      title:
+        "Bring older client context back into memory without extra cleanup.",
       body: "Upload spreadsheets and raw note images, let Brivoly make sense of them, and only keep what supports better follow-through.",
     },
     intake: {
@@ -1943,21 +2818,36 @@ function CRMViewHeader({ view }: { view: CRMWorkspaceView }) {
 
   return (
     <section className="mt-6 rounded-[1.75rem] border bg-white/90 p-6 shadow-sm">
-      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">{copy.eyebrow}</p>
-      <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">{copy.title}</h2>
-      <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">{copy.body}</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+        {copy.eyebrow}
+      </p>
+      <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
+        {copy.title}
+      </h2>
+      <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
+        {copy.body}
+      </p>
     </section>
   );
 }
 
 function resolveIntakeTask(pathname: string): CRMIntakeTask {
-  if (pathname === "/crm/intake/profile" || pathname === "/clientos/intake/profile") {
+  if (
+    pathname === "/crm/intake/profile" ||
+    pathname === "/clientos/intake/profile"
+  ) {
     return "profile";
   }
-  if (pathname === "/crm/intake/routing" || pathname === "/clientos/intake/routing") {
+  if (
+    pathname === "/crm/intake/routing" ||
+    pathname === "/clientos/intake/routing"
+  ) {
     return "routing";
   }
-  if (pathname === "/crm/intake/capture" || pathname === "/clientos/intake/capture") {
+  if (
+    pathname === "/crm/intake/capture" ||
+    pathname === "/clientos/intake/capture"
+  ) {
     return "capture";
   }
   return "hub";
@@ -1972,35 +2862,63 @@ function TodayPrioritiesPanel({
 }: {
   items: CRMLeadFollowUp[];
   inboxSummary: CRMFollowUpOverview["inbox_summary"];
-  onRunAction: (leadId: string, route: string, preset?: TodayDraftPreset, memoryView?: "meeting_prep", threadId?: string | null) => void;
+  onRunAction: (
+    leadId: string,
+    route: string,
+    preset?: TodayDraftPreset,
+    memoryView?: "meeting_prep",
+    threadId?: string | null,
+  ) => void;
   ambientMemorySummary: CRMFollowUpOverview["ambient_memory_summary"];
   onOpenAmbientMemoryAction: (route: string) => void;
 }) {
-  const replyLead = [...items]
-    .filter((item) => item.recent_email_threads.some((thread) => thread.needs_reply))
-    .sort((left, right) => compareReplyPriority(left, right))[0] ?? null;
-  const reconnectLead = [...items]
-    .filter((item) => item.relationship_state === "stale" || item.relationship_state === "at_risk" || item.relationship_state === "drifting")
-    .sort((left, right) => compareReconnectPriority(left, right))[0] ?? null;
-  const proposalLead = [...items]
-    .filter((item) => isProposalFollowThrough(item))
-    .sort((left, right) => compareProposalPriority(left, right))[0] ?? null;
-  const recentUploadLead = [...items]
-    .filter((item) => hasRecentUploadContext(item))
-    .sort((left, right) => compareRecentUploadPriority(left, right))[0] ?? null;
-  const recentContextLead = [...items]
-    .filter((item) => hasFreshContext(item) && !hasRecentUploadContext(item))
-    .sort((left, right) => compareFreshContextPriority(left, right))[0] ?? null;
-  const meetingLead = [...items]
-    .filter((item) => item.relationship_upcoming_meeting_at)
-    .sort(
-      (left, right) =>
-        new Date(left.relationship_upcoming_meeting_at ?? left.next_follow_up_at).getTime() -
-        new Date(right.relationship_upcoming_meeting_at ?? right.next_follow_up_at).getTime(),
-    )[0] ?? null;
+  const replyLead =
+    [...items]
+      .filter((item) =>
+        item.recent_email_threads.some((thread) => thread.needs_reply),
+      )
+      .sort((left, right) => compareReplyPriority(left, right))[0] ?? null;
+  const reconnectLead =
+    [...items]
+      .filter(
+        (item) =>
+          item.relationship_state === "stale" ||
+          item.relationship_state === "at_risk" ||
+          item.relationship_state === "drifting",
+      )
+      .sort((left, right) => compareReconnectPriority(left, right))[0] ?? null;
+  const proposalLead =
+    [...items]
+      .filter((item) => isProposalFollowThrough(item))
+      .sort((left, right) => compareProposalPriority(left, right))[0] ?? null;
+  const recentUploadLead =
+    [...items]
+      .filter((item) => hasRecentUploadContext(item))
+      .sort((left, right) => compareRecentUploadPriority(left, right))[0] ??
+    null;
+  const recentContextLead =
+    [...items]
+      .filter((item) => hasFreshContext(item) && !hasRecentUploadContext(item))
+      .sort((left, right) => compareFreshContextPriority(left, right))[0] ??
+    null;
+  const meetingLead =
+    [...items]
+      .filter((item) => item.relationship_upcoming_meeting_at)
+      .sort(
+        (left, right) =>
+          new Date(
+            left.relationship_upcoming_meeting_at ?? left.next_follow_up_at,
+          ).getTime() -
+          new Date(
+            right.relationship_upcoming_meeting_at ?? right.next_follow_up_at,
+          ).getTime(),
+      )[0] ?? null;
   const replyThread = replyLead ? getReplyThread(replyLead) : null;
 
-  const uploadReentryLead = recentUploadLead && isReconnectMoment(recentUploadLead) ? recentUploadLead : null;
+  const uploadReentryLead =
+    recentUploadLead && isReconnectMoment(recentUploadLead)
+      ? recentUploadLead
+      : null;
 
   const priorities = compactPriorityCards<TodayPriorityCardItem>([
     uploadReentryLead
@@ -2009,9 +2927,15 @@ function TodayPrioritiesPanel({
           href: "/clientos/follow-ups",
           eyebrow: "Fresh way back in",
           title: `Use new context to reopen ${uploadReentryLead.lead_name}`,
-          body: uploadReentryLead.relationship_reconnect_why_now || uploadReentryLead.relationship_upload_follow_through_hint || uploadReentryLead.relationship_recent_upload_summary,
+          body:
+            uploadReentryLead.relationship_reconnect_why_now ||
+            uploadReentryLead.relationship_upload_follow_through_hint ||
+            uploadReentryLead.relationship_recent_upload_summary,
           meta: `${uploadReentryLead.company_name} · ${formatDateTime(getLatestUploadContextEntry(uploadReentryLead)?.occurred_at ?? null)}`,
-          nextMove: uploadReentryLead.relationship_reconnect_next_move || uploadReentryLead.relationship_upload_follow_through_hint || "Use the fresh context to restart the thread gently.",
+          nextMove:
+            uploadReentryLead.relationship_reconnect_next_move ||
+            uploadReentryLead.relationship_upload_follow_through_hint ||
+            "Use the fresh context to restart the thread gently.",
           actionLabel: "Draft reconnect",
           onAction: () =>
             onRunAction(uploadReentryLead.id, "/clientos/follow-ups", {
@@ -2028,17 +2952,29 @@ function TodayPrioritiesPanel({
           href: "/clientos/inbox",
           eyebrow: "Reply soon",
           title: `Reply to ${replyLead.lead_name}`,
-          body: replyThread?.next_touch_hint || replyThread?.memory_summary || getReplySummary(replyLead),
+          body:
+            replyThread?.next_touch_hint ||
+            replyThread?.memory_summary ||
+            getReplySummary(replyLead),
           meta: `${replyLead.company_name} · ${formatDateTime(getNewestThreadTime(replyLead) ?? replyLead.next_follow_up_at)}`,
-          nextMove: replyThread?.open_loop || replyThread?.carry_forward_hint || "Pick up the thread while the context is still fresh.",
+          nextMove:
+            replyThread?.open_loop ||
+            replyThread?.carry_forward_hint ||
+            "Pick up the thread while the context is still fresh.",
           actionLabel: "Draft reply",
           onAction: () =>
-            onRunAction(replyLead.id, "/clientos/follow-ups", {
-              objective: "follow_up",
-              tone: "warm",
-              length: "short",
-              status: "Drafting a reply from Today...",
-            }, undefined, replyThread?.thread_id ?? null),
+            onRunAction(
+              replyLead.id,
+              "/clientos/follow-ups",
+              {
+                objective: "follow_up",
+                tone: "warm",
+                length: "short",
+                status: "Drafting a reply from Today...",
+              },
+              undefined,
+              replyThread?.thread_id ?? null,
+            ),
         }
       : null,
     meetingLead
@@ -2047,12 +2983,23 @@ function TodayPrioritiesPanel({
           href: "/clientos/follow-ups",
           eyebrow: "Meeting prep",
           title: `Prepare for ${meetingLead.lead_name}`,
-          body: meetingLead.relationship_meeting_prep_summary || meetingLead.relationship_upcoming_meeting_label || meetingLead.next_step,
+          body:
+            meetingLead.relationship_meeting_prep_summary ||
+            meetingLead.relationship_upcoming_meeting_label ||
+            meetingLead.next_step,
           meta: `${meetingLead.company_name} · ${formatDateTime(meetingLead.relationship_upcoming_meeting_at ?? meetingLead.next_follow_up_at)}`,
-          nextMove: meetingLead.relationship_upcoming_meeting_label || "Open the relationship and walk in with the right context already in view.",
+          nextMove:
+            meetingLead.relationship_upcoming_meeting_label ||
+            "Open the relationship and walk in with the right context already in view.",
           memoryView: "meeting_prep",
           actionLabel: "Prepare now",
-          onAction: () => onRunAction(meetingLead.id, "/clientos/follow-ups", undefined, "meeting_prep"),
+          onAction: () =>
+            onRunAction(
+              meetingLead.id,
+              "/clientos/follow-ups",
+              undefined,
+              "meeting_prep",
+            ),
         }
       : null,
     reconnectLead && reconnectLead.id !== uploadReentryLead?.id
@@ -2061,9 +3008,16 @@ function TodayPrioritiesPanel({
           href: "/clientos/follow-ups",
           eyebrow: "Reconnect",
           title: `Reconnect with ${reconnectLead.lead_name}`,
-          body: reconnectLead.relationship_reconnect_why_now || reconnectLead.relationship_timing_nudge || reconnectLead.relationship_reminders[0]?.message || reconnectLead.next_step,
+          body:
+            reconnectLead.relationship_reconnect_why_now ||
+            reconnectLead.relationship_timing_nudge ||
+            reconnectLead.relationship_reminders[0]?.message ||
+            reconnectLead.next_step,
           meta: `${reconnectLead.company_name} · last meaningful touch ${formatDateTime(reconnectLead.last_meaningful_interaction_at)}`,
-          nextMove: reconnectLead.relationship_reconnect_next_move || reconnectLead.relationship_reconnect_message_hint || "Use a short, low-pressure check-in.",
+          nextMove:
+            reconnectLead.relationship_reconnect_next_move ||
+            reconnectLead.relationship_reconnect_message_hint ||
+            "Use a short, low-pressure check-in.",
           actionLabel: "Draft reconnect",
           onAction: () =>
             onRunAction(reconnectLead.id, "/clientos/follow-ups", {
@@ -2080,9 +3034,12 @@ function TodayPrioritiesPanel({
           href: "/clientos/follow-ups",
           eyebrow: "Proposal follow-up",
           title: `Keep momentum with ${proposalLead.lead_name}`,
-          body: proposalLead.relationship_timing_nudge || proposalLead.next_step,
+          body:
+            proposalLead.relationship_timing_nudge || proposalLead.next_step,
           meta: `${proposalLead.company_name} · follow up by ${formatDateTime(proposalLead.next_follow_up_at)}`,
-          nextMove: proposalLead.next_step || "Send the lightest possible nudge that moves the thread forward.",
+          nextMove:
+            proposalLead.next_step ||
+            "Send the lightest possible nudge that moves the thread forward.",
           actionLabel: "Draft nudge",
           onAction: () =>
             onRunAction(proposalLead.id, "/clientos/follow-ups", {
@@ -2097,23 +3054,37 @@ function TodayPrioritiesPanel({
       ? {
           id: `${recentUploadLead.id}-upload`,
           href: "/clientos/follow-ups",
-          eyebrow: isReconnectMoment(recentUploadLead) ? "Fresh way back in" : "Fresh client update",
-          title: isReconnectMoment(recentUploadLead) ? `Use new context to reopen ${recentUploadLead.lead_name}` : `Follow up on new context from ${recentUploadLead.lead_name}`,
+          eyebrow: isReconnectMoment(recentUploadLead)
+            ? "Fresh way back in"
+            : "Fresh client update",
+          title: isReconnectMoment(recentUploadLead)
+            ? `Use new context to reopen ${recentUploadLead.lead_name}`
+            : `Follow up on new context from ${recentUploadLead.lead_name}`,
           body:
             (isReconnectMoment(recentUploadLead)
-              ? recentUploadLead.relationship_reconnect_why_now || recentUploadLead.relationship_upload_follow_through_hint
+              ? recentUploadLead.relationship_reconnect_why_now ||
+                recentUploadLead.relationship_upload_follow_through_hint
               : undefined) ||
             recentUploadLead.relationship_upload_follow_through_hint ||
             `${recentUploadLead.relationship_recent_upload_summary}${recentUploadLead.next_step.trim() ? ` Next touch: ${recentUploadLead.next_step}` : ""}`,
           meta: `${recentUploadLead.company_name} · ${formatDateTime(getLatestUploadContextEntry(recentUploadLead)?.occurred_at ?? null)}`,
-          nextMove: recentUploadLead.relationship_upload_follow_through_hint || recentUploadLead.relationship_reconnect_next_move || "Turn the fresh client context into a quick follow-through note.",
-          actionLabel: isReconnectMoment(recentUploadLead) ? "Draft reconnect" : "Draft note",
+          nextMove:
+            recentUploadLead.relationship_upload_follow_through_hint ||
+            recentUploadLead.relationship_reconnect_next_move ||
+            "Turn the fresh client context into a quick follow-through note.",
+          actionLabel: isReconnectMoment(recentUploadLead)
+            ? "Draft reconnect"
+            : "Draft note",
           onAction: () =>
             onRunAction(recentUploadLead.id, "/clientos/follow-ups", {
-              objective: isReconnectMoment(recentUploadLead) ? "revive" : "recap",
+              objective: isReconnectMoment(recentUploadLead)
+                ? "revive"
+                : "recap",
               tone: "warm",
               length: "short",
-              status: isReconnectMoment(recentUploadLead) ? "Drafting a reconnect from fresh client context..." : "Drafting a note from fresh client context...",
+              status: isReconnectMoment(recentUploadLead)
+                ? "Drafting a reconnect from fresh client context..."
+                : "Drafting a note from fresh client context...",
             }),
         }
       : null,
@@ -2123,51 +3094,97 @@ function TodayPrioritiesPanel({
           href: "/clientos/follow-ups",
           eyebrow: "Fresh context",
           title: `New context from ${recentContextLead.lead_name}`,
-          body: getLatestContextEntry(recentContextLead)?.summary ?? recentContextLead.notes,
+          body:
+            getLatestContextEntry(recentContextLead)?.summary ??
+            recentContextLead.notes,
           meta: `${recentContextLead.company_name} · ${formatDateTime(getLatestContextEntry(recentContextLead)?.occurred_at ?? null)}`,
-          nextMove: recentContextLead.next_step || "Open the relationship and decide whether this changes the next touch.",
+          nextMove:
+            recentContextLead.next_step ||
+            "Open the relationship and decide whether this changes the next touch.",
           actionLabel: "Open relationship",
-          onAction: () => onRunAction(recentContextLead.id, "/clientos/follow-ups"),
+          onAction: () =>
+            onRunAction(recentContextLead.id, "/clientos/follow-ups"),
         }
       : null,
   ]);
 
-  const fallbackPriorities: TodayPriorityCardItem[] = items.slice(0, 4).map((item) => ({
-    id: item.id,
-    href: "/clientos/follow-ups",
-    eyebrow: "Next touch",
-    title: summarizePriority(item),
-    body: item.next_step,
-    meta: `${item.lead_name} · ${formatDateTime(item.next_follow_up_at)}`,
-    nextMove: item.relationship_timing_nudge || "Open the relationship and take the smallest useful next step.",
-  }));
-  const visiblePriorities = (priorities.length ? priorities : fallbackPriorities).slice(0, 4);
+  const fallbackPriorities: TodayPriorityCardItem[] = [...items]
+    .sort((left, right) => compareAttentionPriority(left, right))
+    .slice(0, 4)
+    .map((item) => ({
+      id: item.id,
+      href: "/clientos/follow-ups",
+      eyebrow: "Next touch",
+      title: summarizePriority(item),
+      body: item.next_step,
+      meta: `${item.lead_name} · ${formatDateTime(item.next_follow_up_at)}`,
+      nextMove:
+        item.relationship_timing_nudge ||
+        "Open the relationship and take the smallest useful next step.",
+    }));
+  const visiblePriorities = (
+    priorities.length ? priorities : fallbackPriorities
+  ).slice(0, 4);
   const primaryPriority = visiblePriorities[0] ?? null;
   const secondaryPriorities = visiblePriorities.slice(1);
 
   const replyCount = inboxSummary?.needs_reply_count ?? 0;
-  const meetingCount = items.filter((item) => item.relationship_upcoming_meeting_at).length;
-  const reconnectCount = items.filter((item) => item.relationship_state === "stale" || item.relationship_state === "at_risk" || item.relationship_state === "drifting").length;
-  const proposalCount = items.filter((item) => isProposalFollowThrough(item)).length;
-  const recentUploadCount = items.filter((item) => hasRecentUploadContext(item)).length;
-  const freshContextCount = items.filter((item) => hasFreshContext(item)).length;
+  const atRiskCount = items.filter(
+    (item) => item.relationship_state === "at_risk",
+  ).length;
+  const staleCount = items.filter(
+    (item) => item.relationship_state === "stale",
+  ).length;
+  const driftingCount = items.filter(
+    (item) => item.relationship_state === "drifting",
+  ).length;
+  const meetingCount = items.filter(
+    (item) => item.relationship_upcoming_meeting_at,
+  ).length;
+  const reconnectCount = atRiskCount + staleCount + driftingCount;
+  const proposalCount = items.filter((item) =>
+    isProposalFollowThrough(item),
+  ).length;
+  const recentUploadCount = items.filter((item) =>
+    hasRecentUploadContext(item),
+  ).length;
+  const freshContextCount = items.filter((item) =>
+    hasFreshContext(item),
+  ).length;
   const urgentCount = replyCount + proposalCount + reconnectCount;
-  const contextCount = recentUploadCount + Math.max(0, freshContextCount - recentUploadCount);
-  const memoryCoverageLine = ambientMemorySummary?.continuity_summary || "Connect an inbox or calendar once and Brivoly can keep more of this context warm for you.";
+  const contextCount =
+    recentUploadCount + Math.max(0, freshContextCount - recentUploadCount);
+  const memoryCoverageLine =
+    ambientMemorySummary?.continuity_summary ||
+    "Connect an inbox or calendar once and Brivoly can keep more of this context warm for you.";
 
   return (
     <section className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm">
-      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Today’s priorities</p>
-      <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">A short list of who needs your attention right now.</h2>
-      <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-        Brivoly pulls together replies, reconnects, proposal follow-through, upcoming meeting prep, and new client context so you can pick the right next move without re-reading everything first.
+      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+        Today’s priorities
       </p>
-      <p className="mt-3 text-sm font-medium text-slate-700">Start with one relationship and one next move. Brivoly will hold the rest.</p>
-      <p className="mt-2 text-sm leading-6 text-slate-600">{memoryCoverageLine}</p>
+      <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
+        A short list of who needs your attention right now.
+      </h2>
+      <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
+        Brivoly pulls together replies, reconnects, proposal follow-through,
+        upcoming meeting prep, and new client context so you can pick the right
+        next move without re-reading everything first.
+      </p>
+      <p className="mt-3 text-sm font-medium text-slate-700">
+        Start with one relationship and one next move. Brivoly will hold the
+        rest.
+      </p>
+      <p className="mt-2 text-sm leading-6 text-slate-600">
+        {memoryCoverageLine}
+      </p>
       {ambientMemorySummary?.warm_source_labels?.length ? (
         <div className="mt-3 flex flex-wrap gap-2">
           {ambientMemorySummary.warm_source_labels.map((label) => (
-            <span key={`warm-${label}`} className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800">
+            <span
+              key={`warm-${label}`}
+              className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800"
+            >
               Warm: {label}
             </span>
           ))}
@@ -2176,7 +3193,10 @@ function TodayPrioritiesPanel({
       {ambientMemorySummary?.quiet_source_labels?.length ? (
         <div className="mt-3 flex flex-wrap gap-2">
           {ambientMemorySummary.quiet_source_labels.map((label) => (
-            <span key={`quiet-${label}`} className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-medium text-sky-800">
+            <span
+              key={`quiet-${label}`}
+              className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-medium text-sky-800"
+            >
               Quiet: {label}
             </span>
           ))}
@@ -2185,7 +3205,10 @@ function TodayPrioritiesPanel({
       {ambientMemorySummary?.attention_source_labels?.length ? (
         <div className="mt-3 flex flex-wrap gap-2">
           {ambientMemorySummary.attention_source_labels.map((label) => (
-            <span key={`attention-${label}`} className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800">
+            <span
+              key={`attention-${label}`}
+              className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800"
+            >
               Needs care: {label}
             </span>
           ))}
@@ -2193,23 +3216,33 @@ function TodayPrioritiesPanel({
       ) : ambientMemorySummary?.paused_source_labels?.length ? (
         <div className="mt-3 flex flex-wrap gap-2">
           {ambientMemorySummary.paused_source_labels.map((label) => (
-            <span key={`paused-${label}`} className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700">
+            <span
+              key={`paused-${label}`}
+              className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700"
+            >
               Paused: {label}
             </span>
           ))}
         </div>
       ) : null}
-      {ambientMemorySummary?.suggested_action_label && ambientMemorySummary.suggested_action_route ? (
+      {ambientMemorySummary?.suggested_action_label &&
+      ambientMemorySummary.suggested_action_route ? (
         <div className="mt-3">
           <button
             type="button"
-            onClick={() => onOpenAmbientMemoryAction(ambientMemorySummary.suggested_action_route)}
+            onClick={() =>
+              onOpenAmbientMemoryAction(
+                ambientMemorySummary.suggested_action_route,
+              )
+            }
             className="rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-700 transition hover:border-slate-400 hover:bg-white hover:text-slate-950"
           >
             {ambientMemorySummary.suggested_action_label}
           </button>
           {ambientMemorySummary.suggested_action_note ? (
-            <p className="mt-2 text-xs leading-5 text-slate-500">{ambientMemorySummary.suggested_action_note}</p>
+            <p className="mt-2 text-xs leading-5 text-slate-500">
+              {ambientMemorySummary.suggested_action_note}
+            </p>
           ) : null}
         </div>
       ) : null}
@@ -2231,33 +3264,79 @@ function TodayPrioritiesPanel({
           </button>
         ))}
       </div>
+      <div className="mt-5 grid gap-3 xl:grid-cols-4">
+        <CompactMetricLight
+          label="Reply pressure"
+          value={
+            replyCount
+              ? `${replyCount} thread${replyCount === 1 ? "" : "s"}`
+              : "Clear"
+          }
+          tone={replyCount ? "critical" : "neutral"}
+        />
+        <CompactMetricLight
+          label="At risk now"
+          value={
+            atRiskCount
+              ? `${atRiskCount} relationship${atRiskCount === 1 ? "" : "s"}`
+              : "None"
+          }
+          tone={atRiskCount ? "critical" : "neutral"}
+        />
+        <CompactMetricLight
+          label="Ready to reopen"
+          value={
+            staleCount + driftingCount
+              ? `${staleCount + driftingCount} relationship${staleCount + driftingCount === 1 ? "" : "s"}`
+              : "Quiet"
+          }
+          tone={staleCount + driftingCount ? "warning" : "neutral"}
+        />
+        <CompactMetricLight
+          label="Fresh context"
+          value={
+            contextCount
+              ? `${contextCount} update${contextCount === 1 ? "" : "s"}`
+              : "Quiet"
+          }
+          tone={contextCount ? "positive" : "neutral"}
+        />
+      </div>
       <div className="mt-5 grid gap-3 md:grid-cols-2">
         <TodaySignal
           label="Needs care now"
           value={urgentCount ? String(urgentCount) : "Clear"}
           detail={
             urgentCount
-              ? `${replyCount ? `${replyCount} repl${replyCount === 1 ? "y" : "ies"}` : "no replies"}, ${reconnectCount ? `${reconnectCount} reconnect${reconnectCount === 1 ? "" : "s"}` : "no reconnects"}, and ${proposalCount ? `${proposalCount} proposal follow-up${proposalCount === 1 ? "" : "s"}` : "no proposal nudges"}`
+              ? `${replyCount ? `${replyCount} repl${replyCount === 1 ? "y" : "ies"}` : "no replies"}, ${atRiskCount ? `${atRiskCount} at-risk relationship${atRiskCount === 1 ? "" : "s"}` : "no at-risk relationships"}, ${staleCount + driftingCount ? `${staleCount + driftingCount} reopening moment${staleCount + driftingCount === 1 ? "" : "s"}` : "no reopening moments"}, and ${proposalCount ? `${proposalCount} proposal follow-up${proposalCount === 1 ? "" : "s"}` : "no proposal nudges"}`
               : "Nothing urgent is stacking up right now"
           }
         />
         <TodaySignal
           label="Freshest opening"
-          value={meetingCount ? String(meetingCount) : contextCount ? String(contextCount) : "Quiet"}
+          value={
+            meetingCount
+              ? String(meetingCount)
+              : contextCount
+                ? String(contextCount)
+                : "Quiet"
+          }
           detail={
             meetingCount
               ? `${meetingCount} meeting prep moment${meetingCount === 1 ? "" : "s"} is coming up soon`
               : recentUploadCount
-              ? `${recentUploadCount} client upload${recentUploadCount === 1 ? "" : "s"} landed recently`
-              : freshContextCount
-                ? `${freshContextCount} relationship${freshContextCount === 1 ? "" : "s"} picked up new context recently`
-                : "No new client context landed overnight"
+                ? `${recentUploadCount} client upload${recentUploadCount === 1 ? "" : "s"} landed recently`
+                : freshContextCount
+                  ? `${freshContextCount} relationship${freshContextCount === 1 ? "" : "s"} picked up new context recently`
+                  : "No new client context landed overnight"
           }
         />
         {ambientMemorySummary ? (
           <TodaySignal
             label="Background memory"
-            value={formatAmbientContinuityState(ambientMemorySummary.continuity_state)}
+            value={formatAmbientContinuityState(
+              ambientMemorySummary.continuity_state,
+            )}
             detail={ambientMemorySummary.continuity_summary}
           />
         ) : null}
@@ -2266,18 +3345,35 @@ function TodayPrioritiesPanel({
         <div className="mt-5 rounded-[1.5rem] border border-slate-900 bg-slate-950 px-5 py-5 text-white shadow-sm">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="max-w-2xl">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">Start here</p>
-              <p className="mt-2 text-2xl font-semibold tracking-tight">{primaryPriority.title}</p>
-              <p className="mt-3 text-sm leading-6 text-slate-200">{primaryPriority.body}</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">
+                Start here
+              </p>
+              <p className="mt-2 text-2xl font-semibold tracking-tight">
+                {primaryPriority.title}
+              </p>
+              <p className="mt-3 text-sm leading-6 text-slate-200">
+                {primaryPriority.body}
+              </p>
               {primaryPriority.nextMove ? (
                 <div className="mt-4 rounded-[1rem] border border-white/10 bg-white/5 px-4 py-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-200">Next move</p>
-                  <p className="mt-2 text-sm leading-6 text-slate-100">{primaryPriority.nextMove}</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-200">
+                    Next move
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-slate-100">
+                    {primaryPriority.nextMove}
+                  </p>
                 </div>
               ) : null}
-              <p className="mt-3 text-sm leading-6 text-slate-300">Take the smallest next step here first, then let Brivoly hold the rest of the context in place.</p>
-              <p className="mt-4 text-xs text-slate-300">{primaryPriority.meta}</p>
-              <p className="mt-3 text-xs uppercase tracking-[0.16em] text-slate-400">{primaryPriority.eyebrow}</p>
+              <p className="mt-3 text-sm leading-6 text-slate-300">
+                Take the smallest next step here first, then let Brivoly hold
+                the rest of the context in place.
+              </p>
+              <p className="mt-4 text-xs text-slate-300">
+                {primaryPriority.meta}
+              </p>
+              <p className="mt-3 text-xs uppercase tracking-[0.16em] text-slate-400">
+                {primaryPriority.eyebrow}
+              </p>
             </div>
             <div className="flex flex-wrap gap-2 lg:justify-end">
               <Button
@@ -2287,7 +3383,11 @@ function TodayPrioritiesPanel({
               >
                 {primaryPriority.actionLabel ?? "Open"}
               </Button>
-              <Button asChild variant="outline" className="border-white/20 bg-transparent text-white hover:bg-white/10 hover:text-white">
+              <Button
+                asChild
+                variant="outline"
+                className="border-white/20 bg-transparent text-white hover:bg-white/10 hover:text-white"
+              >
                 <Link href={primaryPriority.href}>Open relationship</Link>
               </Button>
             </div>
@@ -2312,23 +3412,43 @@ function TodayPrioritiesPanel({
         </div>
       ) : null}
       <div className="mt-5 flex flex-wrap gap-3">
-        <QuickLinkPill href="/clientos/follow-ups" title="Relationship memory" body="Keep the last touch, the next touch, and the full story together." />
-        <QuickLinkPill href="/clientos/inbox" title="Inbox continuity" body="Let email carry the thread forward without extra logging." />
+        <QuickLinkPill
+          href="/clientos/follow-ups"
+          title="Relationship memory"
+          body="Keep the last touch, the next touch, and the full story together."
+        />
+        <QuickLinkPill
+          href="/clientos/inbox"
+          title="Inbox continuity"
+          body="Let email carry the thread forward without extra logging."
+        />
       </div>
     </section>
   );
 }
 
-function TodaySignal({ label, value, detail }: { label: string; value: string; detail: string }) {
+function TodaySignal({
+  label,
+  value,
+  detail,
+}: {
+  label: string;
+  value: string;
+  detail: string;
+}) {
   return (
     <div className="min-w-0 overflow-hidden rounded-[1.2rem] border bg-slate-50/80 px-5 py-5">
       <div className="flex items-start justify-between gap-4">
         <p className="max-w-[16rem] break-words text-xs font-semibold uppercase tracking-[0.14em] text-slate-400 [overflow-wrap:anywhere] sm:tracking-[0.18em]">
           {label}
         </p>
-        <p className="shrink-0 text-3xl font-semibold tracking-tight text-slate-950">{value}</p>
+        <p className="shrink-0 text-3xl font-semibold tracking-tight text-slate-950">
+          {value}
+        </p>
       </div>
-      <p className="mt-4 max-w-[24rem] break-words text-sm leading-6 text-slate-700 [overflow-wrap:anywhere]">{detail}</p>
+      <p className="mt-4 max-w-[24rem] break-words text-sm leading-6 text-slate-700 [overflow-wrap:anywhere]">
+        {detail}
+      </p>
     </div>
   );
 }
@@ -2349,7 +3469,15 @@ function formatAmbientContinuityState(value: string): string {
   return "Offline";
 }
 
-function QuickLinkPill({ href, title, body }: { href: string; title: string; body: string }) {
+function QuickLinkPill({
+  href,
+  title,
+  body,
+}: {
+  href: string;
+  title: string;
+  body: string;
+}) {
   return (
     <Link
       href={href}
@@ -2362,26 +3490,41 @@ function QuickLinkPill({ href, title, body }: { href: string; title: string; bod
   );
 }
 
-function RelationshipContinuityPanel({ summary }: { summary: NonNullable<CRMFollowUpOverview["relationship_summary"]> }) {
+function RelationshipContinuityPanel({
+  summary,
+}: {
+  summary: NonNullable<CRMFollowUpOverview["relationship_summary"]>;
+}) {
   const steadyCount = summary.active_count + summary.warm_count;
-  const needsCareCount = summary.drifting_count + summary.stale_count + summary.at_risk_count;
-  const warmMoments = summary.referral_reminder_count + summary.milestone_reminder_count;
+  const needsCareCount =
+    summary.drifting_count + summary.stale_count + summary.at_risk_count;
+  const warmMoments =
+    summary.referral_reminder_count + summary.milestone_reminder_count;
   return (
     <section className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm">
-      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Relationship continuity</p>
-      <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Stay warm without holding everything in your head.</h2>
+      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+        Relationship continuity
+      </p>
+      <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
+        Stay warm without holding everything in your head.
+      </h2>
       <div className="mt-5 rounded-[1.3rem] border bg-slate-50/80 px-5 py-5">
         <p className="text-sm leading-7 text-slate-700">
-          <span className="font-semibold text-slate-950">{steadyCount}</span> relationship{steadyCount === 1 ? "" : "s"} still feel steady.
-          {" "}
-          {needsCareCount
-            ? <><span className="font-semibold text-slate-950">{needsCareCount}</span> may need a warmer touch soon.</>
-            : "Nothing feels especially fragile right now."}
-          {" "}
+          <span className="font-semibold text-slate-950">{steadyCount}</span>{" "}
+          relationship{steadyCount === 1 ? "" : "s"} still feel steady.{" "}
+          {needsCareCount ? (
+            <>
+              <span className="font-semibold text-slate-950">
+                {needsCareCount}
+              </span>{" "}
+              may need a warmer touch soon.
+            </>
+          ) : (
+            "Nothing feels especially fragile right now."
+          )}{" "}
           {summary.warm_intro_connections.length
             ? `${summary.warm_intro_connections.length} warm re-entry path${summary.warm_intro_connections.length === 1 ? "" : "s"} could help reopen a thread more naturally.`
-            : ""}
-          {" "}
+            : ""}{" "}
           {warmMoments
             ? `${warmMoments} thoughtful moment${warmMoments === 1 ? "" : "s"} could make the next touch easier.`
             : ""}
@@ -2413,11 +3556,24 @@ function PriorityCard({
   return (
     <div className="min-w-0 overflow-hidden rounded-[1.35rem] border bg-slate-50/80 px-5 py-5 transition hover:border-slate-400 hover:bg-white">
       <Link href={href} className="block min-w-0">
-        <p className="break-words text-xs font-semibold uppercase tracking-[0.14em] text-slate-400 [overflow-wrap:anywhere] sm:tracking-[0.18em]">{eyebrow}</p>
-        <p className="break-words text-lg font-semibold tracking-tight text-slate-950 [overflow-wrap:anywhere]">{title}</p>
-        <p className="mt-2 break-words text-sm leading-6 text-slate-600 [overflow-wrap:anywhere]">{body}</p>
-        {nextMove ? <p className="mt-3 break-words text-sm leading-6 text-slate-800 [overflow-wrap:anywhere]"><span className="font-medium text-slate-950">Next move:</span> {nextMove}</p> : null}
-        <p className="mt-3 break-words text-xs text-slate-500 [overflow-wrap:anywhere]">{meta}</p>
+        <p className="break-words text-xs font-semibold uppercase tracking-[0.14em] text-slate-400 [overflow-wrap:anywhere] sm:tracking-[0.18em]">
+          {eyebrow}
+        </p>
+        <p className="break-words text-lg font-semibold tracking-tight text-slate-950 [overflow-wrap:anywhere]">
+          {title}
+        </p>
+        <p className="mt-2 break-words text-sm leading-6 text-slate-600 [overflow-wrap:anywhere]">
+          {body}
+        </p>
+        {nextMove ? (
+          <p className="mt-3 break-words text-sm leading-6 text-slate-800 [overflow-wrap:anywhere]">
+            <span className="font-medium text-slate-950">Next move:</span>{" "}
+            {nextMove}
+          </p>
+        ) : null}
+        <p className="mt-3 break-words text-xs text-slate-500 [overflow-wrap:anywhere]">
+          {meta}
+        </p>
       </Link>
       {actionLabel && onAction ? (
         <div className="mt-4 flex justify-start">
@@ -2447,7 +3603,11 @@ function PipelineBoardPanel({
   items: CRMLeadFollowUp[];
   selectedLeadId: string | null;
   onSelectLead: (leadId: string) => void;
-  onRunAction: (leadId: string, route: string, preset?: TodayDraftPreset) => void;
+  onRunAction: (
+    leadId: string,
+    route: string,
+    preset?: TodayDraftPreset,
+  ) => void;
   ambientMemorySummary: CRMFollowUpOverview["ambient_memory_summary"];
   onOpenAmbientMemoryAction: (route: string) => void;
 }) {
@@ -2458,25 +3618,42 @@ function PipelineBoardPanel({
     itemsByStage.set(item.stage, bucket);
   }
   const needsCareFirst = [...items]
-    .filter((item) => relationshipStateUrgency(item.relationship_state) > 0 || item.recent_email_threads.some((thread) => thread.needs_reply))
+    .filter(
+      (item) =>
+        relationshipStateUrgency(item.relationship_state) > 0 ||
+        item.recent_email_threads.some((thread) => thread.needs_reply),
+    )
     .sort((left, right) => compareAttentionPriority(left, right))
     .slice(0, 4);
-  const memoryCoverageLine = ambientMemorySummary?.continuity_summary || "Connect an inbox or calendar if you want quiet continuity to show up here with less manual work.";
+  const memoryCoverageLine =
+    ambientMemorySummary?.continuity_summary ||
+    "Connect an inbox or calendar if you want quiet continuity to show up here with less manual work.";
 
   return (
     <section className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm xl:col-span-2">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="max-w-2xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Relationship attention</p>
-          <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Protect the relationships that are easiest to lose.</h2>
-          <p className="mt-3 text-sm leading-6 text-slate-600">
-            This page is for quiet threads, overdue replies, and gentle re-entry moments. The goal is continuity and warmth, not system-heavy tracking.
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+            Relationship attention
           </p>
-          <p className="mt-3 text-sm leading-6 text-slate-600">{memoryCoverageLine}</p>
+          <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
+            Protect the relationships that are easiest to lose.
+          </h2>
+          <p className="mt-3 text-sm leading-6 text-slate-600">
+            This page is for quiet threads, overdue replies, and gentle re-entry
+            moments. The goal is continuity and warmth, not system-heavy
+            tracking.
+          </p>
+          <p className="mt-3 text-sm leading-6 text-slate-600">
+            {memoryCoverageLine}
+          </p>
           {ambientMemorySummary?.warm_source_labels?.length ? (
             <div className="mt-3 flex flex-wrap gap-2">
               {ambientMemorySummary.warm_source_labels.map((label) => (
-                <span key={`warm-${label}`} className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800">
+                <span
+                  key={`warm-${label}`}
+                  className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800"
+                >
                   Warm: {label}
                 </span>
               ))}
@@ -2485,7 +3662,10 @@ function PipelineBoardPanel({
           {ambientMemorySummary?.quiet_source_labels?.length ? (
             <div className="mt-3 flex flex-wrap gap-2">
               {ambientMemorySummary.quiet_source_labels.map((label) => (
-                <span key={`quiet-${label}`} className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-medium text-sky-800">
+                <span
+                  key={`quiet-${label}`}
+                  className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-medium text-sky-800"
+                >
                   Quiet: {label}
                 </span>
               ))}
@@ -2494,7 +3674,10 @@ function PipelineBoardPanel({
           {ambientMemorySummary?.attention_source_labels?.length ? (
             <div className="mt-3 flex flex-wrap gap-2">
               {ambientMemorySummary.attention_source_labels.map((label) => (
-                <span key={`attention-${label}`} className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800">
+                <span
+                  key={`attention-${label}`}
+                  className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800"
+                >
                   Needs care: {label}
                 </span>
               ))}
@@ -2502,35 +3685,83 @@ function PipelineBoardPanel({
           ) : ambientMemorySummary?.paused_source_labels?.length ? (
             <div className="mt-3 flex flex-wrap gap-2">
               {ambientMemorySummary.paused_source_labels.map((label) => (
-                <span key={`paused-${label}`} className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700">
+                <span
+                  key={`paused-${label}`}
+                  className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700"
+                >
                   Paused: {label}
                 </span>
               ))}
             </div>
           ) : null}
-          {ambientMemorySummary?.suggested_action_label && ambientMemorySummary.suggested_action_route ? (
+          {ambientMemorySummary?.suggested_action_label &&
+          ambientMemorySummary.suggested_action_route ? (
             <div className="mt-3">
               <button
                 type="button"
-                onClick={() => onOpenAmbientMemoryAction(ambientMemorySummary.suggested_action_route)}
+                onClick={() =>
+                  onOpenAmbientMemoryAction(
+                    ambientMemorySummary.suggested_action_route,
+                  )
+                }
                 className="rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-700 transition hover:border-slate-400 hover:bg-white hover:text-slate-950"
               >
                 {ambientMemorySummary.suggested_action_label}
               </button>
               {ambientMemorySummary.suggested_action_note ? (
-                <p className="mt-2 text-xs leading-5 text-slate-500">{ambientMemorySummary.suggested_action_note}</p>
+                <p className="mt-2 text-xs leading-5 text-slate-500">
+                  {ambientMemorySummary.suggested_action_note}
+                </p>
               ) : null}
             </div>
           ) : null}
         </div>
-        <div className="rounded-[1.2rem] border bg-slate-50/80 px-4 py-4 lg:max-w-sm">
-          <p className="text-sm leading-6 text-slate-700">
-            <span className="font-semibold text-slate-950">{summary.reduce((total, stage) => total + stage.overdue_count, 0)}</span> relationship{summary.reduce((total, stage) => total + stage.overdue_count, 0) === 1 ? "" : "s"} need a touch,
-            {" "}
-            <span className="font-semibold text-slate-950">{summary.reduce((total, stage) => total + stage.dormant_count, 0)}</span> feel quiet,
-            {" "}
-            and <span className="font-semibold text-slate-950">{summary.reduce((total, stage) => total + stage.high_priority_count, 0)}</span> still have warm openings.
-          </p>
+        <div className="grid gap-3 lg:max-w-md lg:grid-cols-2">
+          <CompactMetricLight
+            label="Reply pressure"
+            value={`${items.filter((item) => item.recent_email_threads.some((thread) => thread.needs_reply)).length} thread${items.filter((item) => item.recent_email_threads.some((thread) => thread.needs_reply)).length === 1 ? "" : "s"}`}
+            tone={
+              items.some((item) =>
+                item.recent_email_threads.some((thread) => thread.needs_reply),
+              )
+                ? "critical"
+                : "neutral"
+            }
+          />
+          <CompactMetricLight
+            label="At risk now"
+            value={`${items.filter((item) => item.relationship_state === "at_risk").length} relationship${items.filter((item) => item.relationship_state === "at_risk").length === 1 ? "" : "s"}`}
+            tone={
+              items.some((item) => item.relationship_state === "at_risk")
+                ? "critical"
+                : "neutral"
+            }
+          />
+          <CompactMetricLight
+            label="Quiet enough to reopen"
+            value={`${items.filter((item) => item.relationship_state === "stale" || item.relationship_state === "drifting").length} relationship${items.filter((item) => item.relationship_state === "stale" || item.relationship_state === "drifting").length === 1 ? "" : "s"}`}
+            tone={
+              items.some(
+                (item) =>
+                  item.relationship_state === "stale" ||
+                  item.relationship_state === "drifting",
+              )
+                ? "warning"
+                : "neutral"
+            }
+          />
+          <CompactMetricLight
+            label="Warm openings"
+            value={`${summary.reduce((total, stage) => total + stage.high_priority_count, 0)} relationship${summary.reduce((total, stage) => total + stage.high_priority_count, 0) === 1 ? "" : "s"}`}
+            tone={
+              summary.reduce(
+                (total, stage) => total + stage.high_priority_count,
+                0,
+              )
+                ? "positive"
+                : "neutral"
+            }
+          />
         </div>
       </div>
 
@@ -2538,10 +3769,18 @@ function PipelineBoardPanel({
         <div className="mt-6 rounded-[1.5rem] border bg-slate-50/80 p-4">
           <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Gentle re-entry first</p>
-              <p className="mt-2 text-sm leading-6 text-slate-600">Start here if you want the shortest path to keeping a relationship warm before it fully slips.</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                Protect first
+              </p>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Start here if you want the shortest path to protecting a warm
+                relationship before it fully slips.
+              </p>
             </div>
-            <p className="text-xs text-slate-500">Reply pressure and quiet relationships surface before stage lanes do.</p>
+            <p className="text-xs text-slate-500">
+              Reply pressure and quiet relationships surface before stage lanes
+              do.
+            </p>
           </div>
           <div className="mt-4 grid gap-3 xl:grid-cols-2">
             {needsCareFirst.map((item) => {
@@ -2551,35 +3790,73 @@ function PipelineBoardPanel({
                 <div
                   key={`${item.id}-needs-care`}
                   className={`rounded-[1.2rem] border px-4 py-4 text-left transition ${
-                    selected ? "border-slate-900 bg-white shadow-sm" : "border-slate-200 bg-white/90 hover:border-slate-400"
+                    selected
+                      ? "border-slate-900 bg-white shadow-sm"
+                      : "border-slate-200 bg-white/90 hover:border-slate-400"
                   }`}
                 >
-                  <button type="button" onClick={() => onSelectLead(item.id)} className="block w-full text-left">
+                  <button
+                    type="button"
+                    onClick={() => onSelectLead(item.id)}
+                    className="block w-full text-left"
+                  >
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <p className="text-sm font-semibold text-slate-950">{item.lead_name}</p>
-                        <p className="mt-1 text-xs text-slate-500">{item.company_name}</p>
+                        <p className="text-sm font-semibold text-slate-950">
+                          {item.lead_name}
+                        </p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {item.company_name}
+                        </p>
                       </div>
                       <div className="flex flex-wrap gap-2">
-                        {item.relationship_state === "stale" ? <MiniFlag tone="warning" label="Stale" /> : null}
-                        {item.relationship_state === "drifting" ? <MiniFlag tone="warning" label="Drifting" /> : null}
-                        {item.relationship_state === "at_risk" ? <MiniFlag tone="critical" label="At risk" /> : null}
-                        {item.recent_email_threads.some((thread) => thread.needs_reply) ? <MiniFlag tone="critical" label="Reply" /> : null}
+                        {item.relationship_state === "stale" ? (
+                          <MiniFlag tone="warning" label="Stale" />
+                        ) : null}
+                        {item.relationship_state === "drifting" ? (
+                          <MiniFlag tone="warning" label="Drifting" />
+                        ) : null}
+                        {item.relationship_state === "at_risk" ? (
+                          <MiniFlag tone="critical" label="At risk" />
+                        ) : null}
+                        {item.recent_email_threads.some(
+                          (thread) => thread.needs_reply,
+                        ) ? (
+                          <MiniFlag tone="critical" label="Reply" />
+                        ) : null}
                       </div>
                     </div>
-                    <p className="mt-3 text-sm leading-6 text-slate-700">{item.relationship_reconnect_why_now || item.relationship_timing_nudge || item.next_step}</p>
+                    <p className="mt-3 text-sm leading-6 text-slate-700">
+                      {item.relationship_reconnect_why_now ||
+                        item.relationship_timing_nudge ||
+                        item.next_step}
+                    </p>
                     {reconnectable ? (
                       <div className="mt-3 rounded-xl border bg-slate-50 px-3 py-3">
-                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Best re-entry</p>
-                        <p className="mt-2 text-sm leading-6 text-slate-700">{item.relationship_reconnect_next_move || item.next_step}</p>
-                        <p className="mt-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Why it can still land</p>
-                        <p className="mt-2 text-sm leading-6 text-slate-700">{describeReconnectWindow(item)}</p>
-                        <p className="mt-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Starter line</p>
-                        <p className="mt-2 text-sm leading-6 text-slate-700">{buildReconnectStarterLine(item)}</p>
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+                          Best re-entry
+                        </p>
+                        <p className="mt-2 text-sm leading-6 text-slate-700">
+                          {item.relationship_reconnect_next_move ||
+                            item.next_step}
+                        </p>
+                        <p className="mt-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+                          Why it can still land
+                        </p>
+                        <p className="mt-2 text-sm leading-6 text-slate-700">
+                          {describeReconnectWindow(item)}
+                        </p>
+                        <p className="mt-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+                          Starter line
+                        </p>
+                        <p className="mt-2 text-sm leading-6 text-slate-700">
+                          {buildReconnectStarterLine(item)}
+                        </p>
                       </div>
                     ) : null}
                     <p className="mt-3 text-xs text-slate-500">
-                      {formatDateTime(item.last_meaningful_interaction_at)} · {formatStageLabel(item.stage)}
+                      {formatDateTime(item.last_meaningful_interaction_at)} ·{" "}
+                      {formatStageLabel(item.stage)}
                     </p>
                   </button>
                   <div className="mt-4 flex flex-wrap gap-2">
@@ -2616,7 +3893,9 @@ function PipelineBoardPanel({
 
       <div className="mt-6 flex gap-4 overflow-x-auto pb-2">
         {summary.map((stage) => {
-          const stageItems = [...(itemsByStage.get(stage.stage) ?? [])].sort((left, right) => compareAttentionPriority(left, right));
+          const stageItems = [...(itemsByStage.get(stage.stage) ?? [])].sort(
+            (left, right) => compareAttentionPriority(left, right),
+          );
           return (
             <section
               key={stage.stage}
@@ -2624,8 +3903,12 @@ function PipelineBoardPanel({
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Relationship lane</p>
-                  <h3 className="mt-2 text-xl font-semibold tracking-tight text-slate-950">{stage.stage}</h3>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                    Continuity lane
+                  </p>
+                  <h3 className="mt-2 text-xl font-semibold tracking-tight text-slate-950">
+                    {stage.stage}
+                  </h3>
                 </div>
                 <div className="rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-semibold text-slate-700">
                   {stage.lead_count}
@@ -2633,10 +3916,22 @@ function PipelineBoardPanel({
               </div>
 
               <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                <TimelineTile label="Needs a touch" value={String(stage.overdue_count)} />
-                <TimelineTile label="Due soon" value={String(stage.due_this_week_count)} />
-                <TimelineTile label="Openings" value={String(stage.high_priority_count)} />
-                <TimelineTile label="Quiet" value={String(stage.dormant_count)} />
+                <TimelineTile
+                  label="Needs a touch"
+                  value={String(stage.overdue_count)}
+                />
+                <TimelineTile
+                  label="Due soon"
+                  value={String(stage.due_this_week_count)}
+                />
+                <TimelineTile
+                  label="Openings"
+                  value={String(stage.high_priority_count)}
+                />
+                <TimelineTile
+                  label="Quiet"
+                  value={String(stage.dormant_count)}
+                />
               </div>
 
               <div className="mt-4 space-y-3">
@@ -2655,22 +3950,45 @@ function PipelineBoardPanel({
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <p className="text-sm font-semibold text-slate-950">{item.lead_name}</p>
-                          <p className="mt-1 text-xs text-slate-500">{item.company_name}</p>
+                          <p className="text-sm font-semibold text-slate-950">
+                            {item.lead_name}
+                          </p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            {item.company_name}
+                          </p>
                         </div>
                         <div className="flex flex-wrap gap-2">
-                          {item.relationship_state === "stale" ? <MiniFlag tone="warning" label="Stale" /> : null}
-                          {item.relationship_state === "drifting" ? <MiniFlag tone="warning" label="Drifting" /> : null}
-                          {item.relationship_state === "at_risk" ? <MiniFlag tone="critical" label="At risk" /> : null}
+                          {item.relationship_state === "stale" ? (
+                            <MiniFlag tone="warning" label="Stale" />
+                          ) : null}
+                          {item.relationship_state === "drifting" ? (
+                            <MiniFlag tone="warning" label="Drifting" />
+                          ) : null}
+                          {item.relationship_state === "at_risk" ? (
+                            <MiniFlag tone="critical" label="At risk" />
+                          ) : null}
                           <PriorityBadge priority={item.priority} />
                         </div>
                       </div>
-                      <p className="mt-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Needs attention by</p>
-                      <p className="mt-1 text-sm text-slate-700">{formatDateTime(item.next_follow_up_at)}</p>
-                      <p className="mt-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Best next touch</p>
-                      <p className="mt-1 text-sm leading-6 text-slate-600">{isReconnectMoment(item) ? item.relationship_reconnect_next_move || item.next_step : item.next_step}</p>
+                      <p className="mt-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+                        Needs attention by
+                      </p>
+                      <p className="mt-1 text-sm text-slate-700">
+                        {formatDateTime(item.next_follow_up_at)}
+                      </p>
+                      <p className="mt-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+                        Best next touch
+                      </p>
+                      <p className="mt-1 text-sm leading-6 text-slate-600">
+                        {isReconnectMoment(item)
+                          ? item.relationship_reconnect_next_move ||
+                            item.next_step
+                          : item.next_step}
+                      </p>
                       {isReconnectMoment(item) ? (
-                        <p className="mt-3 text-sm leading-6 text-slate-600">{buildReconnectStarterLine(item)}</p>
+                        <p className="mt-3 text-sm leading-6 text-slate-600">
+                          {buildReconnectStarterLine(item)}
+                        </p>
                       ) : null}
                     </button>
                   );
@@ -2693,6 +4011,7 @@ function InboxActivityPanel({
   inboxFilter,
   onInboxQueryChange,
   onInboxFilterChange,
+  effectiveInboxQuery,
 }: {
   items: CRMLeadFollowUp[];
   selectedLeadId: string | null;
@@ -2711,6 +4030,7 @@ function InboxActivityPanel({
   inboxFilter: InboxFilter;
   onInboxQueryChange: (value: string) => void;
   onInboxFilterChange: (value: InboxFilter) => void;
+  effectiveInboxQuery: string;
 }) {
   const threads = items
     .flatMap((item) =>
@@ -2722,21 +4042,45 @@ function InboxActivityPanel({
         thread,
       })),
     )
-    .sort((left, right) => new Date(right.thread.last_message_at).getTime() - new Date(left.thread.last_message_at).getTime());
-  const filteredThreads = threads.filter((item) => matchesInboxThread(item, inboxQuery, inboxFilter));
-  const urgentThreads = filteredThreads.filter(({ thread }) => thread.needs_reply || thread.waiting_on_contact || isQuietThread(thread));
-  const steadyThreads = filteredThreads.filter(({ thread }) => !(thread.needs_reply || thread.waiting_on_contact || isQuietThread(thread)));
+    .sort(
+      (left, right) =>
+        new Date(right.thread.last_message_at).getTime() -
+        new Date(left.thread.last_message_at).getTime(),
+    );
+  const filteredThreads = threads.filter((item) =>
+    matchesInboxThread(item, effectiveInboxQuery, inboxFilter),
+  );
+  const urgentThreads = filteredThreads.filter(
+    ({ thread }) =>
+      thread.needs_reply ||
+      thread.waiting_on_contact ||
+      isQuietThread(thread) ||
+      isUnresolvedThread(thread),
+  );
+  const steadyThreads = filteredThreads.filter(
+    ({ thread }) =>
+      !(
+        thread.needs_reply ||
+        thread.waiting_on_contact ||
+        isQuietThread(thread) ||
+        isUnresolvedThread(thread)
+      ),
+  );
 
   return (
     <section className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm">
-      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Relationship activity</p>
-      <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Recent conversations Brivoly is quietly holding together.</h2>
+      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+        Inbox continuity
+      </p>
+      <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
+        Recent conversations Brivoly is quietly holding together.
+      </h2>
       <div className="mt-5 rounded-[1.35rem] border bg-slate-50/80 p-4">
         <div className="grid gap-3 lg:grid-cols-[1.2fr_auto] lg:items-center">
           <input
             value={inboxQuery}
             onChange={(event) => onInboxQueryChange(event.target.value)}
-            placeholder="Search by name, company, subject, or email"
+            placeholder="Search by name, company, subject, email, or open loop"
             className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400"
           />
           <div className="flex flex-wrap gap-2">
@@ -2745,6 +4089,8 @@ function InboxActivityPanel({
               { value: "reply", label: "Reply soon" },
               { value: "waiting", label: "Waiting" },
               { value: "quiet", label: "Quiet" },
+              { value: "unresolved", label: "Open loop" },
+              { value: "long_thread", label: "Long thread" },
             ].map((item) => (
               <button
                 key={item.value}
@@ -2767,14 +4113,29 @@ function InboxActivityPanel({
           <div>
             <div className="flex items-end justify-between gap-3">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Needs you now</p>
-                <p className="mt-2 text-sm leading-6 text-slate-600">These threads are waiting on you, starting to drift, or worth reopening before the relationship loses warmth.</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                  Needs you now
+                </p>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  These threads are waiting on you, carrying an open loop,
+                  starting to drift, or worth reopening before the relationship
+                  loses warmth.
+                </p>
               </div>
-              <p className="text-xs text-slate-500">{urgentThreads.length} conversation{urgentThreads.length === 1 ? "" : "s"}</p>
+              <p className="text-xs text-slate-500">
+                {urgentThreads.length} conversation
+                {urgentThreads.length === 1 ? "" : "s"}
+              </p>
             </div>
             <div className="mt-4 space-y-4">
               {urgentThreads.map((item) => (
-                <InboxThreadCard key={item.thread.thread_id} item={item} selected={item.leadId === selectedLeadId} onSelectLead={onSelectLead} onDraftAction={onDraftAction} />
+                <InboxThreadCard
+                  key={item.thread.thread_id}
+                  item={item}
+                  selected={item.leadId === selectedLeadId}
+                  onSelectLead={onSelectLead}
+                  onDraftAction={onDraftAction}
+                />
               ))}
             </div>
           </div>
@@ -2783,21 +4144,37 @@ function InboxActivityPanel({
           <div>
             <div className="flex items-end justify-between gap-3">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Still warm</p>
-                <p className="mt-2 text-sm leading-6 text-slate-600">Brivoly is holding onto the context here so you can step back in without rereading the whole thread.</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                  Still warm
+                </p>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  Brivoly is holding onto the context here so you can step back
+                  in without rereading the whole thread.
+                </p>
               </div>
-              <p className="text-xs text-slate-500">{steadyThreads.length} conversation{steadyThreads.length === 1 ? "" : "s"}</p>
+              <p className="text-xs text-slate-500">
+                {steadyThreads.length} conversation
+                {steadyThreads.length === 1 ? "" : "s"}
+              </p>
             </div>
             <div className="mt-4 space-y-4">
               {steadyThreads.map((item) => (
-                <InboxThreadCard key={item.thread.thread_id} item={item} selected={item.leadId === selectedLeadId} onSelectLead={onSelectLead} onDraftAction={onDraftAction} />
+                <InboxThreadCard
+                  key={item.thread.thread_id}
+                  item={item}
+                  selected={item.leadId === selectedLeadId}
+                  onSelectLead={onSelectLead}
+                  onDraftAction={onDraftAction}
+                />
               ))}
             </div>
           </div>
         ) : null}
         {!filteredThreads.length ? (
           <div className="rounded-[1.35rem] border border-dashed bg-slate-50/70 p-6 text-sm leading-6 text-slate-600">
-            No conversations match this view yet. Once inbox sync is flowing, this becomes the quiet memory layer for who said what and who needs a reply.
+            No conversations match this view yet. Once inbox sync is flowing,
+            this becomes the quiet memory layer for who said what and who needs
+            a reply.
           </div>
         ) : null}
       </div>
@@ -2836,30 +4213,71 @@ function InboxThreadCard({
   return (
     <div
       className={`block w-full rounded-[1.35rem] border px-5 py-5 text-left transition ${
-        selected ? "border-slate-900 bg-white shadow-sm" : "bg-slate-50/80 hover:border-slate-400 hover:bg-white"
+        selected
+          ? "border-slate-900 bg-white shadow-sm"
+          : "bg-slate-50/80 hover:border-slate-400 hover:bg-white"
       }`}
     >
-      <button type="button" onClick={() => onSelectLead(leadId, thread.thread_id)} className="block w-full text-left">
+      <button
+        type="button"
+        onClick={() => onSelectLead(leadId, thread.thread_id)}
+        className="block w-full text-left"
+      >
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-              {formatStageLabel(stage)} · {thread.last_message_direction === "inbound" ? "Needs your reply" : "Waiting on them"}
+              {formatStageLabel(stage)} ·{" "}
+              {thread.last_message_direction === "inbound"
+                ? "Needs your reply"
+                : "Waiting on them"}
             </p>
-            <h3 className="mt-2 text-xl font-semibold tracking-tight text-slate-950">{thread.subject}</h3>
+            <h3 className="mt-2 text-xl font-semibold tracking-tight text-slate-950">
+              {thread.subject}
+            </h3>
             <p className="mt-1 text-sm text-slate-600">
               {leadName} · {companyName}
             </p>
-            <p className="mt-3 text-sm font-medium text-slate-900">{thread.relationship_pulse}</p>
-            {thread.continuity_memory ? <p className="mt-2 text-sm leading-6 text-slate-700">{thread.continuity_memory}</p> : null}
-            <p className="mt-2 text-sm leading-6 text-slate-600">{thread.continuity_span}</p>
-            <p className="mt-3 text-sm leading-6 text-slate-600">{thread.memory_summary}</p>
-            {thread.carry_forward_hint ? <p className="mt-3 text-sm leading-6 text-slate-700">{thread.carry_forward_hint}</p> : null}
-            {thread.unresolved_hint ? <p className="mt-3 text-sm leading-6 text-slate-700">{thread.unresolved_hint}</p> : null}
+            <p className="mt-3 text-sm font-medium text-slate-900">
+              {thread.relationship_pulse}
+            </p>
+            {thread.continuity_memory ? (
+              <p className="mt-2 text-sm leading-6 text-slate-700">
+                {thread.continuity_memory}
+              </p>
+            ) : null}
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              {thread.continuity_span}
+            </p>
+            <p className="mt-3 text-sm leading-6 text-slate-600">
+              {thread.memory_summary}
+            </p>
+            {thread.carry_forward_hint ? (
+              <p className="mt-3 text-sm leading-6 text-slate-700">
+                {thread.carry_forward_hint}
+              </p>
+            ) : null}
+            {thread.unresolved_hint ? (
+              <p className="mt-3 text-sm leading-6 text-slate-700">
+                {thread.unresolved_hint}
+              </p>
+            ) : null}
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {thread.needs_reply ? <MiniFlag tone="critical" label="Reply" /> : null}
-            {thread.waiting_on_contact ? <MiniFlag tone="warning" label="Waiting" /> : null}
-            {isQuietThread(thread) ? <MiniFlag tone="neutral" label="Quiet" /> : null}
+            {thread.needs_reply ? (
+              <MiniFlag tone="critical" label="Reply" />
+            ) : null}
+            {thread.waiting_on_contact ? (
+              <MiniFlag tone="warning" label="Waiting" />
+            ) : null}
+            {isQuietThread(thread) ? (
+              <MiniFlag tone="neutral" label="Quiet" />
+            ) : null}
+            {isUnresolvedThread(thread) ? (
+              <MiniFlag tone="warning" label="Open loop" />
+            ) : null}
+            {isLongThread(thread) ? (
+              <MiniFlag tone="neutral" label="Long thread" />
+            ) : null}
             <div className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">
               {thread.message_count} msg
             </div>
@@ -2868,8 +4286,14 @@ function InboxThreadCard({
         <div className="mt-4 grid gap-3 lg:grid-cols-2">
           <TimelineTile label="Brivoly read" value={thread.next_touch_hint} />
           <TimelineTile label="Open loop" value={thread.open_loop} />
-          <TimelineTile label="What changed" value={thread.recent_change_hint} />
-          <TimelineTile label="Last turn" value={formatDateTime(thread.last_message_at)} />
+          <TimelineTile
+            label="What changed"
+            value={thread.recent_change_hint}
+          />
+          <TimelineTile
+            label="Last turn"
+            value={formatDateTime(thread.last_message_at)}
+          />
         </div>
       </button>
       <div className="mt-4 flex flex-wrap gap-3">
@@ -2890,7 +4314,7 @@ function InboxThreadCard({
                     objective: "revive",
                     tone: "warm",
                     length: "short",
-                  status: "Drafting a reconnect from Inbox...",
+                    status: "Drafting a reconnect from Inbox...",
                   },
               thread.thread_id,
             );
@@ -2898,6 +4322,26 @@ function InboxThreadCard({
         >
           {thread.needs_reply ? "Draft reply" : "Draft reconnect"}
         </Button>
+        {isUnresolvedThread(thread) ? (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              onDraftAction(
+                leadId,
+                {
+                  objective: "close_loop",
+                  tone: "direct",
+                  length: "short",
+                  status: "Drafting a close-the-loop note from Inbox...",
+                },
+                thread.thread_id,
+              );
+            }}
+          >
+            Close loop
+          </Button>
+        ) : null}
         <Button
           type="button"
           variant="outline"
@@ -2919,19 +4363,27 @@ function InboxNextMovePanel({
   draftStatus,
 }: {
   lead: CRMLeadFollowUp;
-  onDraftAction: (draft: {
-    objective: CRMEmailDraft["objective"];
-    tone: CRMEmailDraft["tone"];
-    length: CRMEmailDraft["length"];
-    status: string;
-  }, threadId?: string | null) => void;
+  onDraftAction: (
+    draft: {
+      objective: CRMEmailDraft["objective"];
+      tone: CRMEmailDraft["tone"];
+      length: CRMEmailDraft["length"];
+      status: string;
+    },
+    threadId?: string | null,
+  ) => void;
   isDrafting: boolean;
   draftStatus: string | null;
 }) {
-  const latestThread = [...lead.recent_email_threads].sort(
-    (left, right) => new Date(right.last_message_at).getTime() - new Date(left.last_message_at).getTime(),
-  )[0] ?? null;
-  const quietReconnect = latestThread ? isQuietThread(latestThread) && !latestThread.needs_reply : false;
+  const latestThread =
+    [...lead.recent_email_threads].sort(
+      (left, right) =>
+        new Date(right.last_message_at).getTime() -
+        new Date(left.last_message_at).getTime(),
+    )[0] ?? null;
+  const quietReconnect = latestThread
+    ? isQuietThread(latestThread) && !latestThread.needs_reply
+    : false;
   const shouldReconnect = quietReconnect || isReconnectMoment(lead);
   const primaryAction = shouldReconnect
     ? {
@@ -2955,58 +4407,120 @@ function InboxNextMovePanel({
 
   return (
     <section className="mt-6 rounded-[1.4rem] border bg-white p-5 shadow-sm">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Next move</p>
-      <h3 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">{lead.lead_name}</h3>
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+        Next move
+      </p>
+      <h3 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+        {lead.lead_name}
+      </h3>
       <p className="mt-1 text-sm text-slate-600">{lead.company_name}</p>
       <div className="mt-4 grid gap-3 md:grid-cols-2">
-        <TimelineTile label="Brivoly read" value={latestThread ? latestThread.next_touch_hint : "No synced thread yet"} />
+        <TimelineTile
+          label="Brivoly read"
+          value={
+            latestThread ? latestThread.next_touch_hint : "No synced thread yet"
+          }
+        />
         <TimelineTile
           label="Recommended next touch"
           value={
             lead.relationship_upload_follow_through_hint ||
-            (shouldReconnect ? lead.relationship_reconnect_next_move || lead.next_step : lead.next_step)
+            (shouldReconnect
+              ? lead.relationship_reconnect_next_move || lead.next_step
+              : lead.next_step)
           }
         />
       </div>
       {latestThread ? (
         <div className="mt-4 rounded-[1.2rem] border bg-slate-50/80 px-4 py-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Latest thread</p>
-          <p className="mt-2 text-sm font-medium text-slate-900">{latestThread.subject}</p>
-          <p className="mt-2 text-sm font-medium text-slate-900">{latestThread.relationship_pulse}</p>
-          {latestThread.continuity_memory ? <p className="mt-2 text-sm leading-6 text-slate-700">{latestThread.continuity_memory}</p> : null}
-          <p className="mt-2 text-sm leading-6 text-slate-600">{latestThread.continuity_span}</p>
-          <p className="mt-2 text-sm leading-6 text-slate-600">{latestThread.memory_summary}</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+            Latest thread
+          </p>
+          <p className="mt-2 text-sm font-medium text-slate-900">
+            {latestThread.subject}
+          </p>
+          <p className="mt-2 text-sm font-medium text-slate-900">
+            {latestThread.relationship_pulse}
+          </p>
+          {latestThread.continuity_memory ? (
+            <p className="mt-2 text-sm leading-6 text-slate-700">
+              {latestThread.continuity_memory}
+            </p>
+          ) : null}
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            {latestThread.continuity_span}
+          </p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            {latestThread.memory_summary}
+          </p>
         </div>
       ) : null}
-      {latestThread?.continuity_memory || latestThread?.recent_change_hint || latestThread?.carry_forward_hint || latestThread?.open_loop ? (
+      {latestThread?.continuity_memory ||
+      latestThread?.recent_change_hint ||
+      latestThread?.carry_forward_hint ||
+      latestThread?.open_loop ? (
         <div className="mt-4 rounded-[1.2rem] border bg-slate-50/80 px-4 py-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Conversation memory</p>
-          {latestThread?.continuity_memory ? <p className="mt-2 text-sm leading-6 text-slate-600">{latestThread.continuity_memory}</p> : null}
-          {latestThread?.recent_change_hint ? <p className="mt-2 text-sm leading-6 text-slate-600">{latestThread.recent_change_hint}</p> : null}
-          {latestThread?.carry_forward_hint ? <p className="mt-2 text-sm leading-6 text-slate-700">{latestThread.carry_forward_hint}</p> : null}
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+            Conversation memory
+          </p>
+          {latestThread?.continuity_memory ? (
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              {latestThread.continuity_memory}
+            </p>
+          ) : null}
+          {latestThread?.recent_change_hint ? (
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              {latestThread.recent_change_hint}
+            </p>
+          ) : null}
+          {latestThread?.carry_forward_hint ? (
+            <p className="mt-2 text-sm leading-6 text-slate-700">
+              {latestThread.carry_forward_hint}
+            </p>
+          ) : null}
           {latestThread?.open_loop ? (
             <div className="mt-3 rounded-2xl border bg-white px-4 py-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Open loop</p>
-              <p className="mt-2 text-sm leading-6 text-slate-700">{latestThread.open_loop}</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+                Open loop
+              </p>
+              <p className="mt-2 text-sm leading-6 text-slate-700">
+                {latestThread.open_loop}
+              </p>
             </div>
           ) : null}
         </div>
       ) : null}
       {latestThread?.unresolved_hint ? (
         <div className="mt-4 rounded-[1.2rem] border bg-slate-50/80 px-4 py-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Still unresolved</p>
-          <p className="mt-2 text-sm leading-6 text-slate-600">{latestThread.unresolved_hint}</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+            Still unresolved
+          </p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            {latestThread.unresolved_hint}
+          </p>
         </div>
       ) : null}
       {lead.relationship_recent_upload_summary ? (
         <div className="mt-4 rounded-[1.2rem] border bg-slate-50/80 px-4 py-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Fresh client context</p>
-          <p className="mt-2 text-sm leading-6 text-slate-600">{lead.relationship_recent_upload_summary}</p>
-          {lead.relationship_upload_follow_through_hint ? <p className="mt-3 text-sm leading-6 text-slate-700">{lead.relationship_upload_follow_through_hint}</p> : null}
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+            Fresh client context
+          </p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            {lead.relationship_recent_upload_summary}
+          </p>
+          {lead.relationship_upload_follow_through_hint ? (
+            <p className="mt-3 text-sm leading-6 text-slate-700">
+              {lead.relationship_upload_follow_through_hint}
+            </p>
+          ) : null}
           {lead.relationship_meeting_prep_summary ? (
             <div className="mt-3 rounded-2xl border bg-white px-4 py-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Use it in the next touch</p>
-              <p className="mt-2 text-sm leading-6 text-slate-700">{lead.relationship_meeting_prep_summary}</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+                Use it in the next touch
+              </p>
+              <p className="mt-2 text-sm leading-6 text-slate-700">
+                {lead.relationship_meeting_prep_summary}
+              </p>
             </div>
           ) : null}
           <div className="mt-4 flex flex-wrap gap-3">
@@ -3015,41 +4529,67 @@ function InboxNextMovePanel({
               variant="outline"
               disabled={isDrafting}
               onClick={() =>
-              onDraftAction({
-                  objective: shouldReconnect ? "revive" : "follow_up",
-                  tone: "warm",
-                  length: "short",
-                  status: shouldReconnect ? "Drafting a reconnect from fresh client context..." : "Drafting a reply from fresh client context...",
-                }, latestThread?.thread_id ?? null)
+                onDraftAction(
+                  {
+                    objective: shouldReconnect ? "revive" : "follow_up",
+                    tone: "warm",
+                    length: "short",
+                    status: shouldReconnect
+                      ? "Drafting a reconnect from fresh client context..."
+                      : "Drafting a reply from fresh client context...",
+                  },
+                  latestThread?.thread_id ?? null,
+                )
               }
             >
-              {shouldReconnect ? "Turn this into a reconnect" : "Turn this into a note"}
+              {shouldReconnect
+                ? "Turn this into a reconnect"
+                : "Turn this into a note"}
             </Button>
           </div>
         </div>
       ) : null}
       {shouldReconnect ? (
         <div className="mt-4 rounded-[1.2rem] border bg-slate-50/80 px-4 py-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Gentle re-entry</p>
-          <p className="mt-2 text-sm leading-6 text-slate-600">{lead.relationship_reconnect_why_now || lead.relationship_timing_nudge}</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+            Gentle re-entry
+          </p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            {lead.relationship_reconnect_why_now ||
+              lead.relationship_timing_nudge}
+          </p>
           {lead.relationship_reconnect_next_move ? (
             <div className="mt-3 rounded-2xl border bg-white px-4 py-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Next move</p>
-              <p className="mt-2 text-sm leading-6 text-slate-700">{lead.relationship_reconnect_next_move}</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+                Next move
+              </p>
+              <p className="mt-2 text-sm leading-6 text-slate-700">
+                {lead.relationship_reconnect_next_move}
+              </p>
             </div>
           ) : null}
-          <p className="mt-3 text-sm leading-6 text-slate-700">{lead.relationship_reconnect_message_hint || "Keep it warm, brief, and easy to answer."}</p>
+          <p className="mt-3 text-sm leading-6 text-slate-700">
+            {lead.relationship_reconnect_message_hint ||
+              "Keep it warm, brief, and easy to answer."}
+          </p>
         </div>
       ) : null}
       <div className="mt-4 flex flex-wrap gap-3">
-        <Button disabled={isDrafting} onClick={() => onDraftAction(primaryAction.draft, latestThread?.thread_id ?? null)}>
+        <Button
+          disabled={isDrafting}
+          onClick={() =>
+            onDraftAction(primaryAction.draft, latestThread?.thread_id ?? null)
+          }
+        >
           {isDrafting ? "Drafting..." : primaryAction.label}
         </Button>
         <Button asChild variant="outline">
           <Link href="/clientos/follow-ups">Open relationship</Link>
         </Button>
       </div>
-      {draftStatus ? <p className="mt-4 text-sm text-slate-500">{draftStatus}</p> : null}
+      {draftStatus ? (
+        <p className="mt-4 text-sm text-slate-500">{draftStatus}</p>
+      ) : null}
     </section>
   );
 }
@@ -3080,56 +4620,84 @@ function RemoteImageCapturePanel({
       await navigator.clipboard.writeText(value);
       setShareStatus(successMessage);
     } catch {
-      setShareStatus("Copy did not work in this browser. You can still copy the link manually.");
+      setShareStatus(
+        "Copy did not work in this browser. You can still copy the link manually.",
+      );
     }
   }
 
   return (
     <section className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm">
-      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Client dropzone</p>
-      <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Give clients an easy place to send updates.</h2>
+      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+        Client dropzone
+      </p>
+      <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
+        Give clients an easy place to send updates.
+      </h2>
       <p className="mt-3 text-sm leading-6 text-slate-600">
-        Brivoly gives you one simple no-login page for screenshots, whiteboard photos, and note images. Save the defaults once, then reuse the same link whenever something changes.
+        Brivoly gives you one simple no-login page for screenshots, whiteboard
+        photos, and note images. Save the defaults once, then reuse the same
+        link whenever something changes.
       </p>
 
       {!advancedAiUnlocked ? (
         <div className="mt-5 rounded-[1.3rem] border border-amber-200 bg-amber-50 px-4 py-4 text-sm leading-6 text-amber-900">
-          Shared image capture uses the same paid AI layer as advanced spreadsheet and file interpretation.
+          Shared image capture uses the same paid AI layer as advanced
+          spreadsheet and file interpretation.
         </div>
       ) : null}
 
       <div className="mt-5 grid gap-4 md:grid-cols-2">
         <div className="rounded-[1.3rem] border bg-slate-50 px-4 py-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">What clients can send</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+            What clients can send
+          </p>
           <p className="mt-2 text-sm leading-6 text-slate-700">
-            Screenshot updates, whiteboard photos, handwritten notes, or other quick visual context that would otherwise get lost in text threads.
+            Screenshot updates, whiteboard photos, handwritten notes, or other
+            quick visual context that would otherwise get lost in text threads.
           </p>
         </div>
         <div className="rounded-[1.3rem] border bg-slate-50 px-4 py-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">What Brivoly does next</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+            What Brivoly does next
+          </p>
           <p className="mt-2 text-sm leading-6 text-slate-700">
-            Brivoly attaches the update to the right relationship memory so you can reopen the context later without hunting through email or messages.
+            Brivoly attaches the update to the right relationship memory so you
+            can reopen the context later without hunting through email or
+            messages.
           </p>
         </div>
       </div>
 
       <div className="mt-5 rounded-[1.3rem] border bg-slate-50 px-4 py-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Ready to share</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+          Ready to share
+        </p>
         <p className="mt-2 text-sm font-medium text-slate-900">
-          {intakeChannel?.magic_link_url ? "Your client link is ready." : "The client link is not ready yet."}
+          {intakeChannel?.magic_link_url
+            ? "Your client link is ready."
+            : "The client link is not ready yet."}
         </p>
         <p className="mt-2 text-sm leading-6 text-slate-600">
-          {intakeChannel?.instructions ?? "Turn this on once so clients have a phone-friendly page they can keep using whenever something changes."}
+          {intakeChannel?.instructions ??
+            "Turn this on once so clients have a phone-friendly page they can keep using whenever something changes."}
         </p>
         {normalizedChannels.length ? (
           <p className="mt-3 text-sm text-slate-700">
-            Usual ways clients send updates here: <span className="font-medium">{normalizedChannels.join(", ")}</span>
+            Usual ways clients send updates here:{" "}
+            <span className="font-medium">{normalizedChannels.join(", ")}</span>
           </p>
         ) : null}
-        {routingNotes ? <p className="mt-2 text-sm leading-6 text-slate-600">{routingNotes}</p> : null}
+        {routingNotes ? (
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            {routingNotes}
+          </p>
+        ) : null}
         {intakeChannel?.magic_link_url ? (
           <>
-            <p className="mt-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Client upload link</p>
+            <p className="mt-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+              Client upload link
+            </p>
             <a
               href={intakeChannel.magic_link_url}
               target="_blank"
@@ -3139,15 +4707,29 @@ function RemoteImageCapturePanel({
               {intakeChannel.magic_link_url}
             </a>
             <div className="mt-4 flex flex-wrap gap-2">
-              <Button type="button" variant="outline" onClick={() => copyText(shareLink, "Client link copied.")}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => copyText(shareLink, "Client link copied.")}
+              >
                 Copy link
               </Button>
-              <Button type="button" variant="outline" onClick={() => copyText(shareMessage, "Client share note copied.")}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() =>
+                  copyText(shareMessage, "Client share note copied.")
+                }
+              >
                 Copy share note
               </Button>
             </div>
-            <p className="mt-3 text-xs text-slate-500">Share the link once, then keep reusing it. No login is required.</p>
-            {shareStatus ? <p className="mt-2 text-sm text-slate-600">{shareStatus}</p> : null}
+            <p className="mt-3 text-xs text-slate-500">
+              Share the link once, then keep reusing it. No login is required.
+            </p>
+            {shareStatus ? (
+              <p className="mt-2 text-sm text-slate-600">{shareStatus}</p>
+            ) : null}
           </>
         ) : null}
       </div>
@@ -3156,16 +4738,43 @@ function RemoteImageCapturePanel({
 }
 
 function IntakeTaskNav({ activeTask }: { activeTask: CRMIntakeTask }) {
-  const items: Array<{ href: string; title: string; body: string; task: CRMIntakeTask }> = [
-    { href: "/clientos/intake", title: "Overview", body: "See the default flow at a glance.", task: "hub" },
-    { href: "/clientos/intake/profile", title: "Usual formats", body: "Show what clients usually send.", task: "profile" },
-    { href: "/clientos/intake/routing", title: "Usual path", body: "Choose the easiest way in once.", task: "routing" },
-    { href: "/clientos/intake/capture", title: "Share link", body: "Keep one phone-friendly page ready.", task: "capture" },
+  const items: Array<{
+    href: string;
+    title: string;
+    body: string;
+    task: CRMIntakeTask;
+  }> = [
+    {
+      href: "/clientos/intake",
+      title: "Overview",
+      body: "See the default flow at a glance.",
+      task: "hub",
+    },
+    {
+      href: "/clientos/intake/profile",
+      title: "Usual formats",
+      body: "Show what clients usually send.",
+      task: "profile",
+    },
+    {
+      href: "/clientos/intake/routing",
+      title: "Usual path",
+      body: "Choose the easiest way in once.",
+      task: "routing",
+    },
+    {
+      href: "/clientos/intake/capture",
+      title: "Share link",
+      body: "Keep one phone-friendly page ready.",
+      task: "capture",
+    },
   ];
 
   return (
     <section className="rounded-[1.75rem] border bg-white/90 p-5 shadow-sm">
-      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Client dropzone</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+        Client dropzone
+      </p>
       <div className="mt-4 grid gap-3 md:grid-cols-2">
         {items.map((item) => {
           const active = item.task === activeTask;
@@ -3174,11 +4783,21 @@ function IntakeTaskNav({ activeTask }: { activeTask: CRMIntakeTask }) {
               key={item.href}
               href={item.href}
               className={`rounded-[1.2rem] border px-4 py-4 transition ${
-                active ? "border-slate-900 bg-slate-950 text-white" : "bg-slate-50/80 hover:border-slate-400 hover:bg-white"
+                active
+                  ? "border-slate-900 bg-slate-950 text-white"
+                  : "bg-slate-50/80 hover:border-slate-400 hover:bg-white"
               }`}
             >
-              <p className={`text-xs font-semibold uppercase tracking-[0.18em] ${active ? "text-cyan-200" : "text-slate-400"}`}>{item.title}</p>
-              <p className={`mt-2 text-sm leading-6 ${active ? "text-slate-100" : "text-slate-700"}`}>{item.body}</p>
+              <p
+                className={`text-xs font-semibold uppercase tracking-[0.18em] ${active ? "text-cyan-200" : "text-slate-400"}`}
+              >
+                {item.title}
+              </p>
+              <p
+                className={`mt-2 text-sm leading-6 ${active ? "text-slate-100" : "text-slate-700"}`}
+              >
+                {item.body}
+              </p>
             </Link>
           );
         })}
@@ -3204,19 +4823,31 @@ function IntakeTaskHub({
         href="/clientos/intake/profile"
         eyebrow="First"
         title="Show the kinds of updates you usually get"
-        body={advancedAiUnlocked ? "Your AI memory defaults are ready. Keep them close to what clients actually send." : "Unlock the paid AI layer before relying on note images and messy files to carry client context back in."}
+        body={
+          advancedAiUnlocked
+            ? "Your AI memory defaults are ready. Keep them close to what clients actually send."
+            : "Unlock the paid AI layer before relying on note images and messy files to carry client context back in."
+        }
       />
       <TaskSummaryCard
         href="/clientos/intake/routing"
         eyebrow="Next"
         title="Choose the easiest path"
-        body={normalizedChannels.length ? `Usual paths are ready: ${normalizedChannels.join(", ")}.` : "Set one path and one short note so sending updates feels obvious."}
+        body={
+          normalizedChannels.length
+            ? `Usual paths are ready: ${normalizedChannels.join(", ")}.`
+            : "Set one path and one short note so sending updates feels obvious."
+        }
       />
       <TaskSummaryCard
         href="/clientos/intake/capture"
         eyebrow="Then"
         title="Share the update link"
-        body={hasMagicLink ? "A signed no-login page is live and ready to reuse with clients." : "Turn this on once so clients can send updates from their phone without friction."}
+        body={
+          hasMagicLink
+            ? "A signed no-login page is live and ready to reuse with clients."
+            : "Turn this on once so clients can send updates from their phone without friction."
+        }
       />
     </section>
   );
@@ -3234,10 +4865,19 @@ function TaskSummaryCard({
   body: string;
 }) {
   return (
-    <Link href={href} className="block min-w-0 overflow-hidden rounded-[1.75rem] border bg-white/90 p-6 shadow-sm transition hover:border-slate-400 hover:bg-white">
-      <p className="break-words text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 [overflow-wrap:anywhere] sm:tracking-[0.24em]">{eyebrow}</p>
-      <h3 className="mt-3 break-words text-2xl font-semibold tracking-tight text-slate-950 [overflow-wrap:anywhere]">{title}</h3>
-      <p className="mt-3 break-words text-sm leading-6 text-slate-600 [overflow-wrap:anywhere]">{body}</p>
+    <Link
+      href={href}
+      className="block min-w-0 overflow-hidden rounded-[1.75rem] border bg-white/90 p-6 shadow-sm transition hover:border-slate-400 hover:bg-white"
+    >
+      <p className="break-words text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 [overflow-wrap:anywhere] sm:tracking-[0.24em]">
+        {eyebrow}
+      </p>
+      <h3 className="mt-3 break-words text-2xl font-semibold tracking-tight text-slate-950 [overflow-wrap:anywhere]">
+        {title}
+      </h3>
+      <p className="mt-3 break-words text-sm leading-6 text-slate-600 [overflow-wrap:anywhere]">
+        {body}
+      </p>
     </Link>
   );
 }
@@ -3263,15 +4903,22 @@ function IntakeRoutingPanel({
 }) {
   return (
     <section className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm">
-      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Usual path</p>
-      <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Set the easiest path once.</h2>
+      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+        Usual path
+      </p>
+      <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
+        Set the easiest path once.
+      </h2>
       <p className="mt-3 text-sm leading-6 text-slate-600">
-        Keep this simple: choose the usual paths for this account and leave one short note so every new update lands in the right place.
+        Keep this simple: choose the usual paths for this account and leave one
+        short note so every new update lands in the right place.
       </p>
 
       <div className="mt-5 space-y-4">
         <label className="block">
-          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Usual ways in</span>
+          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+            Usual ways in
+          </span>
           <input
             value={channelsDraft}
             onChange={(event) => onChannelsDraftChange(event.target.value)}
@@ -3293,8 +4940,14 @@ function IntakeRoutingPanel({
             Use recommended path
           </button>
           {[
-            { label: "Shared link + email", value: "upload, magic_link, email" },
-            { label: "Shared link + WhatsApp", value: "upload, magic_link, whatsapp" },
+            {
+              label: "Shared link + email",
+              value: "upload, magic_link, email",
+            },
+            {
+              label: "Shared link + WhatsApp",
+              value: "upload, magic_link, whatsapp",
+            },
           ].map((preset) => (
             <button
               key={preset.label}
@@ -3318,7 +4971,9 @@ function IntakeRoutingPanel({
           </button>
         </div>
         <label className="block">
-          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">One short note</span>
+          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+            One short note
+          </span>
           <textarea
             value={routingNotesDraft}
             onChange={(event) => onRoutingNotesDraftChange(event.target.value)}
@@ -3332,15 +4987,24 @@ function IntakeRoutingPanel({
         <Button onClick={onSave} disabled={isSaving || !canPersistSettings}>
           {isSaving ? "Saving..." : "Save"}
         </Button>
-        {saveStatus ? <p className="text-sm text-slate-500">{saveStatus}</p> : null}
+        {saveStatus ? (
+          <p className="text-sm text-slate-500">{saveStatus}</p>
+        ) : null}
       </div>
-      {!canPersistSettings ? <p className="mt-3 text-sm text-slate-500">These suggestions will appear once your account details finish loading.</p> : null}
+      {!canPersistSettings ? (
+        <p className="mt-3 text-sm text-slate-500">
+          These suggestions will appear once your account details finish
+          loading.
+        </p>
+      ) : null}
     </section>
   );
 }
 
 function normalizeDisplayChannels(channels: string[]): string[] {
-  return channels.map((channel) => (channel === "telegram" ? "magic_link" : channel));
+  return channels.map((channel) =>
+    channel === "telegram" ? "magic_link" : channel,
+  );
 }
 
 function AIIntakePanel({
@@ -3370,26 +5034,40 @@ function AIIntakePanel({
     <section className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Usual client formats</p>
-          <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Show Brivoly what clients usually send.</h2>
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+            Usual client formats
+          </p>
+          <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
+            Show Brivoly what clients usually send.
+          </h2>
           <p className="mt-3 text-sm leading-6 text-slate-600">
-            Keep a short memory cue and your usual source formats here so future spreadsheet, file, and image interpretation stays close to how you actually work.
+            Keep a short memory cue and your usual source formats here so future
+            spreadsheet, file, and image interpretation stays close to how you
+            actually work.
           </p>
         </div>
-        <div className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${advancedAiUnlocked ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-amber-50 text-amber-800"}`}>
-          {advancedAiUnlocked ? "Advanced AI unlocked" : "Advanced AI paywalled"}
+        <div
+          className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${advancedAiUnlocked ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-amber-50 text-amber-800"}`}
+        >
+          {advancedAiUnlocked
+            ? "Advanced AI unlocked"
+            : "Advanced AI paywalled"}
         </div>
       </div>
 
       {!advancedAiUnlocked ? (
         <div className="mt-5 rounded-[1.3rem] border border-amber-200 bg-amber-50 px-4 py-4 text-sm leading-6 text-amber-900">
-          AI-assisted file, spreadsheet, and image interpretation stays behind a paid plan. Current billing status: {formatBillingStatusLabel(billingStatus)}.
+          AI-assisted file, spreadsheet, and image interpretation stays behind a
+          paid plan. Current billing status:{" "}
+          {formatBillingStatusLabel(billingStatus)}.
         </div>
       ) : null}
 
       <div className="mt-5 space-y-4">
         <label className="block">
-          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Usual formats</span>
+          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+            Usual formats
+          </span>
           <input
             value={aiFormatsDraft}
             onChange={(event) => onAiFormatsDraftChange(event.target.value)}
@@ -3401,7 +5079,9 @@ function AIIntakePanel({
           <button
             type="button"
             onClick={() => {
-              onAiFormatsDraftChange("csv, google_sheets, spreadsheet_screenshot");
+              onAiFormatsDraftChange(
+                "csv, google_sheets, spreadsheet_screenshot",
+              );
               onAiPromptDraftChange(
                 "Treat uploads and messy files as relationship context first. Pull out what changed, what matters now, and the clearest next touch without adding admin work.",
               );
@@ -3411,9 +5091,19 @@ function AIIntakePanel({
             Use recommended formats
           </button>
           {[
-            { label: "Sheets + screenshots", value: "csv, google_sheets, spreadsheet_screenshot" },
-            { label: "Image-first", value: "spreadsheet_screenshot, whiteboard_photo, handwritten_note" },
-            { label: "Ops-heavy", value: "csv, google_sheets, pdf_export, spreadsheet_screenshot" },
+            {
+              label: "Sheets + screenshots",
+              value: "csv, google_sheets, spreadsheet_screenshot",
+            },
+            {
+              label: "Image-first",
+              value:
+                "spreadsheet_screenshot, whiteboard_photo, handwritten_note",
+            },
+            {
+              label: "Ops-heavy",
+              value: "csv, google_sheets, pdf_export, spreadsheet_screenshot",
+            },
           ].map((preset) => (
             <button
               key={preset.label}
@@ -3437,7 +5127,9 @@ function AIIntakePanel({
           </button>
         </div>
         <label className="block">
-          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">What to notice</span>
+          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+            What to notice
+          </span>
           <textarea
             value={aiPromptDraft}
             onChange={(event) => onAiPromptDraftChange(event.target.value)}
@@ -3451,9 +5143,15 @@ function AIIntakePanel({
         <Button onClick={onSave} disabled={isSaving || !canPersistSettings}>
           {isSaving ? "Saving..." : "Save"}
         </Button>
-        {saveStatus ? <p className="text-sm text-slate-500">{saveStatus}</p> : null}
+        {saveStatus ? (
+          <p className="text-sm text-slate-500">{saveStatus}</p>
+        ) : null}
       </div>
-      {!canPersistSettings ? <p className="mt-3 text-sm text-slate-500">These suggestions will appear once account settings finish loading.</p> : null}
+      {!canPersistSettings ? (
+        <p className="mt-3 text-sm text-slate-500">
+          These suggestions will appear once account settings finish loading.
+        </p>
+      ) : null}
     </section>
   );
 }
@@ -3476,16 +5174,25 @@ function ImportPreviewPanel({
   isImportMappingDirty: boolean;
   onFieldMappingChange: (header: string, field: string) => void;
   onClarificationAnswer: (questionId: string, value: string) => void;
-  onRowOverrideChange: (rowNumber: number, fieldName: string, value: string) => void;
+  onRowOverrideChange: (
+    rowNumber: number,
+    fieldName: string,
+    value: string,
+  ) => void;
   onApplyRowFix: (rowNumber: number) => void;
 }) {
   if (!preview) {
     return (
       <section className="rounded-[1.4rem] border border-dashed bg-slate-50/70 p-6">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Preview</p>
-        <h3 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">Nothing staged yet.</h3>
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+          Preview
+        </p>
+        <h3 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
+          Nothing staged yet.
+        </h3>
         <p className="mt-3 text-sm leading-6 text-slate-600">
-          Preview the sheet first to see normalized rows, duplicate detection, and validation issues before importing anything.
+          Preview the sheet first to see normalized rows, duplicate detection,
+          and validation issues before importing anything.
         </p>
       </section>
     );
@@ -3493,52 +5200,95 @@ function ImportPreviewPanel({
 
   const clarificationQuestions = preview.clarification?.questions ?? [];
   const nextClarificationQuestion =
-    clarificationQuestions.find((question) => !clarificationAnswers[question.id]) ?? clarificationQuestions[0] ?? null;
-  const answeredClarificationCount = clarificationQuestions.filter((question) => Boolean(clarificationAnswers[question.id])).length;
+    clarificationQuestions.find(
+      (question) => !clarificationAnswers[question.id],
+    ) ??
+    clarificationQuestions[0] ??
+    null;
+  const answeredClarificationCount = clarificationQuestions.filter((question) =>
+    Boolean(clarificationAnswers[question.id]),
+  ).length;
 
   return (
     <section className="rounded-[1.4rem] border bg-slate-950 p-6 text-slate-50 shadow-[0_24px_80px_-55px_rgba(15,23,42,0.9)]">
-      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300">Preview</p>
-      <h3 className="mt-3 text-2xl font-semibold tracking-tight">{preview.source_label} import check</h3>
+      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300">
+        Preview
+      </p>
+      <h3 className="mt-3 text-2xl font-semibold tracking-tight">
+        {preview.source_label} import check
+      </h3>
       <div className="mt-5 grid gap-3 md:grid-cols-2">
         <CompactMetric label="Rows" value={String(preview.total_rows)} />
-        <CompactMetric label="Importable" value={String(preview.importable_rows)} />
-        <CompactMetric label="Skipped" value={String(preview.duplicate_rows + preview.invalid_rows)} />
+        <CompactMetric
+          label="Importable"
+          value={String(preview.importable_rows)}
+        />
+        <CompactMetric
+          label="Skipped"
+          value={String(preview.duplicate_rows + preview.invalid_rows)}
+        />
       </div>
       {preview.clarification ? (
-        <section className={`mt-5 rounded-[1.2rem] border p-4 ${preview.clarification.required ? "border-cyan-300/40 bg-cyan-400/10" : "border-white/10 bg-white/5"}`}>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-200">AI clarification</p>
-          <p className="mt-2 text-sm leading-6 text-slate-200">{preview.clarification.assistant_message}</p>
+        <section
+          className={`mt-5 rounded-[1.2rem] border p-4 ${preview.clarification.required ? "border-cyan-300/40 bg-cyan-400/10" : "border-white/10 bg-white/5"}`}
+        >
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-200">
+            AI clarification
+          </p>
+          <p className="mt-2 text-sm leading-6 text-slate-200">
+            {preview.clarification.assistant_message}
+          </p>
           {preview.clarification.required ? (
             <p className="mt-2 text-xs text-cyan-100/80">
-              Brivoly will walk through the remaining ambiguity one question at a time and re-check the sheet after each answer.
+              Brivoly will walk through the remaining ambiguity one question at
+              a time and re-check the sheet after each answer.
             </p>
           ) : null}
           {nextClarificationQuestion ? (
             <div className="mt-4 space-y-4">
               {clarificationQuestions.length > 1 ? (
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-100/80">
-                  Question {Math.min(answeredClarificationCount + 1, clarificationQuestions.length)} of {clarificationQuestions.length}
+                  Question{" "}
+                  {Math.min(
+                    answeredClarificationCount + 1,
+                    clarificationQuestions.length,
+                  )}{" "}
+                  of {clarificationQuestions.length}
                 </p>
               ) : null}
               <ClarificationQuestionCard
                 question={nextClarificationQuestion}
-                selectedValue={clarificationAnswers[nextClarificationQuestion.id] ?? ""}
+                selectedValue={
+                  clarificationAnswers[nextClarificationQuestion.id] ?? ""
+                }
                 onAnswer={onClarificationAnswer}
               />
               {answeredClarificationCount > 0 ? (
                 <div className="rounded-xl border border-white/10 bg-slate-900/30 px-3 py-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Already clarified</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                    Already clarified
+                  </p>
                   <div className="mt-2 space-y-2">
                     {clarificationQuestions
-                      .filter((question) => Boolean(clarificationAnswers[question.id]))
+                      .filter((question) =>
+                        Boolean(clarificationAnswers[question.id]),
+                      )
                       .map((question) => {
-                        const answeredChoice = question.choices.find((choice) => choice.value === clarificationAnswers[question.id]);
+                        const answeredChoice = question.choices.find(
+                          (choice) =>
+                            choice.value === clarificationAnswers[question.id],
+                        );
                         return (
-                          <p key={question.id} className="text-sm text-slate-300">
-                            <span className="font-medium text-white">{question.prompt}</span>
+                          <p
+                            key={question.id}
+                            className="text-sm text-slate-300"
+                          >
+                            <span className="font-medium text-white">
+                              {question.prompt}
+                            </span>
                             {" · "}
-                            {answeredChoice?.label ?? clarificationAnswers[question.id]}
+                            {answeredChoice?.label ??
+                              clarificationAnswers[question.id]}
                           </p>
                         );
                       })}
@@ -3552,12 +5302,19 @@ function ImportPreviewPanel({
       <section className="mt-5 rounded-[1.2rem] border border-white/10 bg-white/5 p-4">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Column mapping</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+              Column mapping
+            </p>
             <p className="mt-2 text-sm leading-6 text-slate-300">
-              Keep the suggested mapping if it looks right, or correct any column here before importing.
+              Keep the suggested mapping if it looks right, or correct any
+              column here before importing.
             </p>
           </div>
-          {isImportMappingDirty ? <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-300">Needs refreshed preview</p> : null}
+          {isImportMappingDirty ? (
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-300">
+              Needs refreshed preview
+            </p>
+          ) : null}
         </div>
         <div className="mt-4 space-y-3">
           {preview.header_mappings.map((item) => (
@@ -3585,7 +5342,11 @@ function ImportPreviewPanel({
           />
         ))}
       </div>
-      {preview.rows.length > 5 ? <p className="mt-3 text-xs text-slate-400">Showing the first 5 preview rows.</p> : null}
+      {preview.rows.length > 5 ? (
+        <p className="mt-3 text-xs text-slate-400">
+          Showing the first 5 preview rows.
+        </p>
+      ) : null}
     </section>
   );
 }
@@ -3604,17 +5365,28 @@ function ImportMappingRow({
   return (
     <div className="grid gap-3 rounded-xl border border-white/10 bg-slate-900/40 px-3 py-3 md:grid-cols-[1.1fr_1fr]">
       <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Sheet column</p>
-        <p className="mt-1 text-sm font-medium text-white">{item.original_header}</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+          Sheet column
+        </p>
+        <p className="mt-1 text-sm font-medium text-white">
+          {item.original_header}
+        </p>
         <p className="mt-2 text-xs text-slate-400">
-          Suggested: {item.suggested_field ? formatImportFieldLabel(item.suggested_field) : "Ignore this column"}
+          Suggested:{" "}
+          {item.suggested_field
+            ? formatImportFieldLabel(item.suggested_field)
+            : "Ignore this column"}
         </p>
       </div>
       <label className="block">
-        <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Map to</span>
+        <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+          Map to
+        </span>
         <select
           value={selectedValue}
-          onChange={(event) => onChange(item.original_header, event.target.value)}
+          onChange={(event) =>
+            onChange(item.original_header, event.target.value)
+          }
           className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-sm text-white outline-none transition focus:border-slate-400"
         >
           <option value="">Ignore this column</option>
@@ -3672,35 +5444,70 @@ function ImportPreviewRowCard({
 }: {
   row: CRMImportPreviewRow;
   rowOverride?: Record<string, string>;
-  onRowOverrideChange: (rowNumber: number, fieldName: string, value: string) => void;
+  onRowOverrideChange: (
+    rowNumber: number,
+    fieldName: string,
+    value: string,
+  ) => void;
   onApplyRowFix: (rowNumber: number) => void;
 }) {
   const hasError = row.issues.some((issue) => issue.severity === "error");
-  const needsFollowUpFix = row.issues.some((issue) => issue.field === "next_follow_up_at" && issue.severity === "error");
+  const needsFollowUpFix = row.issues.some(
+    (issue) =>
+      issue.field === "next_follow_up_at" && issue.severity === "error",
+  );
   return (
-    <article className={`rounded-[1.2rem] border px-4 py-4 ${hasError ? "border-rose-300 bg-rose-950/40" : row.duplicate ? "border-amber-300 bg-amber-950/30" : "border-white/10 bg-white/5"}`}>
+    <article
+      className={`rounded-[1.2rem] border px-4 py-4 ${hasError ? "border-rose-300 bg-rose-950/40" : row.duplicate ? "border-amber-300 bg-amber-950/30" : "border-white/10 bg-white/5"}`}
+    >
       <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Row {row.row_number}</p>
-          <h4 className="mt-2 text-lg font-semibold text-white">{row.lead_name}</h4>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+            Row {row.row_number}
+          </p>
+          <h4 className="mt-2 text-lg font-semibold text-white">
+            {row.lead_name}
+          </h4>
           <p className="text-sm text-slate-300">{row.company_name}</p>
-          <p className="mt-2 text-xs uppercase tracking-[0.18em] text-slate-400">Owner · {row.owner_name}</p>
+          <p className="mt-2 text-xs uppercase tracking-[0.18em] text-slate-400">
+            Owner · {row.owner_name}
+          </p>
         </div>
         <div className="text-right">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{row.stage}</p>
-          <p className="mt-2 text-sm text-slate-200">{formatDateTime(row.next_follow_up_at)}</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+            {row.stage}
+          </p>
+          <p className="mt-2 text-sm text-slate-200">
+            {formatDateTime(row.next_follow_up_at)}
+          </p>
         </div>
       </div>
       <div className="mt-3 grid gap-3 md:grid-cols-2">
-        <TimelineTileDark label="Priority" value={row.priority ? `${row.priority} priority` : "Auto after import"} />
-        <TimelineTileDark label="Channel" value={row.contact_channel || "Spreadsheet default"} />
-        <TimelineTileDark label="Next step" value={row.next_step || "Brivoly will draft a default follow-up task"} />
+        <TimelineTileDark
+          label="Priority"
+          value={
+            row.priority ? `${row.priority} priority` : "Auto after import"
+          }
+        />
+        <TimelineTileDark
+          label="Channel"
+          value={row.contact_channel || "Spreadsheet default"}
+        />
+        <TimelineTileDark
+          label="Next step"
+          value={row.next_step || "Brivoly will draft a default follow-up task"}
+        />
       </div>
-      {row.notes ? <p className="mt-3 text-sm leading-6 text-slate-300">{row.notes}</p> : null}
+      {row.notes ? (
+        <p className="mt-3 text-sm leading-6 text-slate-300">{row.notes}</p>
+      ) : null}
       {row.issues.length ? (
         <div className="mt-3 space-y-2">
           {row.issues.map((issue, index) => (
-            <p key={`${issue.row_number}-${issue.field ?? "general"}-${index}`} className={`rounded-xl px-3 py-2 text-xs ${issue.severity === "error" ? "bg-rose-200 text-rose-950" : "bg-amber-200 text-amber-950"}`}>
+            <p
+              key={`${issue.row_number}-${issue.field ?? "general"}-${index}`}
+              className={`rounded-xl px-3 py-2 text-xs ${issue.severity === "error" ? "bg-rose-200 text-rose-950" : "bg-amber-200 text-amber-950"}`}
+            >
               {issue.message}
             </p>
           ))}
@@ -3708,18 +5515,34 @@ function ImportPreviewRowCard({
       ) : null}
       {needsFollowUpFix ? (
         <div className="mt-4 rounded-xl border border-cyan-300/30 bg-cyan-400/10 px-4 py-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">Fix missing data in Brivoly</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">
+            Fix missing data in Brivoly
+          </p>
           <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-end">
             <label className="block flex-1">
-              <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300">Next follow-up date</span>
+              <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300">
+                Next follow-up date
+              </span>
               <input
                 type="datetime-local"
-                value={rowOverride?.next_follow_up_at ?? formatDateTimeInputValue(row.next_follow_up_at)}
-                onChange={(event) => onRowOverrideChange(row.row_number, "next_follow_up_at", event.target.value)}
+                value={
+                  rowOverride?.next_follow_up_at ??
+                  formatDateTimeInputValue(row.next_follow_up_at)
+                }
+                onChange={(event) =>
+                  onRowOverrideChange(
+                    row.row_number,
+                    "next_follow_up_at",
+                    event.target.value,
+                  )
+                }
                 className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-sm text-white outline-none transition focus:border-slate-400"
               />
             </label>
-            <Button variant="outline" onClick={() => onApplyRowFix(row.row_number)}>
+            <Button
+              variant="outline"
+              onClick={() => onApplyRowFix(row.row_number)}
+            >
               Re-check row
             </Button>
           </div>
@@ -3792,16 +5615,58 @@ function LeadMemoryPanel({
   const launchHref = buildMailtoHref(emailSubjectDraft, emailBodyDraft);
   const suggestedResponses = buildSuggestedResponsePresets(lead);
   const composerSectionRef = useRef<HTMLElement | null>(null);
-  const threadProviderMismatch =
-    Boolean(selectedThread && preferredMailboxConnection && selectedThread.source !== preferredMailboxConnection.provider);
-  const threadProviderLabel = selectedThread?.source === "gmail" ? "Gmail" : selectedThread?.source === "outlook" ? "Outlook" : null;
-  const sendProviderLabel = preferredMailboxConnection?.provider === "gmail" ? "Gmail" : preferredMailboxConnection?.provider === "outlook" ? "Outlook" : null;
-  const [memoryView, setMemoryView] = useState<"overview" | "last_30_days" | "meeting_prep" | "recent_changes" | "recent_upload">(initialMemoryView ?? "overview");
+  const threadProviderMismatch = Boolean(
+    selectedThread &&
+    preferredMailboxConnection &&
+    selectedThread.source !== preferredMailboxConnection.provider,
+  );
+  const threadProviderLabel =
+    selectedThread?.source === "gmail"
+      ? "Gmail"
+      : selectedThread?.source === "outlook"
+        ? "Outlook"
+        : null;
+  const sendProviderLabel =
+    preferredMailboxConnection?.provider === "gmail"
+      ? "Gmail"
+      : preferredMailboxConnection?.provider === "outlook"
+        ? "Outlook"
+        : null;
+  const [memoryView, setMemoryView] = useState<
+    | "overview"
+    | "last_30_days"
+    | "meeting_prep"
+    | "recent_changes"
+    | "recent_upload"
+  >(initialMemoryView ?? "overview");
+  const latestTimelineEntry = getLatestContextEntry(lead);
+  const latestUploadEntry = getLatestUploadContextEntry(lead);
   const memoryPanels = [
-    { value: "overview" as const, label: "What matters", body: lead.relationship_context_summary || lead.notes || "No summary yet." },
-    { value: "last_30_days" as const, label: "Last 30 days", body: lead.relationship_last_30_days_summary || "No 30-day summary yet." },
-    { value: "meeting_prep" as const, label: "Meeting prep", body: lead.relationship_meeting_prep_summary || "No meeting prep summary yet." },
-    { value: "recent_changes" as const, label: "What changed", body: lead.relationship_recent_changes_summary || "No recent changes were captured yet." },
+    {
+      value: "overview" as const,
+      label: "What matters",
+      body:
+        lead.relationship_context_summary || lead.notes || "No summary yet.",
+    },
+    {
+      value: "last_30_days" as const,
+      label: "Last 30 days",
+      body: lead.relationship_last_30_days_summary || "No 30-day summary yet.",
+    },
+    {
+      value: "meeting_prep" as const,
+      label: "Meeting prep",
+      body:
+        lead.relationship_meeting_prep_summary ||
+        "No meeting prep summary yet.",
+    },
+    {
+      value: "recent_changes" as const,
+      label: "What changed",
+      body:
+        lead.relationship_recent_changes_summary ||
+        "No recent changes were captured yet.",
+    },
     ...(lead.relationship_recent_upload_summary
       ? [
           {
@@ -3812,13 +5677,17 @@ function LeadMemoryPanel({
         ]
       : []),
   ];
-  const activeMemoryPanel = memoryPanels.find((item) => item.value === memoryView) ?? memoryPanels[0];
+  const activeMemoryPanel =
+    memoryPanels.find((item) => item.value === memoryView) ?? memoryPanels[0];
 
   useEffect(() => {
     if (!draftFocusToken) {
       return;
     }
-    composerSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    composerSectionRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
   }, [draftFocusToken, lead.id]);
 
   useEffect(() => {
@@ -3829,23 +5698,37 @@ function LeadMemoryPanel({
 
   return (
     <section className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm">
-      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Relationship memory</p>
-      <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">{lead.lead_name}</h2>
+      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+        Relationship memory
+      </p>
+      <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
+        {lead.lead_name}
+      </h2>
       <p className="mt-1 text-sm text-slate-600">{lead.company_name}</p>
       {selectedThread ? (
         <p className="mt-2 text-sm leading-6 text-slate-600">
-          Drafting inside <span className="font-medium text-slate-900">{selectedThread.subject}</span>
-          {preferredMailboxConnection ? ` through ${preferredMailboxConnection.provider === "gmail" ? "Gmail" : "Outlook"}.` : "."}
+          Drafting inside{" "}
+          <span className="font-medium text-slate-900">
+            {selectedThread.subject}
+          </span>
+          {preferredMailboxConnection
+            ? ` through ${preferredMailboxConnection.provider === "gmail" ? "Gmail" : "Outlook"}.`
+            : "."}
         </p>
       ) : null}
       {threadProviderMismatch && threadProviderLabel && sendProviderLabel ? (
         <p className="mt-2 rounded-[1rem] border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
-          No {threadProviderLabel} mailbox is connected for this thread right now, so Brivoly will send through {sendProviderLabel} and keep the thread attached in relationship memory.
+          No {threadProviderLabel} mailbox is connected for this thread right
+          now, so Brivoly will send through {sendProviderLabel} and keep the
+          thread attached in relationship memory.
         </p>
       ) : null}
 
       <div className="mt-5 grid gap-3 md:grid-cols-2">
-        <TimelineTile label="Where it stands" value={formatStageLabel(lead.stage)} />
+        <TimelineTile
+          label="Where it stands"
+          value={formatStageLabel(lead.stage)}
+        />
         <TimelineTile label="Best channel" value={lead.contact_channel} />
         <TimelineTile label="Point person" value={lead.owner_name} />
         {lead.relationship_upcoming_meeting_at ? (
@@ -3857,11 +5740,21 @@ function LeadMemoryPanel({
       </div>
 
       <div className="mt-4 grid gap-3 md:grid-cols-2">
-        <TimelineTile label="Last meaningful interaction" value={formatDateTime(lead.last_meaningful_interaction_at)} />
-        <TimelineTile label="Relationship state" value={formatRelationshipState(lead.relationship_state)} />
+        <TimelineTile
+          label="Last meaningful interaction"
+          value={formatDateTime(lead.last_meaningful_interaction_at)}
+        />
+        <TimelineTile
+          label="Relationship state"
+          value={formatRelationshipState(lead.relationship_state)}
+        />
         <TimelineTile
           label="Brivoly nudge"
-          value={lead.relationship_upload_follow_through_hint || lead.relationship_timing_nudge || "Brivoly is keeping the timing in view."}
+          value={
+            lead.relationship_upload_follow_through_hint ||
+            lead.relationship_timing_nudge ||
+            "Brivoly is keeping the timing in view."
+          }
         />
       </div>
 
@@ -3869,17 +5762,26 @@ function LeadMemoryPanel({
         <section className="mt-6 rounded-[1.5rem] border bg-emerald-50/70 p-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="max-w-2xl">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">Upcoming meeting</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">
+                Upcoming meeting
+              </p>
               <h3 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
-                Walk into this conversation with the right context already loaded.
+                Walk into this conversation with the right context already
+                loaded.
               </h3>
               <p className="mt-2 text-sm leading-6 text-slate-600">
-                {lead.relationship_upcoming_meeting_label || "Brivoly found a meeting-like next step for this relationship."}
-                {lead.relationship_upcoming_meeting_source ? ` Source: ${lead.relationship_upcoming_meeting_source}.` : ""}
+                {lead.relationship_upcoming_meeting_label ||
+                  "Brivoly found a meeting-like next step for this relationship."}
+                {lead.relationship_upcoming_meeting_source
+                  ? ` Source: ${lead.relationship_upcoming_meeting_source}.`
+                  : ""}
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
-              <Button type="button" onClick={() => setMemoryView("meeting_prep")}>
+              <Button
+                type="button"
+                onClick={() => setMemoryView("meeting_prep")}
+              >
                 Prepare me
               </Button>
             </div>
@@ -3891,10 +5793,15 @@ function LeadMemoryPanel({
         <section className="mt-6 rounded-[1.5rem] border bg-sky-50/70 p-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="max-w-2xl">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-700">Gentle re-entry</p>
-              <h3 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">Reopen this relationship without sounding abrupt.</h3>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-700">
+                Gentle re-entry
+              </p>
+              <h3 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+                Reopen this relationship without sounding abrupt.
+              </h3>
               <p className="mt-2 text-sm leading-6 text-slate-600">
-                Brivoly is surfacing a low-pressure path back in so you do not have to reconstruct the opening from scratch.
+                Brivoly is surfacing a low-pressure path back in so you do not
+                have to reconstruct the opening from scratch.
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
@@ -3914,19 +5821,43 @@ function LeadMemoryPanel({
             </div>
           </div>
           <div className="mt-4 grid gap-3 lg:grid-cols-2">
-            <TimelineTile label="Why now" value={lead.relationship_reconnect_why_now || lead.relationship_timing_nudge || "Brivoly is keeping a reconnect path ready."} />
-            <TimelineTile label="Why it can still land" value={describeReconnectWindow(lead)} />
-            <TimelineTile label="Best re-entry" value={lead.relationship_reconnect_next_move || lead.next_step} />
-            <TimelineTile label="Starter line" value={buildReconnectStarterLine(lead)} />
+            <TimelineTile
+              label="Why now"
+              value={
+                lead.relationship_reconnect_why_now ||
+                lead.relationship_timing_nudge ||
+                "Brivoly is keeping a reconnect path ready."
+              }
+            />
+            <TimelineTile
+              label="Why it can still land"
+              value={describeReconnectWindow(lead)}
+            />
+            <TimelineTile
+              label="Best re-entry"
+              value={lead.relationship_reconnect_next_move || lead.next_step}
+            />
+            <TimelineTile
+              label="Starter line"
+              value={buildReconnectStarterLine(lead)}
+            />
           </div>
         </section>
       ) : null}
 
-      {lead.referral_source_name || lead.birthday || lead.company_milestone_date || lead.relationship_reminders.length ? (
+      {lead.referral_source_name ||
+      lead.birthday ||
+      lead.company_milestone_date ||
+      lead.relationship_reminders.length ? (
         <section className="mt-6 rounded-[1.5rem] border bg-amber-50/70 p-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">Keep this relationship warm</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">
+            Keep this relationship warm
+          </p>
           <div className="mt-3 grid gap-3 md:grid-cols-2">
-            <TimelineTile label="Warm intro source" value={lead.referral_source_name || "No warm intro mapped yet"} />
+            <TimelineTile
+              label="Warm intro source"
+              value={lead.referral_source_name || "No warm intro mapped yet"}
+            />
             <TimelineTile
               label="Next milestone"
               value={
@@ -3941,7 +5872,10 @@ function LeadMemoryPanel({
           {lead.relationship_reminders.length ? (
             <div className="mt-4 space-y-3">
               {lead.relationship_reminders.map((reminder) => (
-                <RelationshipReminderCard key={`${reminder.kind}-${reminder.title}-${reminder.due_at ?? "none"}`} reminder={reminder} />
+                <RelationshipReminderCard
+                  key={`${reminder.kind}-${reminder.title}-${reminder.due_at ?? "none"}`}
+                  reminder={reminder}
+                />
               ))}
             </div>
           ) : null}
@@ -3967,47 +5901,129 @@ function LeadMemoryPanel({
           ))}
         </div>
         <div className="mt-4 rounded-[1.2rem] border bg-white px-4 py-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{activeMemoryPanel.label}</p>
-          <p className="mt-2 text-sm leading-6 text-slate-700">{activeMemoryPanel.body}</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+            {activeMemoryPanel.label}
+          </p>
+          <p className="mt-2 text-sm leading-6 text-slate-700">
+            {activeMemoryPanel.body}
+          </p>
         </div>
         <div className="mt-4 rounded-[1.2rem] border bg-white px-4 py-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Context on hand</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+            Context on hand
+          </p>
           <p className="mt-2 text-sm leading-6 text-slate-700">{lead.notes}</p>
           {lead.relationship_recent_upload_summary ? (
             <div className="mt-4 rounded-[1rem] border bg-slate-50/80 px-4 py-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Recent upload context</p>
-              <p className="mt-2 text-sm leading-6 text-slate-700">{lead.relationship_recent_upload_summary}</p>
-              {lead.relationship_upload_follow_through_hint ? <p className="mt-3 text-sm leading-6 text-slate-700">{lead.relationship_upload_follow_through_hint}</p> : null}
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+                Recent upload context
+              </p>
+              <p className="mt-2 text-sm leading-6 text-slate-700">
+                {lead.relationship_recent_upload_summary}
+              </p>
+              {lead.relationship_upload_follow_through_hint ? (
+                <p className="mt-3 text-sm leading-6 text-slate-700">
+                  {lead.relationship_upload_follow_through_hint}
+                </p>
+              ) : null}
             </div>
           ) : null}
         </div>
-        {lead.relationship_recent_upload_summary && memoryView !== "meeting_prep" ? (
+        {lead.relationship_recent_upload_summary &&
+        memoryView !== "meeting_prep" ? (
           <div className="mt-4 rounded-[1.2rem] border bg-white px-4 py-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Meeting prep from fresh context</p>
-            <p className="mt-2 text-sm leading-6 text-slate-700">{lead.relationship_meeting_prep_summary}</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+              Meeting prep from fresh context
+            </p>
+            <p className="mt-2 text-sm leading-6 text-slate-700">
+              {lead.relationship_meeting_prep_summary}
+            </p>
           </div>
         ) : null}
       </section>
 
-      <section ref={composerSectionRef} className="mt-6 rounded-[1.5rem] border bg-white p-5">
+      <section className="mt-6 rounded-[1.5rem] border bg-slate-50/80 p-5">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+          Timeline focus
+        </p>
+        <h3 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+          See the relationship story before you draft the next move.
+        </h3>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+          Brivoly keeps the latest saved moment, the current open loop, and the
+          next touch together so you can act without rereading the full history
+          first.
+        </p>
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          <TimelineTile
+            label="Latest saved moment"
+            value={
+              latestTimelineEntry
+                ? `${formatTimelineEntryLabel(latestTimelineEntry)} · ${latestTimelineEntry.summary}`
+                : "No relationship history saved yet"
+            }
+          />
+          <TimelineTile
+            label="Latest client-shared context"
+            value={
+              latestUploadEntry
+                ? `${formatDateTime(latestUploadEntry.occurred_at)} · ${latestUploadEntry.summary}`
+                : "No recent client-shared context"
+            }
+          />
+          <TimelineTile
+            label="Open loop"
+            value={
+              selectedThread?.open_loop ||
+              selectedThread?.unresolved_hint ||
+              lead.next_step ||
+              "No open loop captured yet"
+            }
+          />
+          <TimelineTile
+            label="Best next touch"
+            value={
+              lead.relationship_upload_follow_through_hint ||
+              lead.relationship_reconnect_next_move ||
+              lead.next_step
+            }
+          />
+        </div>
+      </section>
+
+      <section
+        ref={composerSectionRef}
+        className="mt-6 rounded-[1.5rem] border bg-white p-5"
+      >
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <p className="ui-eyebrow">Suggested next note</p>
-            <h3 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">Draft the next note without starting from zero.</h3>
+            <h3 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+              Draft the next note without starting from zero.
+            </h3>
             <p className="mt-2 text-sm leading-6 text-slate-600">
-              Brivoly uses the latest context, suggested next touch, and your saved business profile to suggest a message you can edit before sending.
+              Brivoly uses the latest context, suggested next touch, and your
+              saved business profile to suggest a message you can edit before
+              sending.
             </p>
           </div>
           <div className="rounded-[1.2rem] border bg-slate-50 px-4 py-3 text-sm text-slate-600 lg:max-w-xs">
             <p className="ui-eyebrow">Sent from</p>
             <p className="mt-2">
-              Sender: <span className="font-medium text-slate-900">{settings?.outbound_sender_name || settings?.business_name || "Fallback defaults"}</span>
+              Sender:{" "}
+              <span className="font-medium text-slate-900">
+                {settings?.outbound_sender_name ||
+                  settings?.business_name ||
+                  "Fallback defaults"}
+              </span>
             </p>
           </div>
         </div>
 
         <div className="mt-5 rounded-[1.2rem] border bg-slate-50/80 px-4 py-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Ways to say it</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+            Ways to say it
+          </p>
           <div className="mt-3 flex flex-wrap gap-2">
             {suggestedResponses.map((item) => (
               <button
@@ -4027,7 +6043,10 @@ function LeadMemoryPanel({
               </button>
             ))}
           </div>
-          <p className="mt-3 text-xs text-slate-500">Pick the message shape that fits this moment, then edit before sending.</p>
+          <p className="mt-3 text-xs text-slate-500">
+            Pick the message shape that fits this moment, then edit before
+            sending.
+          </p>
         </div>
 
         <div className="mt-5 grid gap-4 xl:grid-cols-3">
@@ -4035,7 +6054,11 @@ function LeadMemoryPanel({
             <span className="ui-eyebrow">Objective</span>
             <select
               value={emailObjective}
-              onChange={(event) => onEmailObjectiveChange(event.target.value as CRMEmailDraft["objective"])}
+              onChange={(event) =>
+                onEmailObjectiveChange(
+                  event.target.value as CRMEmailDraft["objective"],
+                )
+              }
               className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:bg-white"
             >
               <option value="follow_up">General note</option>
@@ -4048,7 +6071,9 @@ function LeadMemoryPanel({
             <span className="ui-eyebrow">Tone</span>
             <select
               value={emailTone}
-              onChange={(event) => onEmailToneChange(event.target.value as CRMEmailDraft["tone"])}
+              onChange={(event) =>
+                onEmailToneChange(event.target.value as CRMEmailDraft["tone"])
+              }
               className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:bg-white"
             >
               <option value="warm">Warm</option>
@@ -4060,7 +6085,11 @@ function LeadMemoryPanel({
             <span className="ui-eyebrow">Length</span>
             <select
               value={emailLength}
-              onChange={(event) => onEmailLengthChange(event.target.value as CRMEmailDraft["length"])}
+              onChange={(event) =>
+                onEmailLengthChange(
+                  event.target.value as CRMEmailDraft["length"],
+                )
+              }
               className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:bg-white"
             >
               <option value="short">Short</option>
@@ -4070,11 +6099,26 @@ function LeadMemoryPanel({
         </div>
 
         <div className="mt-5 flex flex-wrap items-center gap-3">
-          <Button onClick={() => onGenerateEmailDraft()} disabled={isGeneratingEmail}>
-            {isGeneratingEmail ? "Drafting..." : emailDraft ? "Refresh draft" : "Draft note"}
+          <Button
+            onClick={() => onGenerateEmailDraft()}
+            disabled={isGeneratingEmail}
+          >
+            {isGeneratingEmail
+              ? "Drafting..."
+              : emailDraft
+                ? "Refresh draft"
+                : "Draft note"}
           </Button>
           {canSendFromMailbox ? (
-            <Button variant="outline" onClick={onSendDraftToMailbox} disabled={isGeneratingEmail || !emailSubjectDraft.trim() || !emailBodyDraft.trim()}>
+            <Button
+              variant="outline"
+              onClick={onSendDraftToMailbox}
+              disabled={
+                isGeneratingEmail ||
+                !emailSubjectDraft.trim() ||
+                !emailBodyDraft.trim()
+              }
+            >
               Send from mailbox
             </Button>
           ) : null}
@@ -4086,7 +6130,9 @@ function LeadMemoryPanel({
               Open in email app
             </a>
           ) : null}
-          {emailStatus ? <p className="text-sm text-slate-500">{emailStatus}</p> : null}
+          {emailStatus ? (
+            <p className="text-sm text-slate-500">{emailStatus}</p>
+          ) : null}
         </div>
 
         {emailDraft ? (
@@ -4105,7 +6151,9 @@ function LeadMemoryPanel({
               <span className="ui-eyebrow">Subject</span>
               <input
                 value={emailSubjectDraft}
-                onChange={(event) => onEmailSubjectDraftChange(event.target.value)}
+                onChange={(event) =>
+                  onEmailSubjectDraftChange(event.target.value)
+                }
                 className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:bg-white"
               />
             </label>
@@ -4123,7 +6171,9 @@ function LeadMemoryPanel({
       </section>
 
       <section className="mt-6 rounded-[1.5rem] border bg-white p-5">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Keep the memory current</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+          Keep the memory current
+        </p>
         <textarea
           value={noteDraft}
           onChange={(event) => onNoteDraftChange(event.target.value)}
@@ -4131,36 +6181,63 @@ function LeadMemoryPanel({
           className="mt-3 min-h-28 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:bg-white"
         />
         <div className="mt-4 flex items-center justify-between gap-4">
-          <p className="text-xs text-slate-500">Keep notes light. This is here to preserve context, not create more work.</p>
-          <Button disabled={isSavingNote || !noteDraft.trim()} onClick={onSaveNote}>
+          <p className="text-xs text-slate-500">
+            Keep notes light. This is here to preserve context, not create more
+            work.
+          </p>
+          <Button
+            disabled={isSavingNote || !noteDraft.trim()}
+            onClick={onSaveNote}
+          >
             {isSavingNote ? "Saving..." : "Save note"}
           </Button>
         </div>
       </section>
 
       <section className="mt-6">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Relationship history</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+          Relationship history
+        </p>
+        <p className="mt-2 text-sm leading-6 text-slate-600">
+          The timeline is the running memory of what happened, what changed, and
+          what Brivoly thinks matters now.
+        </p>
         <div className="mt-4 space-y-4">
           {lead.timeline.map((entry) => {
             const uploadContext = isUploadTimelineEntry(entry);
             return (
-            <div
-              key={entry.id}
-              className={`rounded-[1.35rem] border p-4 ${
-                uploadContext ? "border-sky-200 bg-sky-50/80" : "bg-slate-50/80"
-              }`}
-            >
-              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className={`text-xs font-semibold uppercase tracking-[0.2em] ${uploadContext ? "text-sky-700" : "text-slate-400"}`}>
-                    {uploadContext ? "client-shared context" : `${entry.kind.replaceAll("_", " ")} · ${entry.channel}`}
+              <div
+                key={entry.id}
+                className={`rounded-[1.35rem] border p-4 ${
+                  uploadContext
+                    ? "border-sky-200 bg-sky-50/80"
+                    : "bg-slate-50/80"
+                }`}
+              >
+                <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p
+                      className={`text-xs font-semibold uppercase tracking-[0.2em] ${uploadContext ? "text-sky-700" : "text-slate-400"}`}
+                    >
+                      {uploadContext
+                        ? "client-shared context"
+                        : `${entry.kind.replaceAll("_", " ")} · ${entry.channel}`}
+                    </p>
+                    {uploadContext ? (
+                      <MiniFlag
+                        label={formatUploadHistorySource(entry)}
+                        tone="neutral"
+                      />
+                    ) : null}
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    {formatDateTime(entry.occurred_at)}
                   </p>
-                  {uploadContext ? <MiniFlag label={formatUploadHistorySource(entry)} tone="neutral" /> : null}
                 </div>
-                <p className="text-xs text-slate-500">{formatDateTime(entry.occurred_at)}</p>
+                <p className="mt-3 text-sm leading-6 text-slate-700">
+                  {entry.summary}
+                </p>
               </div>
-              <p className="mt-3 text-sm leading-6 text-slate-700">{entry.summary}</p>
-            </div>
             );
           })}
         </div>
@@ -4169,13 +6246,24 @@ function LeadMemoryPanel({
   );
 }
 
-function RelationshipSignalsPanel({ summary }: { summary: NonNullable<CRMFollowUpOverview["relationship_summary"]> }) {
-  const needsAttention = summary.drifting_count + summary.stale_count + summary.at_risk_count;
-  const warmMoments = summary.referral_reminder_count + summary.milestone_reminder_count;
+function RelationshipSignalsPanel({
+  summary,
+}: {
+  summary: NonNullable<CRMFollowUpOverview["relationship_summary"]>;
+}) {
+  const needsAttention =
+    summary.drifting_count + summary.stale_count + summary.at_risk_count;
+  const warmMoments =
+    summary.referral_reminder_count + summary.milestone_reminder_count;
   return (
     <section className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm">
-      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Client momentum</p>
-      <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">A calmer read on which relationships are steady and which ones need warmth.</h2>
+      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+        Relationship posture
+      </p>
+      <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
+        A calmer read on which relationships are steady and which ones need
+        warmth.
+      </h2>
       <div className="mt-5 space-y-3">
         <TimelineTile
           label="Holding steady"
@@ -4183,7 +6271,11 @@ function RelationshipSignalsPanel({ summary }: { summary: NonNullable<CRMFollowU
         />
         <TimelineTile
           label="Needs attention"
-          value={needsAttention ? `${needsAttention} relationship${needsAttention === 1 ? "" : "s"} may need a warmer touch soon` : "Nothing feels especially fragile right now"}
+          value={
+            needsAttention
+              ? `${needsAttention} relationship${needsAttention === 1 ? "" : "s"} may need a warmer touch soon`
+              : "Nothing feels especially fragile right now"
+          }
         />
         {warmMoments ? (
           <TimelineTile
@@ -4196,28 +6288,50 @@ function RelationshipSignalsPanel({ summary }: { summary: NonNullable<CRMFollowU
   );
 }
 
-function WarmIntroGraphPanel({ summary }: { summary: NonNullable<CRMFollowUpOverview["relationship_summary"]> }) {
+function WarmIntroGraphPanel({
+  summary,
+}: {
+  summary: NonNullable<CRMFollowUpOverview["relationship_summary"]>;
+}) {
   return (
     <section className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm">
-      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Warm ways back in</p>
-      <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Know who can help you reopen a quiet relationship more naturally.</h2>
+      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+        Warm ways back in
+      </p>
+      <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
+        Know who can help you reopen a quiet relationship more naturally.
+      </h2>
       <p className="mt-3 text-sm leading-6 text-slate-600">
-        When a past intro or referral gives you a softer re-entry path, Brivoly keeps it close instead of leaving it buried in old notes.
+        When a past intro or referral gives you a softer re-entry path, Brivoly
+        keeps it close instead of leaving it buried in old notes.
       </p>
       <div className="mt-5 grid gap-3 md:grid-cols-2">
         {summary.warm_intro_connections.length ? (
           summary.warm_intro_connections.map((connection) => (
-            <div key={`${connection.source_name}-${connection.target_lead_id}`} className="rounded-[1.2rem] border bg-slate-50/80 px-4 py-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{connection.source_name}</p>
-              <p className="mt-2 text-sm text-slate-700">
-                could help reopen <span className="font-medium text-slate-950">{connection.target_lead_name}</span> at {connection.target_company_name}
+            <div
+              key={`${connection.source_name}-${connection.target_lead_id}`}
+              className="rounded-[1.2rem] border bg-slate-50/80 px-4 py-4"
+            >
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                {connection.source_name}
               </p>
-              <p className="mt-2 text-xs text-slate-500">Best person to pick it up: {connection.owner_name}</p>
+              <p className="mt-2 text-sm text-slate-700">
+                could help reopen{" "}
+                <span className="font-medium text-slate-950">
+                  {connection.target_lead_name}
+                </span>{" "}
+                at {connection.target_company_name}
+              </p>
+              <p className="mt-2 text-xs text-slate-500">
+                Best person to pick it up: {connection.owner_name}
+              </p>
             </div>
           ))
         ) : (
           <div className="rounded-[1.2rem] border border-dashed bg-slate-50/80 px-4 py-4 text-sm text-slate-600">
-            No warm intro links are mapped yet. When you save referral context on a relationship, Brivoly can turn it into a softer path back in later.
+            No warm intro links are mapped yet. When you save referral context
+            on a relationship, Brivoly can turn it into a softer path back in
+            later.
           </div>
         )}
       </div>
@@ -4225,24 +6339,48 @@ function WarmIntroGraphPanel({ summary }: { summary: NonNullable<CRMFollowUpOver
   );
 }
 
-function RelationshipReminderCard({ reminder }: { reminder: CRMRelationshipReminder }) {
+function RelationshipReminderCard({
+  reminder,
+}: {
+  reminder: CRMRelationshipReminder;
+}) {
   return (
     <div className="rounded-[1.2rem] border border-amber-200 bg-white/80 px-4 py-4">
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">{formatReminderKind(reminder.kind)}</p>
-        <p className="text-xs text-slate-500">{reminder.due_at ? formatDateTime(reminder.due_at) : "No due time set"}</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">
+          {formatReminderKind(reminder.kind)}
+        </p>
+        <p className="text-xs text-slate-500">
+          {reminder.due_at
+            ? formatDateTime(reminder.due_at)
+            : "No due time set"}
+        </p>
       </div>
-      <p className="mt-2 text-sm font-medium text-slate-900">{reminder.title}</p>
-      <p className="mt-2 text-sm leading-6 text-slate-700">{reminder.message}</p>
+      <p className="mt-2 text-sm font-medium text-slate-900">
+        {reminder.title}
+      </p>
+      <p className="mt-2 text-sm leading-6 text-slate-700">
+        {reminder.message}
+      </p>
     </div>
   );
 }
 
-function MiniFlag({ label, tone }: { label: string; tone: "warning" | "critical" | "neutral" }) {
+function MiniFlag({
+  label,
+  tone,
+}: {
+  label: string;
+  tone: "warning" | "critical" | "neutral";
+}) {
   return (
     <span
       className={`inline-flex max-w-full items-center rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] [overflow-wrap:anywhere] ${
-        tone === "critical" ? "bg-rose-100 text-rose-800" : tone === "warning" ? "bg-amber-100 text-amber-800" : "bg-slate-100 text-slate-700"
+        tone === "critical"
+          ? "bg-rose-100 text-rose-800"
+          : tone === "warning"
+            ? "bg-amber-100 text-amber-800"
+            : "bg-slate-100 text-slate-700"
       }`}
     >
       {label}
@@ -4265,7 +6403,15 @@ function buildMailtoHref(subject: string, body: string) {
   return `mailto:${recipientHint}?${params.join("&")}`;
 }
 
-function MetricCard({ label, value, tone }: { label: string; value: string; tone: "neutral" | "warning" | "critical" | "positive" }) {
+function MetricCard({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone: "neutral" | "warning" | "critical" | "positive";
+}) {
   const toneClass =
     tone === "positive"
       ? "border-emerald-200 bg-emerald-50 text-emerald-900"
@@ -4276,9 +6422,15 @@ function MetricCard({ label, value, tone }: { label: string; value: string; tone
           : "border-slate-200 bg-white text-slate-900";
 
   return (
-    <div className={`min-w-0 overflow-hidden rounded-[1.4rem] border p-5 shadow-sm ${toneClass}`}>
-      <p className="break-words text-xs font-semibold uppercase tracking-[0.14em] [overflow-wrap:anywhere] sm:tracking-[0.2em]">{label}</p>
-      <p className="mt-3 break-words text-3xl font-semibold tracking-tight [overflow-wrap:anywhere]">{value}</p>
+    <div
+      className={`min-w-0 overflow-hidden rounded-[1.4rem] border p-5 shadow-sm ${toneClass}`}
+    >
+      <p className="break-words text-xs font-semibold uppercase tracking-[0.14em] [overflow-wrap:anywhere] sm:tracking-[0.2em]">
+        {label}
+      </p>
+      <p className="mt-3 break-words text-3xl font-semibold tracking-tight [overflow-wrap:anywhere]">
+        {value}
+      </p>
     </div>
   );
 }
@@ -4286,8 +6438,12 @@ function MetricCard({ label, value, tone }: { label: string; value: string; tone
 function CompactMetric({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-      <p className="break-words text-xs font-semibold uppercase tracking-[0.14em] text-slate-400 [overflow-wrap:anywhere] sm:tracking-[0.18em]">{label}</p>
-      <p className="mt-2 break-words text-xl font-semibold text-white [overflow-wrap:anywhere]">{value}</p>
+      <p className="break-words text-xs font-semibold uppercase tracking-[0.14em] text-slate-400 [overflow-wrap:anywhere] sm:tracking-[0.18em]">
+        {label}
+      </p>
+      <p className="mt-2 break-words text-xl font-semibold text-white [overflow-wrap:anywhere]">
+        {value}
+      </p>
     </div>
   );
 }
@@ -4310,9 +6466,15 @@ function CompactMetricLight({
           ? "border-rose-200 bg-rose-50 text-rose-900"
           : "border-slate-200 bg-white text-slate-900";
   return (
-    <div className={`min-w-0 overflow-hidden rounded-2xl border px-4 py-3 ${className}`}>
-      <p className="break-words text-xs font-semibold uppercase tracking-[0.14em] [overflow-wrap:anywhere] sm:tracking-[0.18em]">{label}</p>
-      <p className="mt-2 break-words text-xl font-semibold [overflow-wrap:anywhere]">{value}</p>
+    <div
+      className={`min-w-0 overflow-hidden rounded-2xl border px-4 py-3 ${className}`}
+    >
+      <p className="break-words text-xs font-semibold uppercase tracking-[0.14em] [overflow-wrap:anywhere] sm:tracking-[0.18em]">
+        {label}
+      </p>
+      <p className="mt-2 break-words text-xl font-semibold [overflow-wrap:anywhere]">
+        {value}
+      </p>
     </div>
   );
 }
@@ -4326,7 +6488,9 @@ function PriorityBadge({ priority }: { priority: string }) {
         : "border-slate-200 bg-white text-slate-700";
 
   return (
-    <div className={`inline-flex max-w-full rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] [overflow-wrap:anywhere] sm:tracking-[0.2em] ${className}`}>
+    <div
+      className={`inline-flex max-w-full rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] [overflow-wrap:anywhere] sm:tracking-[0.2em] ${className}`}
+    >
       {priority} priority
     </div>
   );
@@ -4335,8 +6499,12 @@ function PriorityBadge({ priority }: { priority: string }) {
 function TimelineTile({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0 overflow-hidden rounded-2xl border bg-white px-4 py-3">
-      <p className="break-words text-xs font-semibold uppercase tracking-[0.14em] text-slate-400 [overflow-wrap:anywhere] sm:tracking-[0.2em]">{label}</p>
-      <p className="mt-2 break-words text-sm text-slate-700 [overflow-wrap:anywhere]">{value}</p>
+      <p className="break-words text-xs font-semibold uppercase tracking-[0.14em] text-slate-400 [overflow-wrap:anywhere] sm:tracking-[0.2em]">
+        {label}
+      </p>
+      <p className="mt-2 break-words text-sm text-slate-700 [overflow-wrap:anywhere]">
+        {value}
+      </p>
     </div>
   );
 }
@@ -4344,8 +6512,12 @@ function TimelineTile({ label, value }: { label: string; value: string }) {
 function TimelineTileDark({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-slate-900/40 px-4 py-3">
-      <p className="break-words text-xs font-semibold uppercase tracking-[0.14em] text-slate-400 [overflow-wrap:anywhere] sm:tracking-[0.2em]">{label}</p>
-      <p className="mt-2 break-words text-sm text-slate-200 [overflow-wrap:anywhere]">{value}</p>
+      <p className="break-words text-xs font-semibold uppercase tracking-[0.14em] text-slate-400 [overflow-wrap:anywhere] sm:tracking-[0.2em]">
+        {label}
+      </p>
+      <p className="mt-2 break-words text-sm text-slate-200 [overflow-wrap:anywhere]">
+        {value}
+      </p>
     </div>
   );
 }
@@ -4357,7 +6529,10 @@ function summarizePriority(item: CRMLeadFollowUp) {
   if (item.relationship_state === "stale") {
     return `Reconnect with ${item.lead_name}`;
   }
-  if (item.relationship_state === "at_risk" || item.relationship_state === "drifting") {
+  if (
+    item.relationship_state === "at_risk" ||
+    item.relationship_state === "drifting"
+  ) {
     return `${item.lead_name} needs a warmer touch`;
   }
   return `${formatStageLabel(item.stage)} for ${item.lead_name}`;
@@ -4387,7 +6562,9 @@ function isProposalFollowThrough(item: CRMLeadFollowUp) {
 }
 
 function getNewestThreadTime(item: CRMLeadFollowUp) {
-  const timestamps = item.recent_email_threads.map((thread) => new Date(thread.last_message_at).getTime()).filter((value) => !Number.isNaN(value));
+  const timestamps = item.recent_email_threads
+    .map((thread) => new Date(thread.last_message_at).getTime())
+    .filter((value) => !Number.isNaN(value));
   if (!timestamps.length) {
     return null;
   }
@@ -4396,19 +6573,35 @@ function getNewestThreadTime(item: CRMLeadFollowUp) {
 
 function getLatestContextEntry(item: CRMLeadFollowUp) {
   const timeline = [...item.timeline];
-  timeline.sort((left, right) => new Date(right.occurred_at).getTime() - new Date(left.occurred_at).getTime());
+  timeline.sort(
+    (left, right) =>
+      new Date(right.occurred_at).getTime() -
+      new Date(left.occurred_at).getTime(),
+  );
   return timeline[0] ?? null;
 }
 
 function getLatestUploadContextEntry(item: CRMLeadFollowUp) {
   const timeline = [...item.timeline]
-    .filter((entry) => entry.kind === "import" || entry.channel === "magic_link" || entry.channel === "image" || entry.channel === "telegram")
-    .sort((left, right) => new Date(right.occurred_at).getTime() - new Date(left.occurred_at).getTime());
+    .filter(
+      (entry) =>
+        entry.kind === "import" ||
+        entry.channel === "magic_link" ||
+        entry.channel === "image" ||
+        entry.channel === "telegram",
+    )
+    .sort(
+      (left, right) =>
+        new Date(right.occurred_at).getTime() -
+        new Date(left.occurred_at).getTime(),
+    );
   return timeline[0] ?? null;
 }
 
 function getReplySummary(item: CRMLeadFollowUp) {
-  const replyThread = item.recent_email_threads.find((thread) => thread.needs_reply);
+  const replyThread = item.recent_email_threads.find(
+    (thread) => thread.needs_reply,
+  );
   if (!replyThread) {
     return item.next_step;
   }
@@ -4416,24 +6609,40 @@ function getReplySummary(item: CRMLeadFollowUp) {
 }
 
 function getReplyThread(item: CRMLeadFollowUp) {
-  return [...item.recent_email_threads]
-    .filter((thread) => thread.needs_reply)
-    .sort((left, right) => new Date(right.last_message_at).getTime() - new Date(left.last_message_at).getTime())[0] ?? null;
+  return (
+    [...item.recent_email_threads]
+      .filter((thread) => thread.needs_reply)
+      .sort(
+        (left, right) =>
+          new Date(right.last_message_at).getTime() -
+          new Date(left.last_message_at).getTime(),
+      )[0] ?? null
+  );
 }
 
 function compareReplyPriority(left: CRMLeadFollowUp, right: CRMLeadFollowUp) {
-  return (getNewestThreadTimestamp(right) - getNewestThreadTimestamp(left)) || compareSoonestFollowUp(left, right);
+  return (
+    getNewestThreadTimestamp(right) - getNewestThreadTimestamp(left) ||
+    compareSoonestFollowUp(left, right)
+  );
 }
 
-function compareReconnectPriority(left: CRMLeadFollowUp, right: CRMLeadFollowUp) {
+function compareReconnectPriority(
+  left: CRMLeadFollowUp,
+  right: CRMLeadFollowUp,
+) {
   return (
-    relationshipStateUrgency(right.relationship_state) - relationshipStateUrgency(left.relationship_state) ||
+    relationshipStateUrgency(right.relationship_state) -
+      relationshipStateUrgency(left.relationship_state) ||
     getLastMeaningfulTimestamp(left) - getLastMeaningfulTimestamp(right) ||
     compareSoonestFollowUp(left, right)
   );
 }
 
-function compareProposalPriority(left: CRMLeadFollowUp, right: CRMLeadFollowUp) {
+function compareProposalPriority(
+  left: CRMLeadFollowUp,
+  right: CRMLeadFollowUp,
+) {
   return (
     Number(right.priority === "high") - Number(left.priority === "high") ||
     compareSoonestFollowUp(left, right) ||
@@ -4441,24 +6650,40 @@ function compareProposalPriority(left: CRMLeadFollowUp, right: CRMLeadFollowUp) 
   );
 }
 
-function compareFreshContextPriority(left: CRMLeadFollowUp, right: CRMLeadFollowUp) {
+function compareFreshContextPriority(
+  left: CRMLeadFollowUp,
+  right: CRMLeadFollowUp,
+) {
   return getLatestContextTimestamp(right) - getLatestContextTimestamp(left);
 }
 
-function compareRecentUploadPriority(left: CRMLeadFollowUp, right: CRMLeadFollowUp) {
-  return getLatestUploadContextTimestamp(right) - getLatestUploadContextTimestamp(left);
+function compareRecentUploadPriority(
+  left: CRMLeadFollowUp,
+  right: CRMLeadFollowUp,
+) {
+  return (
+    getLatestUploadContextTimestamp(right) -
+    getLatestUploadContextTimestamp(left)
+  );
 }
 
 function compareSoonestFollowUp(left: CRMLeadFollowUp, right: CRMLeadFollowUp) {
-  return new Date(left.next_follow_up_at).getTime() - new Date(right.next_follow_up_at).getTime();
+  return (
+    new Date(left.next_follow_up_at).getTime() -
+    new Date(right.next_follow_up_at).getTime()
+  );
 }
 
 function getNewestThreadTimestamp(item: CRMLeadFollowUp) {
-  return getNewestThreadTime(item) ? new Date(getNewestThreadTime(item) as string).getTime() : 0;
+  return getNewestThreadTime(item)
+    ? new Date(getNewestThreadTime(item) as string).getTime()
+    : 0;
 }
 
 function getLastMeaningfulTimestamp(item: CRMLeadFollowUp) {
-  return item.last_meaningful_interaction_at ? new Date(item.last_meaningful_interaction_at).getTime() : 0;
+  return item.last_meaningful_interaction_at
+    ? new Date(item.last_meaningful_interaction_at).getTime()
+    : 0;
 }
 
 function getLatestContextTimestamp(item: CRMLeadFollowUp) {
@@ -4491,10 +6716,10 @@ function hasRecentUploadContext(item: CRMLeadFollowUp) {
 }
 
 function relationshipStateUrgency(state: string) {
-  if (state === "stale") {
+  if (state === "at_risk") {
     return 3;
   }
-  if (state === "at_risk") {
+  if (state === "stale") {
     return 2;
   }
   if (state === "drifting") {
@@ -4503,10 +6728,15 @@ function relationshipStateUrgency(state: string) {
   return 0;
 }
 
-function compareAttentionPriority(left: CRMLeadFollowUp, right: CRMLeadFollowUp) {
+function compareAttentionPriority(
+  left: CRMLeadFollowUp,
+  right: CRMLeadFollowUp,
+) {
   return (
-    Number(right.recent_email_threads.some((thread) => thread.needs_reply)) - Number(left.recent_email_threads.some((thread) => thread.needs_reply)) ||
-    relationshipStateUrgency(right.relationship_state) - relationshipStateUrgency(left.relationship_state) ||
+    Number(right.recent_email_threads.some((thread) => thread.needs_reply)) -
+      Number(left.recent_email_threads.some((thread) => thread.needs_reply)) ||
+    relationshipStateUrgency(right.relationship_state) -
+      relationshipStateUrgency(left.relationship_state) ||
     compareSoonestFollowUp(left, right) ||
     getLastMeaningfulTimestamp(left) - getLastMeaningfulTimestamp(right)
   );
@@ -4533,6 +6763,7 @@ function matchesInboxThread(
       waiting_on_contact: boolean;
       needs_reply: boolean;
       last_message_at: string;
+      message_count: number;
     };
   },
   query: string,
@@ -4575,6 +6806,12 @@ function matchesInboxThread(
   if (filter === "quiet") {
     return isQuietThread(item.thread);
   }
+  if (filter === "unresolved") {
+    return isUnresolvedThread(item.thread);
+  }
+  if (filter === "long_thread") {
+    return isLongThread(item.thread);
+  }
   return true;
 }
 
@@ -4584,7 +6821,22 @@ function isQuietThread(thread: {
   waiting_on_contact: boolean;
 }) {
   const ageMs = Date.now() - new Date(thread.last_message_at).getTime();
-  return !thread.needs_reply && !thread.waiting_on_contact && ageMs >= 1000 * 60 * 60 * 24 * 7;
+  return (
+    !thread.needs_reply &&
+    !thread.waiting_on_contact &&
+    ageMs >= 1000 * 60 * 60 * 24 * 7
+  );
+}
+
+function isUnresolvedThread(thread: {
+  unresolved_hint: string;
+  open_loop: string;
+}) {
+  return Boolean(thread.unresolved_hint.trim() || thread.open_loop.trim());
+}
+
+function isLongThread(thread: { message_count: number }) {
+  return thread.message_count >= 5;
 }
 
 function formatStageLabel(stage: string) {
@@ -4608,6 +6860,13 @@ function formatStageLabel(stage: string) {
     return "Waiting on them";
   }
   return stage;
+}
+
+function formatTimelineEntryLabel(entry: CRMLeadFollowUp["timeline"][number]) {
+  if (isUploadTimelineEntry(entry)) {
+    return "Client-shared context";
+  }
+  return `${entry.kind.replaceAll("_", " ")} · ${entry.channel}`;
 }
 
 function formatDateTime(value: string | null) {
@@ -4638,7 +6897,10 @@ function formatDateOnly(value: string | null) {
   }).format(date);
 }
 
-function matchesRelationshipQuery(item: CRMLeadFollowUp, query: string): boolean {
+function matchesRelationshipQuery(
+  item: CRMLeadFollowUp,
+  query: string,
+): boolean {
   const normalized = query.trim().toLowerCase();
   if (!normalized) {
     return true;
@@ -4651,13 +6913,29 @@ function matchesRelationshipQuery(item: CRMLeadFollowUp, query: string): boolean
     item.next_step,
     item.stage,
     item.contact_channel,
+    item.relationship_context_summary,
+    item.relationship_recent_changes_summary,
+    item.relationship_recent_upload_summary,
+    item.relationship_timing_nudge,
+    item.relationship_reconnect_next_move,
+    ...item.recent_email_threads.flatMap((thread) => [
+      thread.subject,
+      thread.counterpart_email,
+      thread.counterpart_name,
+      thread.memory_summary,
+      thread.open_loop,
+      thread.unresolved_hint,
+    ]),
   ]
     .join(" ")
     .toLowerCase();
   return haystack.includes(normalized);
 }
 
-function matchesRelationshipFilter(item: CRMLeadFollowUp, filter: RelationshipFilter): boolean {
+function matchesRelationshipFilter(
+  item: CRMLeadFollowUp,
+  filter: RelationshipFilter,
+): boolean {
   if (filter === "all") {
     return true;
   }
@@ -4667,7 +6945,10 @@ function matchesRelationshipFilter(item: CRMLeadFollowUp, filter: RelationshipFi
   if (filter === "stale") {
     return item.relationship_state === "stale";
   }
-  return item.relationship_state === "at_risk" || item.relationship_state === "drifting";
+  return (
+    item.relationship_state === "at_risk" ||
+    item.relationship_state === "drifting"
+  );
 }
 
 function isDueNow(value: string): boolean {
@@ -4706,7 +6987,11 @@ function formatRelationshipState(value: string) {
 }
 
 function isMailboxTokenExpiringSoon(connection: CRMMailboxConnection) {
-  if (connection.connection_mode !== "oauth" || !connection.token_expires_at || connection.reauth_required) {
+  if (
+    connection.connection_mode !== "oauth" ||
+    !connection.token_expires_at ||
+    connection.reauth_required
+  ) {
     return false;
   }
   const expiresAt = new Date(connection.token_expires_at).getTime();
@@ -4725,24 +7010,61 @@ function buildSuggestedResponsePresets(lead: CRMLeadFollowUp) {
     length: CRMEmailDraft["length"];
   }> = [];
 
-  const hasReplyPressure = lead.recent_email_threads.some((thread) => thread.needs_reply);
+  const hasReplyPressure = lead.recent_email_threads.some(
+    (thread) => thread.needs_reply,
+  );
   const isProposalMoment = lead.stage.trim().toLowerCase() === "proposal";
   const isReconnectionMoment = isReconnectMoment(lead);
 
   if (hasReplyPressure) {
-    presets.push({ label: "Reply", objective: "follow_up", tone: "warm", length: "short" });
-    presets.push({ label: "Schedule", objective: "follow_up", tone: "direct", length: "short" });
+    presets.push({
+      label: "Reply",
+      objective: "follow_up",
+      tone: "warm",
+      length: "short",
+    });
+    presets.push({
+      label: "Schedule",
+      objective: "follow_up",
+      tone: "direct",
+      length: "short",
+    });
   }
   if (isProposalMoment) {
-    presets.push({ label: "Proposal nudge", objective: "follow_up", tone: "confident", length: "short" });
-    presets.push({ label: "Send recap", objective: "recap", tone: "warm", length: "medium" });
+    presets.push({
+      label: "Proposal nudge",
+      objective: "follow_up",
+      tone: "confident",
+      length: "short",
+    });
+    presets.push({
+      label: "Send recap",
+      objective: "recap",
+      tone: "warm",
+      length: "medium",
+    });
   }
   if (isReconnectionMoment) {
-    presets.push({ label: "Reconnect", objective: "revive", tone: "warm", length: "short" });
+    presets.push({
+      label: "Reconnect",
+      objective: "revive",
+      tone: "warm",
+      length: "short",
+    });
   }
 
-  presets.push({ label: "Recap", objective: "recap", tone: "warm", length: "medium" });
-  presets.push({ label: "Close loop", objective: "close_loop", tone: "direct", length: "short" });
+  presets.push({
+    label: "Recap",
+    objective: "recap",
+    tone: "warm",
+    length: "medium",
+  });
+  presets.push({
+    label: "Close loop",
+    objective: "close_loop",
+    tone: "direct",
+    length: "short",
+  });
 
   const seen = new Set<string>();
   return presets.filter((item) => {
@@ -4755,7 +7077,11 @@ function buildSuggestedResponsePresets(lead: CRMLeadFollowUp) {
 }
 
 function isReconnectMoment(lead: CRMLeadFollowUp) {
-  return lead.relationship_state === "stale" || lead.relationship_state === "drifting" || lead.relationship_state === "at_risk";
+  return (
+    lead.relationship_state === "stale" ||
+    lead.relationship_state === "drifting" ||
+    lead.relationship_state === "at_risk"
+  );
 }
 
 function describeReconnectWindow(lead: CRMLeadFollowUp) {
@@ -4765,7 +7091,14 @@ function describeReconnectWindow(lead: CRMLeadFollowUp) {
   if (lead.relationship_recent_upload_summary) {
     return "Fresh client context gives you a natural reason to step back in.";
   }
-  if (lead.recent_email_threads.some((thread) => thread.continuity_memory || thread.carry_forward_hint || thread.unresolved_hint)) {
+  if (
+    lead.recent_email_threads.some(
+      (thread) =>
+        thread.continuity_memory ||
+        thread.carry_forward_hint ||
+        thread.unresolved_hint,
+    )
+  ) {
     return "Brivoly is still holding enough thread context that you do not need to reopen this cold.";
   }
   if (lead.relationship_reminders.length) {
@@ -4799,7 +7132,12 @@ function formatReminderKind(value: string) {
 
 function isUploadTimelineEntry(entry: CRMLeadFollowUp["timeline"][number]) {
   const normalizedChannel = entry.channel.trim().toLowerCase();
-  return entry.kind === "import" || normalizedChannel === "magic_link" || normalizedChannel === "image" || normalizedChannel === "telegram";
+  return (
+    entry.kind === "import" ||
+    normalizedChannel === "magic_link" ||
+    normalizedChannel === "image" ||
+    normalizedChannel === "telegram"
+  );
 }
 
 function formatUploadHistorySource(entry: CRMLeadFollowUp["timeline"][number]) {
@@ -4817,7 +7155,10 @@ function formatUploadHistorySource(entry: CRMLeadFollowUp["timeline"][number]) {
 }
 
 function hasAdvancedAiAccess(billing: BillingOverview | null) {
-  return billing?.enabled === true && ["active", "trialing"].includes(billing.subscription_status ?? "");
+  return (
+    billing?.enabled === true &&
+    ["active", "trialing"].includes(billing.subscription_status ?? "")
+  );
 }
 
 function formatBillingStatusLabel(status: string | null) {
@@ -4829,5 +7170,10 @@ function formatBillingStatusLabel(status: string | null) {
 
 function isImageFile(fileName: string) {
   const normalized = fileName.toLowerCase();
-  return normalized.endsWith(".png") || normalized.endsWith(".jpg") || normalized.endsWith(".jpeg") || normalized.endsWith(".webp");
+  return (
+    normalized.endsWith(".png") ||
+    normalized.endsWith(".jpg") ||
+    normalized.endsWith(".jpeg") ||
+    normalized.endsWith(".webp")
+  );
 }

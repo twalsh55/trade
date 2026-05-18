@@ -7,15 +7,43 @@ import { useState } from "react";
 import { BrandMark } from "@/components/brand-mark";
 
 const items = [
-  { href: "/clientos", label: "Today", body: "Start where attention matters most" },
-  { href: "/clientos/follow-ups", label: "Relationships", body: "Pick back up with context intact" },
-  { href: "/clientos/inbox", label: "Inbox", body: "Hold onto what changed in email" },
-  { href: "/clientos/pipeline", label: "Attention", body: "See who may be starting to drift" },
-  { href: "/clientos/import", label: "Saved context", body: "Bring old notes and sheets back in" },
-  { href: "/clientos/intake", label: "Dropzones", body: "Simple ways for clients to send updates" },
+  {
+    href: "/clientos",
+    label: "Today",
+    body: "Start where attention matters most",
+  },
+  {
+    href: "/clientos/follow-ups",
+    label: "Relationships",
+    body: "Pick back up with context intact",
+  },
+  {
+    href: "/clientos/inbox",
+    label: "Inbox",
+    body: "Hold onto what changed across email threads",
+  },
+  {
+    href: "/clientos/pipeline",
+    label: "Attention",
+    body: "See who may be starting to cool off",
+  },
+  {
+    href: "/clientos/import",
+    label: "Saved context",
+    body: "Bring old notes and sheets back in",
+  },
+  {
+    href: "/clientos/intake",
+    label: "Dropzones",
+    body: "Simple ways for clients to send updates",
+  },
 ];
 
-export function CRMTaskbar({ authenticated = false }: { authenticated?: boolean }) {
+export function CRMTaskbar({
+  authenticated = false,
+}: {
+  authenticated?: boolean;
+}) {
   const pathname = usePathname();
   const [isSigningOut, setIsSigningOut] = useState(false);
 
@@ -34,7 +62,9 @@ export function CRMTaskbar({ authenticated = false }: { authenticated?: boolean 
         />
         <div>
           <p className="ui-eyebrow-inverse text-cyan-300">Client OS</p>
-          <p className="mt-1 text-xs text-slate-400">Brivoly relationship memory</p>
+          <p className="mt-1 text-xs text-slate-400">
+            Brivoly relationship memory
+          </p>
         </div>
       </div>
       <nav className="mt-6 space-y-3">
