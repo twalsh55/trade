@@ -3766,6 +3766,7 @@ function PipelineBoardPanel({
     )
     .sort((left, right) => compareAttentionPriority(left, right))
     .slice(0, 4);
+  const primaryFragile = needsCareFirst[0] ?? null;
   const memoryCoverageLine =
     ambientMemorySummary?.continuity_summary ||
     "Connect an inbox or calendar if you want quiet continuity to show up here with less manual work.";
@@ -3906,6 +3907,94 @@ function PipelineBoardPanel({
         </div>
       </div>
 
+      {primaryFragile ? (
+        <div className="mt-6 rounded-[1.5rem] border border-slate-900 bg-slate-950 px-5 py-5 text-white shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">
+            Most fragile now
+          </p>
+          <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="max-w-2xl">
+              <p className="text-2xl font-semibold tracking-tight">
+                {primaryFragile.lead_name}
+              </p>
+              <p className="mt-1 text-sm text-slate-300">
+                {primaryFragile.company_name}
+              </p>
+              <p className="mt-4 text-sm leading-6 text-slate-200">
+                {primaryFragile.relationship_reconnect_why_now ||
+                  primaryFragile.relationship_timing_nudge ||
+                  primaryFragile.next_step}
+              </p>
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                <TimelineTileDark
+                  label="Latest saved moment"
+                  value={getLeadCardStory(primaryFragile)}
+                />
+                <TimelineTileDark
+                  label="Best re-entry"
+                  value={
+                    primaryFragile.recent_email_threads.some(
+                      (thread) => thread.needs_reply,
+                    )
+                      ? buildThreadReplyAngle(
+                          getReplyThread(primaryFragile) ??
+                            getNewestThread(primaryFragile)!,
+                        )
+                      : primaryFragile.relationship_reconnect_next_move ||
+                        primaryFragile.next_step
+                  }
+                />
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2 lg:justify-end">
+              <Button
+                type="button"
+                onClick={() => onSelectLead(primaryFragile.id)}
+                className="border border-white/20 bg-white text-slate-950 hover:bg-slate-100"
+              >
+                Open relationship
+              </Button>
+              {primaryFragile.recent_email_threads.some(
+                (thread) => thread.needs_reply,
+              ) ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="border-white/20 bg-transparent text-white hover:bg-white/10 hover:text-white"
+                  onClick={() =>
+                    onRunAction(primaryFragile.id, "/clientos/follow-ups", {
+                      objective: "follow_up",
+                      tone: "warm",
+                      length: "short",
+                      status: "Drafting a reply from Attention...",
+                    })
+                  }
+                >
+                  Draft reply
+                </Button>
+              ) : null}
+              {isReconnectMoment(primaryFragile) ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="border-white/20 bg-transparent text-white hover:bg-white/10 hover:text-white"
+                  onClick={() =>
+                    onRunAction(primaryFragile.id, "/clientos/follow-ups", {
+                      objective: "revive",
+                      tone: "warm",
+                      length: "short",
+                      status: "Drafting a reconnect from Attention...",
+                    })
+                  }
+                >
+                  Draft reconnect
+                </Button>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {needsCareFirst.length ? (
         <div className="mt-6 rounded-[1.5rem] border bg-slate-50/80 p-4">
           <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
@@ -3927,6 +4016,8 @@ function PipelineBoardPanel({
             {needsCareFirst.map((item) => {
               const selected = item.id === selectedLeadId;
               const reconnectable = isReconnectMoment(item);
+              const replyThread = getReplyThread(item);
+              const latestThread = getNewestThread(item);
               return (
                 <div
                   key={`${item.id}-needs-care`}
@@ -3972,6 +4063,35 @@ function PipelineBoardPanel({
                         item.relationship_timing_nudge ||
                         item.next_step}
                     </p>
+                    <div className="mt-3 grid gap-3 md:grid-cols-2">
+                      <TimelineTile
+                        label="Latest saved moment"
+                        value={getLeadCardStory(item)}
+                      />
+                      <TimelineTile
+                        label={
+                          item.recent_email_threads.some(
+                            (thread) => thread.needs_reply,
+                          )
+                            ? "Reply angle"
+                            : "Open loop"
+                        }
+                        value={
+                          item.recent_email_threads.some(
+                            (thread) => thread.needs_reply,
+                          )
+                            ? buildThreadReplyAngle(
+                                replyThread ?? latestThread ?? getNewestThread(item)!,
+                              )
+                            : item.relationship_reconnect_next_move ||
+                              (hasOpenLoop(item)
+                                ? latestThread?.open_loop ||
+                                  latestThread?.unresolved_hint ||
+                                  item.next_step
+                                : item.next_step)
+                        }
+                      />
+                    </div>
                     {reconnectable ? (
                       <div className="mt-3 rounded-xl border bg-slate-50 px-3 py-3">
                         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
@@ -4014,6 +4134,24 @@ function PipelineBoardPanel({
                     >
                       Open relationship
                     </button>
+                    {item.recent_email_threads.some(
+                      (thread) => thread.needs_reply,
+                    ) ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onRunAction(item.id, "/clientos/follow-ups", {
+                            objective: "follow_up",
+                            tone: "warm",
+                            length: "short",
+                            status: "Drafting a reply from Attention...",
+                          })
+                        }
+                        className="rounded-full border border-slate-300 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-700 transition hover:border-slate-500 hover:text-slate-950"
+                      >
+                        Draft reply
+                      </button>
+                    ) : null}
                     {reconnectable ? (
                       <button
                         type="button"
