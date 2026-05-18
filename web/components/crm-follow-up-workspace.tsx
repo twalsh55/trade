@@ -69,6 +69,14 @@ type TodayPriorityCardItem = {
   actionLabel?: string;
   onAction?: () => void;
 };
+type TodayFocusMove = {
+  id: string;
+  label: string;
+  title: string;
+  body: string;
+  actionLabel: string;
+  onAction: () => void;
+};
 
 export function CRMFollowUpWorkspace({
   initialOverview,
@@ -3306,6 +3314,96 @@ function TodayPrioritiesPanel({
   const memoryCoverageLine =
     ambientMemorySummary?.continuity_summary ||
     "Connect an inbox or calendar once and Brivoly can keep more of this context warm for you.";
+  const focusMoves = compactPriorityCards<TodayFocusMove>([
+    replyLead
+      ? {
+          id: `${replyLead.id}-reply-focus`,
+          label: "Reply soon",
+          title: `${replyLead.lead_name} is waiting on you`,
+          body:
+            replyThread?.open_loop ||
+            replyThread?.next_touch_hint ||
+            getReplySummary(replyLead),
+          actionLabel: "Draft reply",
+          onAction: () =>
+            onRunAction(
+              replyLead.id,
+              "/clientos/follow-ups",
+              {
+                objective: "follow_up",
+                tone: "warm",
+                length: "short",
+                status: "Drafting a reply from Today...",
+              },
+              undefined,
+              replyThread?.thread_id ?? null,
+            ),
+        }
+      : null,
+    reconnectLead
+      ? {
+          id: `${reconnectLead.id}-reconnect-focus`,
+          label: "Reconnect gently",
+          title: `${reconnectLead.lead_name} has a soft way back in`,
+          body:
+            reconnectLead.relationship_reconnect_why_now ||
+            reconnectLead.relationship_reconnect_next_move ||
+            reconnectLead.next_step,
+          actionLabel: "Draft reconnect",
+          onAction: () =>
+            onRunAction(reconnectLead.id, "/clientos/follow-ups", {
+              objective: "revive",
+              tone: "warm",
+              length: "short",
+              status: "Drafting a reconnect from Today...",
+            }),
+        }
+      : null,
+    proposalLead
+      ? {
+          id: `${proposalLead.id}-proposal-focus`,
+          label: "Proposal follow-through",
+          title: `${proposalLead.lead_name} needs momentum, not a long chase`,
+          body:
+            proposalLead.next_step ||
+            proposalLead.relationship_timing_nudge ||
+            "Keep the proposal thread moving with one confident nudge.",
+          actionLabel: "Draft nudge",
+          onAction: () =>
+            onRunAction(proposalLead.id, "/clientos/follow-ups", {
+              objective: "follow_up",
+              tone: "confident",
+              length: "short",
+              status: "Drafting a proposal nudge from Today...",
+            }),
+        }
+      : null,
+    recentUploadLead
+      ? {
+          id: `${recentUploadLead.id}-upload-focus`,
+          label: "Fresh client update",
+          title: `${recentUploadLead.lead_name} gave you new context to use`,
+          body:
+            recentUploadLead.relationship_upload_follow_through_hint ||
+            recentUploadLead.relationship_recent_upload_summary ||
+            recentUploadLead.next_step,
+          actionLabel: isReconnectMoment(recentUploadLead)
+            ? "Draft reconnect"
+            : "Draft note",
+          onAction: () =>
+            onRunAction(recentUploadLead.id, "/clientos/follow-ups", {
+              objective: isReconnectMoment(recentUploadLead)
+                ? "revive"
+                : "recap",
+              tone: "warm",
+              length: "short",
+              status: isReconnectMoment(recentUploadLead)
+                ? "Drafting a reconnect from fresh client context..."
+                : "Drafting a note from fresh client context...",
+            }),
+        }
+      : null,
+  ]).slice(0, 4);
 
   return (
     <section className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm">
@@ -3413,6 +3511,51 @@ function TodayPrioritiesPanel({
           </button>
         ))}
       </div>
+      {focusMoves.length ? (
+        <div className="mt-5 rounded-[1.35rem] border bg-slate-50/80 px-5 py-4">
+          <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                Keep close
+              </p>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                These are the warmest openings across replies, reconnects,
+                proposals, and new client context.
+              </p>
+            </div>
+            <p className="text-xs text-slate-500">
+              One quick move in each lane is enough.
+            </p>
+          </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            {focusMoves.map((item) => (
+              <div
+                key={item.id}
+                className="rounded-[1rem] border bg-white px-4 py-4"
+              >
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+                  {item.label}
+                </p>
+                <p className="mt-2 text-sm font-medium text-slate-900">
+                  {item.title}
+                </p>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  {item.body}
+                </p>
+                <div className="mt-4">
+                  <button
+                    type="button"
+                    onClick={item.onAction}
+                    className="rounded-full border border-slate-300 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-700 transition hover:border-slate-500 hover:text-slate-950"
+                  >
+                    {item.actionLabel}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
       <div className="mt-5 grid gap-3 md:grid-cols-3">
         <TodaySignal
           label="Needs care now"
