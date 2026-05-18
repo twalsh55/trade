@@ -6077,6 +6077,36 @@ function RemoteImageCapturePanel({
     }
   }
 
+  async function shareFromDevice() {
+    if (!shareLink) {
+      return;
+    }
+    if (
+      typeof navigator === "undefined" ||
+      typeof navigator.share !== "function"
+    ) {
+      setShareStatus(
+        "System share is not available here. Copy the link or share note instead.",
+      );
+      return;
+    }
+    try {
+      await navigator.share({
+        title: "Client handoff link",
+        text: shareTextMessage || shareMessage,
+        url: shareLink,
+      });
+      setShareStatus("Shared from this device.");
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        return;
+      }
+      setShareStatus(
+        "System share did not complete here. You can still copy the link or note.",
+      );
+    }
+  }
+
   return (
     <section className="rounded-[1.75rem] border bg-white/90 p-6 shadow-sm">
       <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
@@ -6194,6 +6224,12 @@ function RemoteImageCapturePanel({
             <div className="mt-4 flex flex-wrap gap-2">
               <Button
                 type="button"
+                onClick={shareFromDevice}
+              >
+                Share from this device
+              </Button>
+              <Button
+                type="button"
                 variant="outline"
                 onClick={() => copyText(shareLink, "Client link copied.")}
               >
@@ -6227,6 +6263,16 @@ function RemoteImageCapturePanel({
               <p className="mt-3 text-xs text-slate-500">
                 Keep it short. Clients should understand the next step without
                 reading instructions twice.
+              </p>
+            </div>
+            <div className="mt-4 rounded-[1rem] border bg-white px-4 py-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+                Fastest share paths
+              </p>
+              <p className="mt-2 text-sm leading-6 text-slate-700">
+                If you are already on your phone, use the system share button.
+                If you are at your desk, copy the text-friendly note and drop it
+                into iMessage, WhatsApp, Slack, or email.
               </p>
             </div>
             <p className="mt-3 text-xs text-slate-500">
