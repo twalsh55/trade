@@ -5103,6 +5103,46 @@ function PipelineBoardPanel({
                       )
                     : item.relationship_reconnect_next_move || item.next_step}
                 </p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onSelectLead(item.id)}
+                    className="rounded-full border border-slate-300 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-700 transition hover:border-slate-500 hover:text-slate-950"
+                  >
+                    Open relationship
+                  </button>
+                  {item.recent_email_threads.some((thread) => thread.needs_reply) ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onRunAction(item.id, "/clientos/follow-ups", {
+                          objective: "follow_up",
+                          tone: "warm",
+                          length: "short",
+                          status: "Drafting a reply from Attention...",
+                        })
+                      }
+                      className="rounded-full border border-slate-300 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-700 transition hover:border-slate-500 hover:text-slate-950"
+                    >
+                      Draft reply
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onRunAction(item.id, "/clientos/follow-ups", {
+                          objective: "revive",
+                          tone: "warm",
+                          length: "short",
+                          status: "Drafting a reconnect from Attention...",
+                        })
+                      }
+                      className="rounded-full border border-slate-300 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-700 transition hover:border-slate-500 hover:text-slate-950"
+                    >
+                      Draft reconnect
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
